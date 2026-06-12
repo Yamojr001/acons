@@ -15,13 +15,17 @@ class RolesAndPermissionsSeeder extends Seeder
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
         // Clear existing to avoid duplicates when re-seeding
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        DB::table('role_has_permissions')->truncate();
-        DB::table('model_has_roles')->truncate();
-        DB::table('model_has_permissions')->truncate();
-        DB::table('roles')->truncate();
-        DB::table('permissions')->truncate();
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('TRUNCATE TABLE role_has_permissions, model_has_roles, model_has_permissions, roles, permissions CASCADE');
+        } else {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+            DB::table('role_has_permissions')->truncate();
+            DB::table('model_has_roles')->truncate();
+            DB::table('model_has_permissions')->truncate();
+            DB::table('roles')->truncate();
+            DB::table('permissions')->truncate();
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        }
 
         $entities = [
             'settings', 'roles', 'users', 'lecturers', 'students', 

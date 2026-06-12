@@ -134,7 +134,7 @@ export default function Landing({ tenant, stats, auth, admission_form }: Landing
                     bursar: '/bursary/dashboard',
                     admission_officer: '/admissions/dashboard',
                     exam_officer: '/exam-office/dashboard',
-                    provost: '/registrar/dashboard',
+                    provost: '/provost/dashboard',
                     hod: '/hod/dashboard',
                     dean: '/dean/dashboard',
                   }[auth.user.role] ?? '/'

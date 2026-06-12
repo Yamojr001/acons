@@ -1,9 +1,9 @@
 <?php return array(
     'root' => array(
         'name' => 'edusaas/platform',
-        'pretty_version' => '1.0.0+no-version-set',
-        'version' => '1.0.0.0',
-        'reference' => null,
+        'pretty_version' => 'dev-master',
+        'version' => 'dev-master',
+        'reference' => '32db25971bc46a273a03503441a30a73edeee86e',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -149,9 +149,9 @@
             'dev_requirement' => false,
         ),
         'edusaas/platform' => array(
-            'pretty_version' => '1.0.0+no-version-set',
-            'version' => '1.0.0.0',
-            'reference' => null,
+            'pretty_version' => 'dev-master',
+            'version' => 'dev-master',
+            'reference' => '32db25971bc46a273a03503441a30a73edeee86e',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

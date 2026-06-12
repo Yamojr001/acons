@@ -20,39 +20,20 @@ class AuthController extends Controller {
             $secs = RateLimiter::availableIn($key);
             throw ValidationException::withMessages(['email' => ["Too many attempts. Try again in {$secs} seconds."]]);
         }
-        $tenantId = app()->has('currentTenant') ? app('currentTenant')->id : null;
-        $query = User::where('email', $request->email)->where('is_active', true);
-        if ($tenantId) {
-            $query->where('tenant_id', $tenantId);
-        }
-        $user = $query->first();
+
+        $user = User::where('email', $request->email)->where('is_active', true)->first();
+
         if (!$user || !Hash::check($request->password, $user->password)) {
             RateLimiter::hit($key, config('auth.throttle.decay_seconds', 900));
             $remaining = RateLimiter::remaining($key, $maxAttempts);
             throw ValidationException::withMessages(['email' => ["The provided credentials are incorrect. You have {$remaining} attempts remaining."]]);
         }
-        // Universal Gateway: Centralizing login flow for global users
+
         Auth::login($user, $request->boolean('remember'));
         $request->session()->regenerate();
+        RateLimiter::clear($key);
 
-        $intendedPath = $this->dashboardRoute($user->role);
-        
-        // If a valid tenant student/staff logs into the ROOT domain, automatically route them into their isolated subdomain space!
-        if (!$tenantId && $user->tenant_id && !$user->hasRole('super_admin')) {
-            $tenant = \App\Models\Tenant::find($user->tenant_id);
-            $host = $tenant->subdomain . '.' . str_replace(['http://', 'https://'], '', config('app.url'));
-            
-            // Localhost fallback for URL assembling (JS URL object crashes on subdomain.127.0.0.1)
-            if (str_contains(request()->getHost(), '127.0.0.1')) {
-                $port = request()->getPort();
-                $host = $tenant->subdomain . '.localhost' . ($port !== 80 && $port !== 443 ? ':' . $port : '');
-            }
-            
-            $url = request()->getScheme() . '://' . $host . $intendedPath;
-            return Inertia::location($url);
-        }
-
-        return redirect()->intended($intendedPath);
+        return redirect()->intended($this->dashboardRoute($user->role));
     }
 
     public function logout(Request $request): RedirectResponse {
@@ -89,7 +70,6 @@ class AuthController extends Controller {
 
     private function dashboardRoute(string $role): string {
         return match($role) {
-            User::ROLE_SUPER_ADMIN       => '/superadmin/dashboard',
             User::ROLE_SCHOOL_ADMIN      => '/admin/dashboard',
             User::ROLE_LECTURER          => '/lecturer/dashboard',
             User::ROLE_TEACHER           => '/lecturer/dashboard',
@@ -98,10 +78,10 @@ class AuthController extends Controller {
             User::ROLE_BURSAR            => '/bursary/dashboard',
             User::ROLE_ADMISSION_OFFICER => '/admissions/dashboard',
             User::ROLE_EXAM_OFFICER      => '/exam-office/dashboard',
-            User::ROLE_PROVOST           => '/admin/dashboard', // Provost uses Admin dash
+            User::ROLE_PROVOST           => '/provost/dashboard',
             User::ROLE_HOD               => '/hod/dashboard',
             User::ROLE_DEAN              => '/dean/dashboard',
-            default                 => '/',
+            default                      => '/',
         };
     }
 }

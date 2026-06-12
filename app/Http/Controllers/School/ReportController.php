@@ -27,9 +27,9 @@ class ReportController extends Controller
     {
         return Inertia::render('SchoolAdmin/Reports/Financial', [
             'monthly_revenue' => Payment::where('status','successful')
-                ->selectRaw("DATE_FORMAT(created_at, '%b %Y') as month, sum(amount) as total")
-                ->groupBy(DB::raw("DATE_FORMAT(created_at, '%Y-%m')"), DB::raw("DATE_FORMAT(created_at, '%b %Y')"))
-                ->orderBy(DB::raw("DATE_FORMAT(created_at, '%Y-%m')"))
+                ->selectRaw("TO_CHAR(created_at,'Mon YYYY') as month, sum(amount) as total")
+                ->groupBy(DB::raw("TO_CHAR(created_at,'YYYY-MM')"), DB::raw("TO_CHAR(created_at,'Mon YYYY')"))
+                ->orderBy(DB::raw("TO_CHAR(created_at,'YYYY-MM')"))
                 ->get(),
             'fees_summary' => [
                 'collected' => Fee::where('status','paid')->sum('amount'),
@@ -51,7 +51,7 @@ class ReportController extends Controller
                 ? Grade::join('exams', 'grades.exam_id','=','exams.id')
                     ->join('subjects', 'exams.subject_id','=','subjects.id')
                     ->where('exams.class_room_id', $classId)
-                    ->selectRaw('subjects.name as subject, avg(grades.score) as avg_score')
+                    ->selectRaw('subjects.name as subject, avg(grades.total_score) as avg_score')
                     ->groupBy('subjects.id','subjects.name')
                     ->get() : collect(),
             'filters' => $request->only('class_room_id'),
@@ -62,10 +62,10 @@ class ReportController extends Controller
     {
         return Inertia::render('SchoolAdmin/Reports/Attendance', [
             'classrooms' => ClassRoom::orderBy('name')->get(['id','name']),
-            'monthly_trend' => Attendance::selectRaw("DATE_FORMAT(date, '%b') as month, status, count(*) as count")
+            'monthly_trend' => Attendance::selectRaw("TO_CHAR(date,'Mon') as month, status, count(*) as count")
                 ->where('date', '>=', now()->subMonths(6))
-                ->groupBy(DB::raw("DATE_FORMAT(date, '%Y-%m')"), DB::raw("DATE_FORMAT(date, '%b')"), 'status')
-                ->orderBy(DB::raw("DATE_FORMAT(date, '%Y-%m')"))
+                ->groupBy(DB::raw("TO_CHAR(date,'YYYY-MM')"), DB::raw("TO_CHAR(date,'Mon')"), 'status')
+                ->orderBy(DB::raw("TO_CHAR(date,'YYYY-MM')"))
                 ->get(),
             'filters' => $request->only('class_room_id'),
         ]);

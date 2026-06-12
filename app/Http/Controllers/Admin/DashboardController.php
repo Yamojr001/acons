@@ -21,18 +21,18 @@ class DashboardController extends Controller
         $monthlyRevenue = Payment::withoutGlobalScopes()
             ->where('status','successful')
             ->where('created_at','>=',now()->subMonths(6))
-            ->select(DB::raw("DATE_FORMAT(created_at,'%b') as month"), DB::raw('SUM(amount) as amount'))
-            ->groupBy(DB::raw("DATE_FORMAT(created_at,'%Y-%m')"), DB::raw("DATE_FORMAT(created_at,'%b')"))
-            ->orderBy(DB::raw("DATE_FORMAT(created_at,'%Y-%m')"))
+            ->select(DB::raw("TO_CHAR(created_at,'Mon') as month"), DB::raw('SUM(amount) as amount'))
+            ->groupBy(DB::raw("TO_CHAR(created_at,'YYYY-MM')"), DB::raw("TO_CHAR(created_at,'Mon')"))
+            ->orderBy(DB::raw("TO_CHAR(created_at,'YYYY-MM')"))
             ->get();
 
         $schoolGrowth = Tenant::select(
-                DB::raw("DATE_FORMAT(created_at,'%b') as month"),
+                DB::raw("TO_CHAR(created_at,'Mon') as month"),
                 DB::raw('COUNT(*) as count')
             )
             ->where('created_at','>=',now()->subMonths(8))
-            ->groupBy(DB::raw("DATE_FORMAT(created_at,'%Y-%m')"), DB::raw("DATE_FORMAT(created_at,'%b')"))
-            ->orderBy(DB::raw("DATE_FORMAT(created_at,'%Y-%m')"))
+            ->groupBy(DB::raw("TO_CHAR(created_at,'YYYY-MM')"), DB::raw("TO_CHAR(created_at,'Mon')"))
+            ->orderBy(DB::raw("TO_CHAR(created_at,'YYYY-MM')"))
             ->get();
 
         $schools = Tenant::withCount([

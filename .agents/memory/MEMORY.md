@@ -1,0 +1,5 @@
+- [Vite dev server & static build](vite-static-build.md) — Vite HMR writes http://0.0.0.0:443 hot file in Replit; use `npm run build` + PHP-only workflow instead.
+- [Grades table columns](grades-columns.md) — Grade model uses total_score/ca_score/exam_score/grade_letter (NOT score/letter_grade); DB has no score column.
+- [Course registrations relationship](course-registrations.md) — Course model relationship is registrations() not courseRegistrations().
+- [PostgreSQL date formatting](pg-date-format.md) — Use TO_CHAR(col,'Mon YYYY') not DATE_FORMAT(col,'%b %Y') — MySQL syntax crashes on PostgreSQL.
+- [Provost result release architecture](provost-security.md) — Provost has exclusive result release; registrar is read-only; routes at /provost/* with role:provost middleware.

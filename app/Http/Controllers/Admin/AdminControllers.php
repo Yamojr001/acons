@@ -24,14 +24,14 @@ class DashboardController extends Controller
                 'monthly_revenue' => Payment::withoutTenantScope()
                     ->where('status','successful')
                     ->where('created_at','>=', now()->subMonths(6))
-                    ->selectRaw("DATE_FORMAT(created_at,'%b') as month, sum(amount) as amount")
-                    ->groupBy(DB::raw("DATE_FORMAT(created_at,'%Y-%m')"), DB::raw("DATE_FORMAT(created_at,'%b')"))
-                    ->orderBy(DB::raw("DATE_FORMAT(created_at,'%Y-%m')"))
+                    ->selectRaw("TO_CHAR(created_at,'Mon') as month, sum(amount) as amount")
+                    ->groupBy(DB::raw("TO_CHAR(created_at,'YYYY-MM')"), DB::raw("TO_CHAR(created_at,'Mon')"))
+                    ->orderBy(DB::raw("TO_CHAR(created_at,'YYYY-MM')"))
                     ->get(),
                 'school_growth' => Tenant::where('created_at','>=', now()->subMonths(6))
-                    ->selectRaw("DATE_FORMAT(created_at,'%b') as month, count(*) as count")
-                    ->groupBy(DB::raw("DATE_FORMAT(created_at,'%Y-%m')"), DB::raw("DATE_FORMAT(created_at,'%b')"))
-                    ->orderBy(DB::raw("DATE_FORMAT(created_at,'%Y-%m')"))
+                    ->selectRaw("TO_CHAR(created_at,'Mon') as month, count(*) as count")
+                    ->groupBy(DB::raw("TO_CHAR(created_at,'YYYY-MM')"), DB::raw("TO_CHAR(created_at,'Mon')"))
+                    ->orderBy(DB::raw("TO_CHAR(created_at,'YYYY-MM')"))
                     ->get(),
             ],
             'schools'       => $schools->map(fn ($t) => array_merge($t->toArray(), [
@@ -145,9 +145,9 @@ class AnalyticsController extends Controller
             'top_schools' => Tenant::withCount('students')
                 ->orderByDesc('students_count')->limit(10)->get(),
             'monthly_signups' => Tenant::where('created_at','>=', now()->subYear())
-                ->selectRaw("DATE_FORMAT(created_at,'%b %Y') as month, count(*) as count")
-                ->groupBy(DB::raw("DATE_FORMAT(created_at,'%Y-%m')"), DB::raw("DATE_FORMAT(created_at,'%b %Y')"))
-                ->orderBy(DB::raw("DATE_FORMAT(created_at,'%Y-%m')"))
+                ->selectRaw("TO_CHAR(created_at,'Mon YYYY') as month, count(*) as count")
+                ->groupBy(DB::raw("TO_CHAR(created_at,'YYYY-MM')"), DB::raw("TO_CHAR(created_at,'Mon YYYY')"))
+                ->orderBy(DB::raw("TO_CHAR(created_at,'YYYY-MM')"))
                 ->get(),
         ]);
     }

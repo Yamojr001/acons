@@ -13,16 +13,16 @@ import type { PageProps } from '@/types'
 
 const navConfig: Record<string, Array<{ label: string; href: string; icon: ReactNode }>> = {
   provost: [
-    { label: 'Dashboard',     href: '/admin/dashboard',        icon: <LayoutDashboard size={17} /> },
-    { label: 'Student Records', href: '/registrar/students',   icon: <GraduationCap size={17} /> },
-    { label: 'Staff Directory', href: '/registrar/lecturers',  icon: <UserCheck size={17} /> },
-    { label: 'Departments', href: '/registrar/faculties', icon: <School size={17} /> },
-    { label: 'Academic Calendar', href: '/registrar/calendar',  icon: <Calendar size={17} /> },
-    { label: 'Admissions',    href: '/registrar/admissions',   icon: <FileText size={17} /> },
-    { label: 'Fee Schedules', href: '/bursary/fees',           icon: <DollarSign size={17} /> },
-    { label: 'Transaction Logs', href: '/bursary/payments',    icon: <Wallet size={17} /> },
-    { label: 'Expenses',      href: '/bursary/expenses',       icon: <CreditCard size={17} /> },
-    { label: 'Notices',       href: '/registrar/announcements', icon: <Megaphone size={17} /> },
+    { label: 'Dashboard',         href: '/provost/dashboard',            icon: <LayoutDashboard size={17} /> },
+    { label: 'Result Release',    href: '/provost/results',              icon: <CheckCircle size={17} /> },
+    { label: 'Student Records',   href: '/provost/registrar/students',   icon: <GraduationCap size={17} /> },
+    { label: 'Staff Directory',   href: '/provost/registrar/dashboard',  icon: <UserCheck size={17} /> },
+    { label: 'Departments',       href: '/provost/registrar/faculties',  icon: <School size={17} /> },
+    { label: 'Academic Calendar', href: '/provost/registrar/calendar',   icon: <Calendar size={17} /> },
+    { label: 'Admissions',        href: '/provost/registrar/admissions', icon: <FileText size={17} /> },
+    { label: 'Fee Schedules',     href: '/provost/bursary/fees',         icon: <DollarSign size={17} /> },
+    { label: 'Financial Reports', href: '/provost/bursary/reports',      icon: <Wallet size={17} /> },
+    { label: 'Notices',           href: '/provost/announcements',        icon: <Megaphone size={17} /> },
   ],
   super_admin: [
     { label: 'Dashboard',   href: '/superadmin/dashboard',   icon: <LayoutDashboard size={17} /> },
