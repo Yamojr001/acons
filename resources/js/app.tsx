@@ -11,7 +11,7 @@ router.on('start',  () => NProgress.start())
 router.on('finish', () => NProgress.done())
 router.on('error',  () => NProgress.done())
 
-const appName = import.meta.env.VITE_APP_NAME ?? 'Ameenatu'
+const appName = import.meta.env.VITE_APP_NAME ?? 'Ameenatu College of Nursing'
 
 createInertiaApp({
   title: (title) => title ? `${title} · ${appName}` : appName,
