@@ -1,5 +1,10 @@
 <?php
 return [
+    'zainpay' => [
+        'public_key'   => env('ZAINPAY_PUBLIC_KEY'),
+        'zainbox_code' => env('ZAINPAY_ZAINBOX_CODE'),
+        'mode'         => env('ZAINPAY_MODE', 'dev'),
+    ],
     'stripe' => [
         'public'  => env('STRIPE_PUBLIC_KEY'),
         'secret'  => env('STRIPE_SECRET_KEY'),

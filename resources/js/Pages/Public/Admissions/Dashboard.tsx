@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Head, router } from '@inertiajs/react'
 import { motion } from 'framer-motion'
 import { 
-  Heart, LogOut, CheckCircle, Clock, Calendar, 
+  LogOut, CheckCircle, Clock, Calendar, 
   MapPin, Printer, ClipboardCheck, Phone, ShieldAlert, Sparkles, Award
 } from 'lucide-react'
 
@@ -194,8 +194,8 @@ export default function Dashboard({ tenant, applicant, academicSession, admissio
           {/* Header bar */}
           <nav className="fixed top-0 left-0 right-0 z-40 bg-white border-b border-surface-200 shadow-sm h-16 flex items-center justify-between px-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold bg-blue-600 shadow-md">
-                <Heart size={20} className="animate-pulse" />
+              <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center bg-white border border-blue-100 shadow-sm">
+                <img src="/assets/images/acons_logo.png" alt="ACONS" className="w-full h-full object-contain p-1" />
               </div>
               <div>
                 <span className="font-display font-black text-sm tracking-tight text-surface-900 block leading-none">ACONS PORTAL</span>

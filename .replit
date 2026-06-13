@@ -23,6 +23,7 @@ SESSION_DRIVER = "file"
 CACHE_STORE = "file"
 QUEUE_CONNECTION = "sync"
 VITE_APP_NAME = "EduSaaS"
+ZAINPAY_MODE = "dev"
 
 [workflows]
 runButton = "Project"
@@ -51,3 +52,7 @@ waitForPort = 5000
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5173
+externalPort = 5173

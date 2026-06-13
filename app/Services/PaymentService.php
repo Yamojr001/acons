@@ -17,6 +17,7 @@ class PaymentService
             'stripe'   => $this->initiateStripe($fee, $callbackUrl),
             'paystack' => $this->initiatePaystack($fee, $callbackUrl),
             'monnify'  => $this->initiateMonnify($fee, $callbackUrl),
+            'zainpay'  => $this->initiateZainPay($fee, $callbackUrl),
             'sandbox'  => $this->initiateSandbox($fee, $callbackUrl),
             default    => throw new \InvalidArgumentException("Unknown gateway: {$gateway}"),
         };
@@ -30,6 +31,7 @@ class PaymentService
             'stripe'   => $this->verifyStripe($reference),
             'paystack' => $this->verifyPaystack($reference),
             'monnify'  => $this->verifyMonnify($reference),
+            'zainpay'  => $this->verifyZainPay($reference),
             'sandbox'  => $this->verifySandbox($reference),
             default    => false,
         };
@@ -165,6 +167,52 @@ class PaymentService
 
         return $response['responseBody']['accessToken']
             ?? throw new \RuntimeException('Monnify authentication failed');
+    }
+
+    // ─── ZainPay ──────────────────────────────────────────────────────────────
+
+    private function zainPayBaseUrl(): string
+    {
+        return config('services.zainpay.mode', 'dev') === 'production'
+            ? 'https://api.zainpay.ng'
+            : 'https://dev.zainpay.ng';
+    }
+
+    private function initiateZainPay(Fee $fee, string $callbackUrl): array
+    {
+        $txnRef   = 'ZAP_' . Str::uuid();
+        $response = Http::withToken(config('services.zainpay.public_key'))
+            ->post($this->zainPayBaseUrl() . '/zainbox/payment/initialize', [
+                'amount'        => (string) intval($fee->amount),
+                'txnRef'        => $txnRef,
+                'payerEmail'    => $fee->student->user->email,
+                'payerMobileNo' => $fee->student->phone ?? '08000000000',
+                'zainboxCode'   => config('services.zainpay.zainbox_code'),
+                'callbackUrl'   => $callbackUrl . '?gateway=zainpay&ref=' . $txnRef,
+            ])->json();
+
+        if (($response['code'] ?? '') !== '00') {
+            throw new \RuntimeException('ZainPay: ' . ($response['description'] ?? 'Initialization failed'));
+        }
+
+        return [
+            'redirect_url' => $response['data'],
+            'reference'    => $txnRef,
+        ];
+    }
+
+    private function verifyZainPay(string $reference): bool
+    {
+        try {
+            $response = Http::withToken(config('services.zainpay.public_key'))
+                ->get($this->zainPayBaseUrl() . '/zainbox/payment/verify/' . $reference)
+                ->json();
+
+            return ($response['code'] ?? '') === '00'
+                && ($response['data']['status'] ?? '') === 'success';
+        } catch (\Exception) {
+            return false;
+        }
     }
 
     // ─── Sandbox (Local Dev Only) ─────────────────────────────────────────────

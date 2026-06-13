@@ -8,6 +8,7 @@ use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -142,11 +143,10 @@ class PublicApplicantController extends Controller
     }
 
     /**
-     * Show mock ACONS admission form fee gateway screen.
+     * Show ACONS admission form fee gateway screen (ZainPay).
      */
-    public function showPaymentPage(Applicant $applicant): Response
+    public function showPaymentPage(Applicant $applicant)
     {
-        // Safety: if already paid, forward to success login
         if ($applicant->payment_status === 'paid') {
             return redirect()->route('admissions.login')->with('success', 'Your fee is already cleared. Please log in.');
         }
@@ -154,18 +154,124 @@ class PublicApplicantController extends Controller
         $tenant = app('currentTenant');
 
         return Inertia::render('Public/Admissions/PaymentGateway', [
-            'tenant' => $tenant,
-            'applicant' => $applicant,
+            'tenant'     => $tenant,
+            'applicant'  => $applicant,
             'fee_amount' => 14700.00,
-            'monnify' => [
-                'apiKey' => config('services.monnify.api_key'),
-                'contractCode' => config('services.monnify.contract_code'),
-            ]
         ]);
     }
 
     /**
-     * Authorize and record applicant form fee payment.
+     * Initialize a ZainPay payment session and redirect applicant to ZainPay.
+     */
+    public function zainpayInit(Applicant $applicant)
+    {
+        if ($applicant->payment_status === 'paid') {
+            return Inertia::location(route('admissions.login'));
+        }
+
+        $txnRef      = 'ACON_ADM_' . $applicant->id . '_' . time();
+        $callbackUrl = route('admissions.pay.verify', $applicant->id);
+        $mode        = config('services.zainpay.mode', 'dev');
+        $baseUrl     = $mode === 'production' ? 'https://api.zainpay.ng' : 'https://dev.zainpay.ng';
+
+        $response = Http::withToken(config('services.zainpay.public_key'))
+            ->post("{$baseUrl}/zainbox/payment/initialize", [
+                'amount'        => (string) 14700,
+                'txnRef'        => $txnRef,
+                'payerEmail'    => $applicant->email ?: $applicant->jamb_number . '@acons.edu.ng',
+                'payerMobileNo' => $applicant->phone_number,
+                'zainboxCode'   => config('services.zainpay.zainbox_code'),
+                'callbackUrl'   => $callbackUrl . '?txnRef=' . $txnRef,
+            ])->json();
+
+        if (($response['code'] ?? '') !== '00') {
+            return back()->withErrors(['payment' => 'ZainPay initialization failed: ' . ($response['description'] ?? 'Unknown error. Check your ZainPay credentials.')]);
+        }
+
+        // Stash ref in session for verification fallback
+        session(['zainpay_txn_' . $applicant->id => $txnRef]);
+
+        return Inertia::location($response['data']);
+    }
+
+    /**
+     * Verify ZainPay callback after applicant completes payment.
+     */
+    public function zainpayVerify(Request $request, Applicant $applicant)
+    {
+        if ($applicant->payment_status === 'paid') {
+            return redirect()->route('admissions.login')->with('success', 'Fee already cleared. Please log in.');
+        }
+
+        $txnRef  = $request->query('txnRef', session('zainpay_txn_' . $applicant->id));
+        $mode    = config('services.zainpay.mode', 'dev');
+        $baseUrl = $mode === 'production' ? 'https://api.zainpay.ng' : 'https://dev.zainpay.ng';
+
+        if (!$txnRef) {
+            return redirect()->route('admissions.pay', $applicant->id)
+                ->with('error', 'Payment reference missing. Please try again.');
+        }
+
+        try {
+            $verify = Http::withToken(config('services.zainpay.public_key'))
+                ->get("{$baseUrl}/zainbox/payment/verify/{$txnRef}")
+                ->json();
+        } catch (\Exception $e) {
+            return redirect()->route('admissions.pay', $applicant->id)
+                ->with('error', 'Could not verify payment. Please contact support.');
+        }
+
+        if (($verify['code'] ?? '') === '00' && ($verify['data']['status'] ?? '') === 'success') {
+            $applicant->update([
+                'payment_status'    => 'paid',
+                'amount_paid'       => 14700.00,
+                'payment_reference' => $txnRef,
+            ]);
+
+            $this->createAdmissionApplication($applicant);
+
+            return redirect()->route('admissions.login')
+                ->with('success', 'Payment successful! Log in with your JAMB Number and Phone Number.');
+        }
+
+        return redirect()->route('admissions.pay', $applicant->id)
+            ->with('error', 'Payment not confirmed yet. Please complete payment or contact support if you were charged.');
+    }
+
+    /**
+     * Create the AdmissionApplication record after successful payment.
+     */
+    private function createAdmissionApplication(Applicant $applicant): void
+    {
+        $tenant       = app('currentTenant');
+        $admissionForm = \App\Models\AdmissionForm::where('tenant_id', $tenant->id)->where('is_active', true)->first();
+
+        \App\Models\AdmissionApplication::create([
+            'tenant_id'        => $tenant->id,
+            'admission_form_id' => $admissionForm ? $admissionForm->id : 1,
+            'applicant_name'   => $applicant->full_name,
+            'applicant_email'  => $applicant->email,
+            'status'           => 'pending',
+            'data'             => [
+                'jamb_number'         => $applicant->jamb_number,
+                'phone_number'        => $applicant->phone_number,
+                'jamb_score'          => $applicant->jamb_score,
+                'state_of_origin'     => $applicant->state_of_origin,
+                'lga'                 => $applicant->lga,
+                'gender'              => $applicant->sex,
+                'date_of_birth'       => $applicant->dob ? $applicant->dob->format('Y-m-d') : null,
+                'first_sitting_type'  => $applicant->first_sitting_type,
+                'first_sitting_no'    => $applicant->first_sitting_no,
+                'first_sitting_grades' => $applicant->first_sitting_grades,
+                'second_sitting_type' => $applicant->second_sitting_type,
+                'second_sitting_no'   => $applicant->second_sitting_no,
+                'second_sitting_grades' => $applicant->second_sitting_grades,
+            ],
+        ]);
+    }
+
+    /**
+     * Legacy authorize fallback (kept for any direct POST scenarios).
      */
     public function authorizePayment(Request $request, Applicant $applicant)
     {
@@ -173,40 +279,16 @@ class PublicApplicantController extends Controller
             return redirect()->route('admissions.login')->with('success', 'Fee already authorized.');
         }
 
-        $tenant = app('currentTenant');
-        
         $applicant->update([
-            'payment_status' => 'paid',
-            'amount_paid' => 14700.00,
-            'payment_reference' => 'ACON_ADM_' . strtoupper(Str::random(12))
+            'payment_status'    => 'paid',
+            'amount_paid'       => 14700.00,
+            'payment_reference' => 'ACON_ADM_' . strtoupper(Str::random(12)),
         ]);
 
-        $admissionForm = \App\Models\AdmissionForm::where('tenant_id', $tenant->id)->where('is_active', true)->first();
+        $this->createAdmissionApplication($applicant);
 
-        \App\Models\AdmissionApplication::create([
-            'tenant_id' => $tenant->id,
-            'admission_form_id' => $admissionForm ? $admissionForm->id : 1,
-            'applicant_name' => $applicant->full_name,
-            'applicant_email' => $applicant->email,
-            'status' => 'pending',
-            'data' => [
-                'jamb_number' => $applicant->jamb_number,
-                'phone_number' => $applicant->phone_number,
-                'jamb_score' => $applicant->jamb_score,
-                'state_of_origin' => $applicant->state_of_origin,
-                'lga' => $applicant->lga,
-                'gender' => $applicant->sex,
-                'date_of_birth' => $applicant->dob ? $applicant->dob->format('Y-m-d') : null,
-                'first_sitting_type' => $applicant->first_sitting_type,
-                'first_sitting_no' => $applicant->first_sitting_no,
-                'first_sitting_grades' => $applicant->first_sitting_grades,
-                'second_sitting_type' => $applicant->second_sitting_type,
-                'second_sitting_no' => $applicant->second_sitting_no,
-                'second_sitting_grades' => $applicant->second_sitting_grades,
-            ]
-        ]);
-
-        return redirect()->route('admissions.login')->with('success', 'Payment authorized successfully! You can now log in using your JAMB Number and Phone Number.');
+        return redirect()->route('admissions.login')
+            ->with('success', 'Payment authorized! Log in with your JAMB Number and Phone Number.');
     }
 
     /**

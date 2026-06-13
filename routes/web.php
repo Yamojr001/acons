@@ -29,12 +29,19 @@ Route::middleware(['identify.tenant'])->group(function () {
     Route::post('/admissions/apply/{form}',[PublicAdmissionController::class, 'submit'])->name('public.admission.submit');
 
     // ACONS Dedicated Applicant Portal
-    Route::get('/admissions/apply',               [PublicApplicantController::class, 'showApplyForm'])->name('admissions.apply');
-    Route::post('/admissions/apply',              [PublicApplicantController::class, 'submitApplyForm'])->name('admissions.apply.submit');
-    Route::get('/admissions/pay/{applicant}',     [PublicApplicantController::class, 'showPaymentPage'])->name('admissions.pay');
+    Route::get('/admissions/apply',                      [PublicApplicantController::class, 'showApplyForm'])->name('admissions.apply');
+    Route::post('/admissions/apply',                     [PublicApplicantController::class, 'submitApplyForm'])->name('admissions.apply.submit');
+    Route::get('/admissions/pay/{applicant}',            [PublicApplicantController::class, 'showPaymentPage'])->name('admissions.pay');
+    Route::post('/admissions/pay/{applicant}/init',      [PublicApplicantController::class, 'zainpayInit'])->name('admissions.pay.zainpay.init');
+    Route::get('/admissions/pay/{applicant}/verify',     [PublicApplicantController::class, 'zainpayVerify'])->name('admissions.pay.verify');
     Route::post('/admissions/pay/authorize/{applicant}', [PublicApplicantController::class, 'authorizePayment'])->name('admissions.pay.authorize');
-    Route::get('/admissions/login',               [PublicApplicantController::class, 'showLoginForm'])->name('admissions.login');
-    Route::post('/admissions/login',              [PublicApplicantController::class, 'login'])->name('admissions.login.submit');
+    Route::get('/admissions/login',                      [PublicApplicantController::class, 'showLoginForm'])->name('admissions.login');
+    Route::post('/admissions/login',                     [PublicApplicantController::class, 'login'])->name('admissions.login.submit');
+
+    // ZainPay webhook (CSRF exempt)
+    Route::post('/webhooks/zainpay', [WebhookController::class, 'zainpay'])
+        ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class])
+        ->name('webhooks.zainpay');
 
     Route::middleware(['auth:applicant'])->group(function () {
         Route::get('/admissions/status',  [PublicApplicantController::class, 'dashboard'])->name('admissions.dashboard');

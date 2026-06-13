@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Head, useForm, Link } from '@inertiajs/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Heart, ChevronRight, ChevronLeft, CheckCircle, 
+  ChevronRight, ChevronLeft, CheckCircle, 
   User, BookOpen, GraduationCap, Users, ShieldAlert, Sparkles
 } from 'lucide-react'
 
@@ -135,8 +135,8 @@ export default function Apply({ tenant, programs }: ApplyProps) {
       {/* ── Navbar ─────────────────────────────────────────────────────── */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-surface-200 shadow-sm h-16 flex items-center justify-between px-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold bg-blue-600 shadow-md">
-            <Heart size={20} className="animate-pulse" />
+          <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center bg-white border border-blue-100 shadow-sm">
+            <img src="/assets/images/acons_logo.png" alt="ACONS" className="w-full h-full object-contain p-1" />
           </div>
           <div>
             <span className="font-display font-black text-sm tracking-tight text-surface-900 block leading-none">ACONS PORTAL</span>
@@ -162,8 +162,8 @@ export default function Apply({ tenant, programs }: ApplyProps) {
               className="bg-white rounded-3xl p-8 md:p-12 border border-surface-200 shadow-xl space-y-8 text-left"
             >
               <div className="text-center pb-6 border-b border-surface-200 space-y-3">
-                <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-white bg-blue-600 font-bold shadow-md">
-                  <Heart size={32} />
+                <div className="w-16 h-16 mx-auto rounded-2xl overflow-hidden flex items-center justify-center bg-white border border-blue-100 shadow-md">
+                  <img src="/assets/images/acons_logo.png" alt="ACONS" className="w-full h-full object-contain p-2" />
                 </div>
                 <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest block">Entry Guidelines Criteria</span>
                 <h2 className="text-2xl md:text-3xl font-black text-surface-900 font-display">SECTION A: GENERAL ADMISSION CRITERIA</h2>

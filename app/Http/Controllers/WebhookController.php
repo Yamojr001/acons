@@ -43,4 +43,34 @@ class WebhookController extends Controller {
         }
         return response()->json(['requestSuccessful' => true]);
     }
+
+    public function zainpay(Request $request): JsonResponse {
+        $payload = $request->json()->all();
+        $data    = $payload['data'] ?? [];
+        $txnRef  = $data['txnRef'] ?? '';
+        $status  = $data['status'] ?? '';
+
+        if ($status === 'success' && $txnRef) {
+            // Re-verify independently before fulfilling
+            try {
+                $mode    = config('services.zainpay.mode', 'dev');
+                $baseUrl = $mode === 'production' ? 'https://api.zainpay.ng' : 'https://dev.zainpay.ng';
+                $verify  = \Illuminate\Support\Facades\Http::withToken(config('services.zainpay.public_key'))
+                    ->get("{$baseUrl}/zainbox/payment/verify/{$txnRef}")
+                    ->json();
+
+                if (($verify['code'] ?? '') === '00' && ($verify['data']['status'] ?? '') === 'success') {
+                    $this->ps->markSuccessful($txnRef, [
+                        'zainpay_ref'  => $txnRef,
+                        'payer_email'  => $data['payerEmail'] ?? '',
+                        'amount_after' => $data['amountAfterCharges'] ?? 0,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('ZainPay webhook processing: ' . $e->getMessage());
+            }
+        }
+
+        return response()->json(['received' => true]);
+    }
 }
