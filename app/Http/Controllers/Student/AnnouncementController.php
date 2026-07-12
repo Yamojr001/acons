@@ -13,7 +13,7 @@ class AnnouncementController extends Controller
 {
     public function index(): Response
     {
-        $announcements = Announcement::whereIn('audience', ['all', 'students'])
+        $announcements = Announcement::whereIn('audience', ['all', 'student', 'students'])
             ->whereNotNull('published_at')
             ->orderByDesc('published_at')
             ->paginate(20);

@@ -16,7 +16,7 @@ const navConfig: Record<string, Array<{ label: string; href: string; icon: React
     { label: 'Dashboard',         href: '/provost/dashboard',            icon: <LayoutDashboard size={17} /> },
     { label: 'Result Release',    href: '/provost/results',              icon: <CheckCircle size={17} /> },
     { label: 'Student Records',   href: '/provost/registrar/students',   icon: <GraduationCap size={17} /> },
-    { label: 'Staff Directory',   href: '/provost/registrar/dashboard',  icon: <UserCheck size={17} /> },
+    { label: 'Staff Directory',   href: '/provost/registrar/lecturers',  icon: <UserCheck size={17} /> },
     { label: 'Departments',       href: '/provost/registrar/faculties',  icon: <School size={17} /> },
     { label: 'Academic Calendar', href: '/provost/registrar/calendar',   icon: <Calendar size={17} /> },
     { label: 'Admissions',        href: '/provost/registrar/admissions', icon: <FileText size={17} /> },
@@ -120,7 +120,7 @@ function Sidebar({ open, onClose, tenant, user, currentPath }: SidebarProps) {
         animate={{ x: open ? 0 : -280 }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         className="fixed top-0 left-0 h-full w-64 border-r border-white/10 flex flex-col z-40 lg:translate-x-0 lg:static lg:h-screen shadow-xl"
-        style={{ background: 'linear-gradient(180deg, var(--color-tenant-primary, #1d4ed8), var(--color-tenant-secondary, #a31d1d))' }}
+        style={{ background: 'var(--color-tenant-primary, #2e5fa9)' }}
       >
         {/* Brand */}
         <div className="flex items-center gap-3 px-5 h-16 border-b border-white/10 flex-shrink-0">
@@ -192,7 +192,7 @@ function Sidebar({ open, onClose, tenant, user, currentPath }: SidebarProps) {
 function Topbar({ onMenuClick, title, user }: { onMenuClick: () => void; title?: string; user: any }) {
   return (
     <header className="h-16 shadow-sm flex items-center px-4 lg:px-6 gap-4 sticky top-0 z-20 text-white" 
-      style={{ background: 'linear-gradient(135deg, var(--color-tenant-primary, #1d4ed8), var(--color-tenant-secondary, #a31d1d))' }}>
+      style={{ background: 'var(--color-tenant-primary, #2e5fa9)' }}>
       <button onClick={onMenuClick} className="lg:hidden p-2 rounded-xl text-white/80 hover:bg-white/20 transition-colors"><Menu size={20} /></button>
       {title && <h1 className="text-lg font-semibold text-white hidden sm:block">{title}</h1>}
       <div className="flex items-center gap-2 ml-auto">

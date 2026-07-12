@@ -201,7 +201,9 @@ export default function StudentIndex({ students, departments, filters, auth }: P
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                       <Button variant="ghost" size="sm" iconLeft={<Eye size={14} />}>View</Button>
+                       <Link href={isProvost ? `/provost/registrar/students/${student.id}` : `/registrar/students/${student.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-50 border border-surface-200 hover:bg-surface-100 hover:border-surface-300 rounded-lg text-xs font-bold text-surface-600 transition-colors">
+                          <Eye size={14} /> View
+                       </Link>
                        <button className="p-2 rounded-lg text-surface-400 hover:bg-surface-100 transition-colors">
                           <MoreVertical size={16} />
                        </button>

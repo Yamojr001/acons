@@ -12,25 +12,47 @@ class ResultController extends Controller
 {
     public function index(): Response
     {
-        $student = Auth::user()->student;
+        $student = Auth::user()->student->load(['user', 'department']);
         $cacheKey = 'student_results_' . $student->id;
 
-        $groupedResults = \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addDays(1), function() use ($student) {
-            // Fetch all approved grades for the student
-            $results = Grade::whereHas('registration', function($q) use ($student) {
-                    $q->where('student_id', $student->id);
-                })
-                ->where('approval_status', 'approved')
-                ->with(['registration.course', 'registration.semester.academicSession'])
-                ->latest()
-                ->get();
+        $allApprovedGrades = Grade::whereHas('registration', function($q) use ($student) {
+                $q->where('student_id', $student->id);
+            })
+            ->where('approval_status', 'approved')
+            ->with(['registration.course', 'registration.semester.academicSession'])
+            ->latest()
+            ->get();
 
+        $totalPoints = $allApprovedGrades->sum(fn($g) => $g->grade_points * $g->registration->course->credit_units);
+        $totalUnits = $allApprovedGrades->sum(fn($g) => $g->registration->course->credit_units);
+        $cgpa = $totalUnits > 0 ? round($totalPoints / $totalUnits, 2) : 0.00;
+
+        $reseatCourseCodes = [];
+        if (!empty($student->reseat_course_ids)) {
+            $reseatCourseCodes = \App\Models\Course::whereIn('id', $student->reseat_course_ids)->pluck('code')->toArray();
+        }
+
+        $studentDetails = [
+            'name' => $student->user->name,
+            'matric_number' => $student->matriculation_number,
+            'level' => $student->current_level,
+            'department' => $student->department->name ?? 'N/A',
+            'avatar_url' => $student->user->avatar_url,
+            'cgpa' => $cgpa,
+            'total_load' => $totalUnits,
+            'academic_status' => $student->academic_status ?? 'normal',
+            'reseat_courses' => $reseatCourseCodes,
+        ];
+
+        $groupedResults = \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addDays(1), function() use ($allApprovedGrades) {
             // Group results by Session and Semester
-            return $results->groupBy(function($g) {
+            return $allApprovedGrades->groupBy(function($g) {
                 return $g->registration->semester->academicSession->name . ' - ' . $g->registration->semester->name;
             })->map(function($grades, $sessionName) {
+                $semesterLoad = $grades->sum(fn($g) => $g->registration->course->credit_units);
                 return [
                     'session_name' => $sessionName,
+                    'semester_load' => $semesterLoad,
                     'grades' => $grades->map(fn($g) => [
                         'course_code' => $g->registration->course->code,
                         'course_name' => $g->registration->course->name,
@@ -46,6 +68,7 @@ class ResultController extends Controller
 
         return Inertia::render('Student/Results', [
             'groupedResults' => $groupedResults,
+            'studentDetails' => $studentDetails,
         ]);
     }
 

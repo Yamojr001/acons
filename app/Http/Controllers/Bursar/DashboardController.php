@@ -168,9 +168,9 @@ class DashboardController extends Controller
 
         $monthly_revenue = Payment::where('tenant_id', $tenant->id)
             ->where('status', 'successful')
-            ->selectRaw("TO_CHAR(created_at, 'Mon YYYY') as month, SUM(amount) as collected")
-            ->groupBy(\Illuminate\Support\Facades\DB::raw("TO_CHAR(created_at,'YYYY-MM')"), \Illuminate\Support\Facades\DB::raw("TO_CHAR(created_at,'Mon YYYY')"))
-            ->orderBy(\Illuminate\Support\Facades\DB::raw("TO_CHAR(created_at,'YYYY-MM')"))
+            ->selectRaw("DATE_FORMAT(created_at, '%b %Y') as month, SUM(amount) as collected")
+            ->groupBy(\Illuminate\Support\Facades\DB::raw("DATE_FORMAT(created_at,'%Y-%m')"), \Illuminate\Support\Facades\DB::raw("DATE_FORMAT(created_at,'%b %Y')"))
+            ->orderBy(\Illuminate\Support\Facades\DB::raw("DATE_FORMAT(created_at,'%Y-%m')"))
             ->get()
             ->map(function ($item) {
                 return [

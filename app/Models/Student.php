@@ -51,6 +51,7 @@ class Student extends Model
     public function department(): BelongsTo  { return $this->belongsTo(Department::class); }
     public function program(): BelongsTo     { return $this->belongsTo(Program::class); }
     public function invoices(): HasMany      { return $this->hasMany(StudentInvoice::class); }
+    public function payments()               { return $this->hasManyThrough(Payment::class, StudentInvoice::class); }
     public function registrations(): HasMany { return $this->hasMany(CourseRegistration::class); }
     public function academicRecords(): HasMany { return $this->hasMany(AcademicRecord::class); }
 

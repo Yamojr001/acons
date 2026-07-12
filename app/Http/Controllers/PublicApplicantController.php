@@ -171,17 +171,17 @@ class PublicApplicantController extends Controller
 
         $txnRef      = 'ACON_ADM_' . $applicant->id . '_' . time();
         $callbackUrl = route('admissions.pay.verify', $applicant->id);
-        $mode        = config('services.zainpay.mode', 'dev');
-        $baseUrl     = $mode === 'production' ? 'https://api.zainpay.ng' : 'https://dev.zainpay.ng';
+        $mode        = config('services.zainpay.mode', 'sandbox');
+        $baseUrl     = $mode === 'production' ? 'https://api.zainpay.ng' : 'https://sandbox.zainpay.ng';
 
-        $response = Http::withToken(config('services.zainpay.public_key'))
-            ->post("{$baseUrl}/zainbox/payment/initialize", [
+        $response = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
+            ->post("{$baseUrl}/zainbox/card/initialize/payment", [
                 'amount'        => (string) 14700,
                 'txnRef'        => $txnRef,
-                'payerEmail'    => $applicant->email ?: $applicant->jamb_number . '@acons.edu.ng',
-                'payerMobileNo' => $applicant->phone_number,
+                'emailAddress'  => $applicant->email ?: $applicant->jamb_number . '@acons.edu.ng',
+                'mobileNumber'  => $applicant->phone_number,
                 'zainboxCode'   => config('services.zainpay.zainbox_code'),
-                'callbackUrl'   => $callbackUrl . '?txnRef=' . $txnRef,
+                'callBackUrl'   => $callbackUrl . '?txnRef=' . $txnRef,
             ])->json();
 
         if (($response['code'] ?? '') !== '00') {
@@ -204,8 +204,8 @@ class PublicApplicantController extends Controller
         }
 
         $txnRef  = $request->query('txnRef', session('zainpay_txn_' . $applicant->id));
-        $mode    = config('services.zainpay.mode', 'dev');
-        $baseUrl = $mode === 'production' ? 'https://api.zainpay.ng' : 'https://dev.zainpay.ng';
+        $mode    = config('services.zainpay.mode', 'sandbox');
+        $baseUrl = $mode === 'production' ? 'https://api.zainpay.ng' : 'https://sandbox.zainpay.ng';
 
         if (!$txnRef) {
             return redirect()->route('admissions.pay', $applicant->id)
@@ -213,7 +213,7 @@ class PublicApplicantController extends Controller
         }
 
         try {
-            $verify = Http::withToken(config('services.zainpay.public_key'))
+            $verify = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
                 ->get("{$baseUrl}/zainbox/payment/verify/{$txnRef}")
                 ->json();
         } catch (\Exception $e) {
@@ -302,6 +302,8 @@ class PublicApplicantController extends Controller
             'tenant' => $tenant
         ]);
     }
+
+
 
     /**
      * Authenticate applicant credentials.

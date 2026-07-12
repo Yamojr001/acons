@@ -15,9 +15,10 @@ class AnnouncementController extends Controller
     {
         $lecturer = Auth::user()->lecturer;
         $courses = Course::where('lecturer_id', $lecturer->id)->get();
-        $notices = Announcement::where('created_by', Auth::id())
-            ->latest()
-            ->get();
+        $notices = Announcement::where(function ($query) {
+            $query->where('created_by', Auth::id())
+                  ->orWhereIn('audience', ['all', 'lecturer', 'staff']);
+        })->latest()->get();
 
         return Inertia::render('Lecturer/Announcements', [
             'notices' => $notices,

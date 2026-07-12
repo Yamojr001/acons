@@ -17,13 +17,4 @@ export default defineConfig({
             '~': path.resolve(__dirname, 'resources'),
         },
     },
-    server: {
-        host: '0.0.0.0',
-        port: 5173,
-        hmr: {
-            clientPort: 443,
-        },
-        cors: true,
-        allowedHosts: true,
-    },
 })

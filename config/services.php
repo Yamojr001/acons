@@ -1,10 +1,5 @@
 <?php
 return [
-    'zainpay' => [
-        'public_key'   => env('ZAINPAY_PUBLIC_KEY'),
-        'zainbox_code' => env('ZAINPAY_ZAINBOX_CODE'),
-        'mode'         => env('ZAINPAY_MODE', 'dev'),
-    ],
     'stripe' => [
         'public'  => env('STRIPE_PUBLIC_KEY'),
         'secret'  => env('STRIPE_SECRET_KEY'),
@@ -23,5 +18,12 @@ return [
         'contract_code' => env('MONNIFY_CONTRACT_CODE'),
         'base_url'      => env('MONNIFY_BASE_URL'),
         'currency'      => env('MONNIFY_CURRENCY', 'NGN'),
+    ],
+    'zainpay' => [
+        'public_key'   => env('ZAINPAY_PUBLIC_KEY'),
+        'secret_key'   => env('ZAINPAY_SECRET_KEY'),
+        'zainbox_code' => env('ZAINPAY_ZAINBOX_CODE'),
+        'mode'         => env('ZAINPAY_MODE', 'dev'),
+        'base_url'     => env('ZAINPAY_BASE_URL', 'https://api.zainpay.ng'),
     ],
 ];

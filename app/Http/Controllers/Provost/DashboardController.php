@@ -73,9 +73,8 @@ class DashboardController extends Controller
 
                     $gradeStats = Grade::whereIn('course_registration_id', $registrationIds)
                         ->selectRaw("
-                            COUNT(*) as total,
                             COUNT(CASE WHEN approval_status = 'hod_approved' THEN 1 END) as pending,
-                            ROUND(AVG(CASE WHEN total_score IS NOT NULL THEN total_score END)::numeric, 1) as avg_score
+                            ROUND(AVG(CASE WHEN total_score IS NOT NULL THEN total_score END), 1) as avg_score
                         ")
                         ->first();
 
@@ -86,7 +85,7 @@ class DashboardController extends Controller
                         'credit_units'   => $course->credit_units,
                         'department'     => $course->department?->name,
                         'lecturer'       => $course->lecturer?->user?->name ?? 'Unassigned',
-                        'total_students' => $gradeStats->total ?? 0,
+                        'total_students' => $registrationIds->count(),
                         'pending_grades' => $gradeStats->pending ?? 0,
                         'avg_score'      => $gradeStats->avg_score ?? 0,
                     ];
@@ -95,14 +94,14 @@ class DashboardController extends Controller
 
         // Recently released results
         $recentReleases = Grade::where('approval_status', 'approved')
-            ->with(['courseRegistration.course.department', 'courseRegistration.student.user'])
+            ->with(['registration.course.department', 'registration.student.user'])
             ->latest('updated_at')
             ->limit(10)
             ->get()
             ->map(fn($g) => [
-                'student'   => $g->courseRegistration?->student?->user?->name,
-                'matric'    => $g->courseRegistration?->student?->matriculation_number,
-                'course'    => $g->courseRegistration?->course?->code,
+                'student'   => $g->registration?->student?->user?->name,
+                'matric'    => $g->registration?->student?->matriculation_number,
+                'course'    => $g->registration?->course?->code,
                 'score'     => $g->total_score,
                 'grade'     => $g->grade_letter,
                 'released'  => $g->updated_at?->diffForHumans(),
@@ -147,12 +146,11 @@ class DashboardController extends Controller
 
                 $counts = Grade::whereIn('course_registration_id', $registrationIds)
                     ->selectRaw("
-                        COUNT(*) as total,
                         COUNT(CASE WHEN approval_status = 'draft' THEN 1 END) as draft,
                         COUNT(CASE WHEN approval_status = 'submitted' THEN 1 END) as submitted,
                         COUNT(CASE WHEN approval_status = 'hod_approved' THEN 1 END) as hod_approved,
                         COUNT(CASE WHEN approval_status = 'approved' THEN 1 END) as approved,
-                        ROUND(AVG(CASE WHEN total_score IS NOT NULL THEN total_score END)::numeric, 1) as avg_score
+                        ROUND(AVG(CASE WHEN total_score IS NOT NULL THEN total_score END), 1) as avg_score
                     ")
                     ->first();
 
@@ -164,7 +162,7 @@ class DashboardController extends Controller
                     'department'   => $course->department?->name,
                     'lecturer'     => $course->lecturer?->user?->name ?? 'Unassigned',
                     'counts'       => [
-                        'total'       => $counts->total ?? 0,
+                        'total'       => $registrationIds->count(),
                         'draft'       => $counts->draft ?? 0,
                         'submitted'   => $counts->submitted ?? 0,
                         'hod_approved'=> $counts->hod_approved ?? 0,
@@ -204,6 +202,18 @@ class DashboardController extends Controller
 
         if ($registrationIds->isEmpty()) {
             return back()->with('error', 'No course registrations found for the active semester.');
+        }
+
+        $pendingRegistrations = CourseRegistration::where('semester_id', $currentSemester->id)
+            ->where(function($query) {
+                $query->whereDoesntHave('grade')
+                      ->orWhereHas('grade', function($q) {
+                          $q->whereIn('approval_status', ['draft', 'submitted']);
+                      });
+            })->count();
+
+        if ($pendingRegistrations > 0) {
+            return back()->with('error', "Release blocked! There are {$pendingRegistrations} student results still pending lecturer submission or HOD approval. All courses must be HOD-approved before releasing.");
         }
 
         $count = Grade::whereIn('course_registration_id', $registrationIds)
@@ -247,6 +257,18 @@ class DashboardController extends Controller
 
         if ($registrationIds->isEmpty()) {
             return back()->with('error', 'No registrations found for this course in the active semester.');
+        }
+
+        $pendingRegistrations = CourseRegistration::where('semester_id', $currentSemester->id)
+            ->where(function($query) {
+                $query->whereDoesntHave('grade')
+                      ->orWhereHas('grade', function($q) {
+                          $q->whereIn('approval_status', ['draft', 'submitted']);
+                      });
+            })->count();
+
+        if ($pendingRegistrations > 0) {
+            return back()->with('error', "Release blocked! There are {$pendingRegistrations} student results across the school still pending lecturer submission or HOD approval. All results must be HOD-approved before any course can be released.");
         }
 
         $count = Grade::whereIn('course_registration_id', $registrationIds)

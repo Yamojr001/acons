@@ -33,6 +33,7 @@ class FeeController extends Controller
             config('services.stripe.secret')       ? 'stripe'   : null,
             config('services.paystack.secret_key') ? 'paystack' : null,
             config('services.monnify.api_key')     ? 'monnify'  : null,
+            config('services.zainpay.public_key')  ? 'zainpay'  : null,
             app()->environment('local')            ? 'sandbox'  : null,
         ]));
 
@@ -54,6 +55,7 @@ class FeeController extends Controller
             config('services.stripe.secret')       ? 'stripe'   : null,
             config('services.paystack.secret_key') ? 'paystack' : null,
             config('services.monnify.api_key')     ? 'monnify'  : null,
+            config('services.zainpay.public_key')  ? 'zainpay'  : null,
             app()->environment('local')            ? 'sandbox'  : null,
         ]));
 
@@ -65,7 +67,7 @@ class FeeController extends Controller
 
     public function pay(Request $request, Fee $fee)
     {
-        $request->validate(['gateway' => 'required|in:stripe,paystack,monnify,sandbox']);
+        $request->validate(['gateway' => 'required|in:stripe,paystack,monnify,zainpay,sandbox']);
 
         $guardian = Auth::user()->guardian;
         $owns     = $guardian && $guardian->students()->where('students.id', $fee->student_id)->exists();

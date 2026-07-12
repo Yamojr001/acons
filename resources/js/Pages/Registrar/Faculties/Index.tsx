@@ -212,29 +212,32 @@ export default function FacultyIndex({ faculties, auth }: Props) {
                       Active Students by Level
                     </h3>
                     <div className="space-y-3">
-                      {[100, 200, 300, 400].map((lvl) => {
-                        const count = selectedDept.level_breakdown?.[lvl] ?? 0
-                        const total = selectedDept.students_count || 1
-                        const percentage = Math.round((count / total) * 100)
-                        return (
-                          <div key={lvl} className="p-3 bg-surface-50/50 rounded-xl border border-surface-100/30 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-white border border-surface-100 flex items-center justify-center text-xs font-bold text-surface-700">
-                                {lvl}
+                      {Object.keys(selectedDept.level_breakdown || {}).length > 0 ? (
+                        Object.entries(selectedDept.level_breakdown).map(([lvl, count]: [string, any]) => {
+                          const total = selectedDept.students_count || 1
+                          const percentage = Math.round((Number(count) / total) * 100)
+                          return (
+                            <div key={lvl} className="p-3 bg-surface-50/50 rounded-xl border border-surface-100/30 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-8 rounded-lg bg-white border border-surface-100 flex items-center justify-center text-[10px] font-bold text-surface-700">
+                                  {lvl.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4)}
+                                </div>
+                                <span className="text-xs font-semibold text-surface-600">{lvl}</span>
                               </div>
-                              <span className="text-xs font-semibold text-surface-600">Level {lvl}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <div className="w-24 bg-surface-100 h-2 rounded-full overflow-hidden hidden sm:block">
-                                <div className="bg-brand-500 h-full rounded-full transition-all duration-500" style={{ width: `${percentage}%` }} />
+                              <div className="flex items-center gap-3">
+                                <div className="w-24 bg-surface-100 h-2 rounded-full overflow-hidden hidden sm:block">
+                                  <div className="bg-brand-500 h-full rounded-full transition-all duration-500" style={{ width: `${percentage}%` }} />
+                                </div>
+                                <span className="text-xs font-bold text-surface-800 bg-white border border-surface-100 px-2 py-0.5 rounded-md min-w-[28px] text-center">
+                                  {count}
+                                </span>
                               </div>
-                              <span className="text-xs font-bold text-surface-800 bg-white border border-surface-100 px-2 py-0.5 rounded-md min-w-[28px] text-center">
-                                {count}
-                              </span>
                             </div>
-                          </div>
-                        )
-                      })}
+                          )
+                        })
+                      ) : (
+                        <p className="text-xs text-surface-400">No active students.</p>
+                      )}
                     </div>
                   </div>
                 </div>

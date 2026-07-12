@@ -120,7 +120,7 @@ export default function ProvostAnnouncements({ announcements, roles = [] }: Prop
               initial={{ opacity: 0, scale: 0.97, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.97, y: 10 }}
-              className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 w-full max-w-lg mx-auto bg-white rounded-2xl shadow-2xl"
+              className="fixed inset-x-4 top-[5vh] md:top-[10vh] z-50 w-full max-w-lg mx-auto bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
             >
               <div className="p-6 border-b border-surface-100 flex items-center justify-between">
                 <h3 className="font-bold text-surface-900 text-lg">New Announcement</h3>

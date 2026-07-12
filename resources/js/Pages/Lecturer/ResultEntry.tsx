@@ -43,16 +43,20 @@ export default function ResultEntry({ courses, students, selectedCourseId, selec
   }, [students])
 
   useEffect(() => {
-    setData(d => ({
-      ...d,
-      course_id: selectedCourseId,
-      results: localResults
-    }))
-  }, [selectedCourseId, localResults])
+    setLocalResults(students)
+  }, [students])
 
   const handleScoreChange = (index: number, field: 'ca_score' | 'exam_score', value: string) => {
     const updated = [...localResults]
-    const numValue = value === '' ? null : parseFloat(value)
+    let numValue = value === '' ? null : parseFloat(value)
+    
+    // Prevent exceeding max capacity
+    if (numValue !== null) {
+      if (field === 'ca_score' && numValue > 30) numValue = 30;
+      if (field === 'exam_score' && numValue > 70) numValue = 70;
+      if (numValue < 0) numValue = 0;
+    }
+
     updated[index][field] = numValue
     
     // Auto-calculate total and grade for UI feedback
@@ -88,9 +92,23 @@ export default function ResultEntry({ courses, students, selectedCourseId, selec
     return 'F'
   }
 
+  const [isSaving, setIsSaving] = useState(false);
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    post(`/lecturer/courses/${selectedCourseId}/grades`)
+    setIsSaving(true)
+    router.post(`/lecturer/courses/${selectedCourseId}/grades`, {
+      course_id: selectedCourseId,
+      results: localResults
+    }, {
+      preserveState: true,
+      preserveScroll: true,
+      onFinish: () => setIsSaving(false),
+      onError: (errors) => {
+        const errorMsg = Object.values(errors)[0] as string;
+        alert("Failed to save draft: " + errorMsg);
+      }
+    })
   }
 
   const handleSubmitToHod = () => {
@@ -123,15 +141,15 @@ export default function ResultEntry({ courses, students, selectedCourseId, selec
                 <Button 
                   variant="outline" 
                   onClick={submit} 
-                  disabled={processing} 
+                  disabled={isSaving} 
                   iconLeft={<Save size={18} />}
                 >
-                  {processing ? 'Saving...' : 'Save Draft'}
+                  {isSaving ? 'Saving...' : 'Save Draft'}
                 </Button>
                 <Button 
                   variant="brand" 
                   onClick={handleSubmitToHod} 
-                  disabled={processing || localResults.length === 0} 
+                  disabled={isSaving || localResults.length === 0} 
                   iconLeft={<Send size={18} />}
                 >
                   Submit to HOD

@@ -50,6 +50,18 @@ class StudentController extends Controller
         ]);
     }
 
+    public function show($id)
+    {
+        $tenant = app('currentTenant');
+        $student = Student::with(['user', 'department', 'registrations.course', 'registrations.semester', 'payments'])
+            ->where('tenant_id', $tenant->id)
+            ->findOrFail($id);
+
+        return Inertia::render('Registrar/Students/Show', [
+            'student' => $student
+        ]);
+    }
+
     public function create()
     {
         abort(403, 'Unauthorized action. Registrars cannot manually enroll/add students.');

@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react'
+import { Head, useForm, router } from '@inertiajs/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   CheckCircle, AlertCircle, X, Search, FileText, 
@@ -59,8 +59,7 @@ export default function HODResultsIndex({ courses, department_name, semester_nam
 
   const handleApprove = (courseId: number) => {
     if (confirm('Are you sure you want to approve and finalize this grades sheet? Approved scores will immediately be visible to students.')) {
-      post('/hod/results/approve', {
-        data: { course_id: courseId },
+      router.post('/hod/results/approve', { course_id: courseId }, {
         onSuccess: () => {
           setSelectedCourse(null)
         }

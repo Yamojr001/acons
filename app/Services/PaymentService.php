@@ -17,7 +17,7 @@ class PaymentService
             'stripe'   => $this->initiateStripe($fee, $callbackUrl),
             'paystack' => $this->initiatePaystack($fee, $callbackUrl),
             'monnify'  => $this->initiateMonnify($fee, $callbackUrl),
-            'zainpay'  => $this->initiateZainPay($fee, $callbackUrl),
+            'zainpay'  => $this->initiateZainpay($fee, $callbackUrl),
             'sandbox'  => $this->initiateSandbox($fee, $callbackUrl),
             default    => throw new \InvalidArgumentException("Unknown gateway: {$gateway}"),
         };
@@ -31,7 +31,7 @@ class PaymentService
             'stripe'   => $this->verifyStripe($reference),
             'paystack' => $this->verifyPaystack($reference),
             'monnify'  => $this->verifyMonnify($reference),
-            'zainpay'  => $this->verifyZainPay($reference),
+            'zainpay'  => $this->verifyZainpay($reference),
             'sandbox'  => $this->verifySandbox($reference),
             default    => false,
         };
@@ -169,47 +169,39 @@ class PaymentService
             ?? throw new \RuntimeException('Monnify authentication failed');
     }
 
-    // ─── ZainPay ──────────────────────────────────────────────────────────────
+    // ─── Zainpay ──────────────────────────────────────────────────────────────
 
-    private function zainPayBaseUrl(): string
+    private function initiateZainpay(Fee $fee, string $callbackUrl): array
     {
-        return config('services.zainpay.mode', 'dev') === 'production'
-            ? 'https://api.zainpay.ng'
-            : 'https://dev.zainpay.ng';
-    }
+        $reference = 'ZNP_' . Str::uuid();
 
-    private function initiateZainPay(Fee $fee, string $callbackUrl): array
-    {
-        $txnRef   = 'ZAP_' . Str::uuid();
         $response = Http::withToken(config('services.zainpay.public_key'))
-            ->post($this->zainPayBaseUrl() . '/zainbox/payment/initialize', [
-                'amount'        => (string) intval($fee->amount),
-                'txnRef'        => $txnRef,
-                'payerEmail'    => $fee->student->user->email,
-                'payerMobileNo' => $fee->student->phone ?? '08000000000',
-                'zainboxCode'   => config('services.zainpay.zainbox_code'),
-                'callbackUrl'   => $callbackUrl . '?gateway=zainpay&ref=' . $txnRef,
+            ->post(config('services.zainpay.base_url', 'https://api.zainpay.ng') . '/zainbox/card/initialize/payment', [
+                'amount'       => (string) $fee->amount,
+                'emailAddress' => $fee->student->user->email,
+                'txnRef'       => $reference,
+                'zainboxCode'  => config('services.zainpay.zainbox_code'),
+                'callBackUrl'  => $callbackUrl . '?gateway=zainpay&ref=' . $reference,
             ])->json();
 
-        if (($response['code'] ?? '') !== '00') {
-            throw new \RuntimeException('ZainPay: ' . ($response['description'] ?? 'Initialization failed'));
+        if (!isset($response['code']) || $response['code'] !== '00') {
+            throw new \RuntimeException('Zainpay: ' . ($response['description'] ?? 'Initialization failed'));
         }
 
         return [
-            'redirect_url' => $response['data'],
-            'reference'    => $txnRef,
+            'redirect_url' => $response['data']['url'] ?? '',
+            'reference'    => $reference,
         ];
     }
 
-    private function verifyZainPay(string $reference): bool
+    private function verifyZainpay(string $reference): bool
     {
         try {
             $response = Http::withToken(config('services.zainpay.public_key'))
-                ->get($this->zainPayBaseUrl() . '/zainbox/payment/verify/' . $reference)
+                ->get(config('services.zainpay.base_url', 'https://api.zainpay.ng') . '/zainbox/transactions/' . $reference)
                 ->json();
 
-            return ($response['code'] ?? '') === '00'
-                && ($response['data']['status'] ?? '') === 'success';
+            return isset($response['data']['status']) && strtolower($response['data']['status']) === 'success';
         } catch (\Exception) {
             return false;
         }

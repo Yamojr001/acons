@@ -8,6 +8,16 @@ use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
+|─── WEBHOOKS (no auth/csrf) ──────────────────────────────────────────────
+*/
+Route::prefix('webhooks')->name('webhooks.')->group(function () {
+    Route::post('/stripe', [WebhookController::class, 'stripe'])->name('stripe');
+    Route::post('/paystack', [WebhookController::class, 'paystack'])->name('paystack');
+    Route::post('/monnify', [WebhookController::class, 'monnify'])->name('monnify');
+    Route::post('/zainpay', [WebhookController::class, 'zainpay'])->name('zainpay');
+});
+
+/*
 |─── PUBLIC (no auth required) ──────────────────────────────────────────────
 */
 Route::middleware(['identify.tenant'])->group(function () {
@@ -29,19 +39,14 @@ Route::middleware(['identify.tenant'])->group(function () {
     Route::post('/admissions/apply/{form}',[PublicAdmissionController::class, 'submit'])->name('public.admission.submit');
 
     // ACONS Dedicated Applicant Portal
-    Route::get('/admissions/apply',                      [PublicApplicantController::class, 'showApplyForm'])->name('admissions.apply');
-    Route::post('/admissions/apply',                     [PublicApplicantController::class, 'submitApplyForm'])->name('admissions.apply.submit');
-    Route::get('/admissions/pay/{applicant}',            [PublicApplicantController::class, 'showPaymentPage'])->name('admissions.pay');
-    Route::post('/admissions/pay/{applicant}/init',      [PublicApplicantController::class, 'zainpayInit'])->name('admissions.pay.zainpay.init');
-    Route::get('/admissions/pay/{applicant}/verify',     [PublicApplicantController::class, 'zainpayVerify'])->name('admissions.pay.verify');
+    Route::get('/admissions/apply',               [PublicApplicantController::class, 'showApplyForm'])->name('admissions.apply');
+    Route::post('/admissions/apply',              [PublicApplicantController::class, 'submitApplyForm'])->name('admissions.apply.submit');
+    Route::get('/admissions/pay/{applicant}',     [PublicApplicantController::class, 'showPaymentPage'])->name('admissions.pay');
+    Route::post('/admissions/pay/zainpay/init/{applicant}', [PublicApplicantController::class, 'zainpayInit'])->name('admissions.pay.zainpay.init');
+    Route::get('/admissions/pay/zainpay/verify/{applicant}', [PublicApplicantController::class, 'zainpayVerify'])->name('admissions.pay.verify');
     Route::post('/admissions/pay/authorize/{applicant}', [PublicApplicantController::class, 'authorizePayment'])->name('admissions.pay.authorize');
-    Route::get('/admissions/login',                      [PublicApplicantController::class, 'showLoginForm'])->name('admissions.login');
-    Route::post('/admissions/login',                     [PublicApplicantController::class, 'login'])->name('admissions.login.submit');
-
-    // ZainPay webhook (CSRF exempt)
-    Route::post('/webhooks/zainpay', [WebhookController::class, 'zainpay'])
-        ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class])
-        ->name('webhooks.zainpay');
+    Route::get('/admissions/login',               [PublicApplicantController::class, 'showLoginForm'])->name('admissions.login');
+    Route::post('/admissions/login',              [PublicApplicantController::class, 'login'])->name('admissions.login.submit');
 
     Route::middleware(['auth:applicant'])->group(function () {
         Route::get('/admissions/status',  [PublicApplicantController::class, 'dashboard'])->name('admissions.dashboard');
@@ -159,6 +164,8 @@ Route::middleware(['identify.tenant', 'auth', 'tenant.access'])->group(function 
         // Provost has read access to registrar views
         Route::get('/registrar/dashboard',          [\App\Http\Controllers\Registrar\DashboardController::class, 'index'])->name('registrar.dashboard');
         Route::get('/registrar/students',           [\App\Http\Controllers\Registrar\StudentController::class, 'index'])->name('registrar.students');
+        Route::get('/registrar/students/{student}', [\App\Http\Controllers\Registrar\StudentController::class, 'show'])->name('registrar.students.show');
+        Route::get('/registrar/lecturers',          [\App\Http\Controllers\Registrar\DashboardController::class, 'lecturers'])->name('registrar.lecturers');
         Route::get('/registrar/admissions',         [\App\Http\Controllers\Registrar\DashboardController::class, 'admissions'])->name('registrar.admissions');
         Route::get('/registrar/faculties',          [\App\Http\Controllers\Registrar\DashboardController::class, 'faculties'])->name('registrar.faculties');
         Route::get('/registrar/calendar',           [\App\Http\Controllers\Registrar\DashboardController::class, 'calendar'])->name('registrar.calendar');
