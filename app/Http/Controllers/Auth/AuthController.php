@@ -3,7 +3,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\{RedirectResponse, Request};
-use Illuminate\Support\Facades\{Auth, Hash, RateLimiter};
+use Illuminate\Support\Facades\{Auth, Hash, RateLimiter, Log};
 use Illuminate\Validation\ValidationException;
 use Inertia\{Inertia, Response as InertiaResponse};
 
@@ -13,15 +13,32 @@ class AuthController extends Controller {
     }
 
     public function login(Request $request) {
+        Log::info('Login process started', ['ip' => $request->ip(), 'email' => $request->email]);
+
         $request->validate(['email' => 'required|email', 'password' => 'required|string']);
         $key = 'login:'.$request->ip().':'.strtolower($request->email);
         $maxAttempts = config('auth.throttle.max_attempts', 5);
+
+        Log::info('Checking rate limit', ['key' => $key]);
         if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+            Log::warning('Rate limit exceeded', ['email' => $request->email]);
             $secs = RateLimiter::availableIn($key);
             throw ValidationException::withMessages(['email' => ["Too many attempts. Try again in {$secs} seconds."]]);
         }
 
-        $user = User::where('email', $request->email)->where('is_active', true)->first();
+        Log::info('Querying user from database', ['email' => $request->email]);
+        try {
+            $user = User::where('email', $request->email)->where('is_active', true)->first();
+        } catch (\Exception $e) {
+            Log::error('Database error during user query', ['message' => $e->getMessage()]);
+            throw $e;
+        }
+
+        if (!$user) {
+            Log::warning('User not found or inactive', ['email' => $request->email]);
+        } elseif (!Hash::check($request->password, $user->password)) {
+            Log::warning('Invalid password', ['email' => $request->email]);
+        }
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             RateLimiter::hit($key, config('auth.throttle.decay_seconds', 900));
@@ -29,11 +46,21 @@ class AuthController extends Controller {
             throw ValidationException::withMessages(['email' => ["The provided credentials are incorrect. You have {$remaining} attempts remaining."]]);
         }
 
-        Auth::login($user, $request->boolean('remember'));
-        $request->session()->regenerate();
-        RateLimiter::clear($key);
+        Log::info('Authenticating user', ['user_id' => $user->id]);
+        try {
+            Auth::login($user, $request->boolean('remember'));
+            Log::info('Regenerating session');
+            $request->session()->regenerate();
+            RateLimiter::clear($key);
+        } catch (\Exception $e) {
+            Log::error('Error during Auth::login or session regeneration', ['message' => $e->getMessage()]);
+            throw $e;
+        }
 
-        return redirect()->intended($this->dashboardRoute($user->role));
+        Log::info('Login successful, determining route', ['role' => $user->role]);
+        $route = $this->dashboardRoute($user->role);
+        Log::info('Redirecting', ['route' => $route]);
+        return redirect()->intended($route);
     }
 
     public function logout(Request $request): RedirectResponse {
