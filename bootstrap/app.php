@@ -9,6 +9,7 @@ use App\Http\Middleware\{
 };
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\{Exceptions, Middleware};
+use Illuminate\Support\Facades\Log;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -40,10 +41,22 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (\Spatie\Permission\Exceptions\UnauthorizedException $e, $request) {
+            Log::warning('Unauthorized access attempt (Spatie)', [
+                'url' => $request->url(),
+                'user_id' => $request->user()?->id,
+                'role' => $request->user()?->role,
+                'message' => $e->getMessage()
+            ]);
             return redirect()->route('landing')->with('error', 'You do not have permission to access that page.');
         });
 
         $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException $e, $request) {
+            Log::warning('Access denied attempt (HttpKernel)', [
+                'url' => $request->url(),
+                'user_id' => $request->user()?->id,
+                'role' => $request->user()?->role,
+                'message' => $e->getMessage()
+            ]);
             return redirect()->route('landing')->with('error', 'You do not have permission to access that page.');
         });
         
