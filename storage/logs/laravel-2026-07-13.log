@@ -1,0 +1,9 @@
+[2026-07-13 11:21:12] local.ERROR: Command "serev" is not defined. {"exception":"[object] (Symfony\\Component\\Console\\Exception\\CommandNotFoundException(code: 0): Command \"serev\" is not defined. at /home/yamojr/acons/vendor/symfony/console/Application.php:759)
+[stacktrace]
+#0 /home/yamojr/acons/vendor/symfony/console/Application.php(298): Symfony\\Component\\Console\\Application->find()
+#1 /home/yamojr/acons/vendor/symfony/console/Application.php(195): Symfony\\Component\\Console\\Application->doRun()
+#2 /home/yamojr/acons/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(198): Symfony\\Component\\Console\\Application->run()
+#3 /home/yamojr/acons/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1235): Illuminate\\Foundation\\Console\\Kernel->handle()
+#4 /home/yamojr/acons/artisan(12): Illuminate\\Foundation\\Application->handleCommand()
+#5 {main}
+"} 

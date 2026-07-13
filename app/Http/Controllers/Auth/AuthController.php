@@ -68,7 +68,7 @@ class AuthController extends Controller {
             : back()->withErrors(['email' => [__($status)]]);
     }
 
-    private function dashboardRoute(string $role): string {
+    private function dashboardRoute(?string $role): string {
         return match($role) {
             User::ROLE_SCHOOL_ADMIN      => '/admin/dashboard',
             User::ROLE_LECTURER          => '/lecturer/dashboard',

@@ -90,134 +90,123 @@ export default function StudentResults({ groupedResults, studentDetails }: Props
         </Card>
       ) : (
         /* Print Container */
-        <div className="bg-white rounded-2xl shadow-sm border border-surface-150 p-8 md:p-12 print:p-0 print:border-none print:shadow-none w-full max-w-5xl mx-auto mb-10">
-          
-          {/* Print Header */}
-          <div className="flex items-start justify-between border-b-2 border-surface-200 pb-8 mb-8 print:pb-3 print:mb-3">
-            <div className="flex items-center gap-5 print:gap-3">
-              <Avatar 
-                src={studentDetails.avatar_url} 
-                name={studentDetails.name} 
-                className="w-24 h-24 print:w-16 print:h-16 rounded-2xl border-4 border-surface-50 print:border-gray-200 print:rounded-none object-cover" 
-              />
-              <div>
-                <h2 className="text-2xl print:text-lg font-display font-bold text-surface-900 uppercase tracking-wide">
-                  {studentDetails.name}
-                </h2>
-                <div className="grid grid-cols-2 gap-x-8 print:gap-x-4 gap-y-2 print:gap-y-0.5 mt-3 print:mt-1 text-sm print:text-[10px] font-medium text-surface-700">
-                  <p><span className="text-surface-400 font-bold uppercase tracking-wider text-[10px] print:text-[8px] block">Reg Number</span> {studentDetails.matric_number || 'N/A'}</p>
-                  <p><span className="text-surface-400 font-bold uppercase tracking-wider text-[10px] print:text-[8px] block">Department</span> {studentDetails.department}</p>
-                  <p><span className="text-surface-400 font-bold uppercase tracking-wider text-[10px] print:text-[8px] block">Current Level</span> {studentDetails.level || 'N/A'}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="text-right">
-              <div className="inline-block bg-brand-50 print:bg-white print:border print:border-gray-300 text-brand-700 print:text-black px-6 py-4 print:px-3 print:py-1 rounded-2xl print:rounded-md text-center">
-                <p className="text-[10px] print:text-[8px] font-bold uppercase tracking-widest opacity-80 mb-1 print:mb-0">Cumulative GPA</p>
-                <p className="text-4xl print:text-2xl font-display font-bold leading-none">{studentDetails.cgpa.toFixed(2)}</p>
-              </div>
-              <p className="text-xs print:text-[10px] font-bold text-surface-500 mt-3 print:mt-1">Total Units: <span className="text-surface-900 print:text-black">{studentDetails.total_load}</span></p>
-            </div>
+        <div className="bg-white p-8 md:p-12 print:p-0 print:border-none print:shadow-none w-full max-w-4xl mx-auto mb-10 shadow-sm border border-surface-150 font-sans text-black relative">
+          {/* Watermark Logo */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden z-0 print:opacity-[0.03] opacity-5">
+             <img src="/logo.png" className="w-[500px] h-[500px] object-contain" alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
           </div>
 
-          {currentGroup && (
-            <motion.div 
-              key={currentGroup.session_name}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <div className="flex items-center justify-between mb-4 print:mb-2 px-2 print:px-0">
-                <div>
-                  <h3 className="font-bold text-surface-900 text-xl print:text-sm uppercase">{currentGroup.session_name}</h3>
-                  <p className="text-sm print:text-[10px] font-semibold text-surface-500 mt-1 print:mt-0">
-                    Semester Units Registered: <span className="text-surface-900 print:text-black">{currentGroup.semester_load}</span>
-                  </p>
-                </div>
-                <div className="text-right border-l-2 pl-6 py-1 print:pl-3 print:py-0 print:border-gray-300">
-                  <p className="text-[10px] print:text-[8px] text-surface-500 uppercase font-bold mb-0.5">Semester GPA</p>
-                  <p className="text-2xl print:text-lg font-display font-bold text-brand-600 print:text-black">{currentGroup.semester_gpa.toFixed(2)}</p>
+          <div className="relative z-10">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b-4 border-gray-200 pb-2 mb-4">
+              <div className="flex items-start gap-4 w-full">
+                <img src="/logo.png" alt="Logo" className="w-[100px] h-[100px] object-contain flex-shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                <div className="flex-1 text-center pt-2 relative">
+                  <h1 className="text-[18px] md:text-[22px] font-black text-[#1a237e] tracking-tight leading-tight">COLLEGE OF NURSING SCIENCES, BABURA, JIGAWA STATE</h1>
+                  <h2 className="text-[15px] md:text-[17px] font-bold text-[#5c6bc0] leading-tight mt-1">SCHOOL OF NURSING, BABURA</h2>
+                  <h3 className="text-[14px] md:text-[15px] font-bold text-[#3949ab] italic leading-tight mt-0.5">Result Slip</h3>
+                  
+                  <div className="md:absolute right-0 top-8 text-right text-xs font-bold text-[#1976d2] space-y-1 mt-2 md:mt-0 flex flex-col items-center md:items-end">
+                    <div className="flex items-center gap-1.5">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
+                      <span>www.consbabura.edu.ng</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                      <span>son@consbabura.edu.ng</span>
+                    </div>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div className="overflow-hidden border border-surface-200 print:border-gray-300 rounded-xl print:rounded-none">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-surface-50 print:bg-gray-100 text-xs print:text-[9px] uppercase tracking-wider text-surface-600 print:text-black font-bold">
-                    <tr>
-                      <th className="px-6 py-4 print:px-2 print:py-1.5 border-b print:border-gray-300">Course Code</th>
-                      <th className="px-6 py-4 print:px-2 print:py-1.5 border-b print:border-gray-300">Course Title</th>
-                      <th className="px-6 py-4 print:px-2 print:py-1.5 border-b print:border-gray-300 text-center">Units</th>
-                      <th className="px-6 py-4 print:px-2 print:py-1.5 border-b print:border-gray-300 text-center">Score</th>
-                      <th className="px-6 py-4 print:px-2 print:py-1.5 border-b print:border-gray-300 text-center">Grade</th>
-                      <th className="px-6 py-4 print:px-2 print:py-1.5 border-b print:border-gray-300 text-center">GP</th>
+            <div className="text-center font-bold text-sm md:text-md mb-6">
+              {currentGroup?.session_name || '2023/2024 Academic Session'}
+            </div>
+
+            {/* Student Info */}
+            <div className="flex justify-between items-start mb-6 border-b-4 border-gray-100 pb-6">
+              <div className="space-y-1.5 text-sm md:text-base">
+                <h3 className="font-extrabold text-lg mb-2">Student's Information</h3>
+                <div className="flex"><span className="w-32 md:w-40 inline-block">Registration No.:</span> <span className="font-bold">{studentDetails.matric_number}</span></div>
+                <div className="flex"><span className="w-32 md:w-40 inline-block">Name:</span> <span className="font-bold uppercase">{studentDetails.name}</span></div>
+                <div className="flex"><span className="w-32 md:w-40 inline-block">Gender:</span> <span className="font-bold">{(studentDetails as any).gender || 'Male'}</span></div>
+              </div>
+              <div>
+                <img src={studentDetails.avatar_url || '/default-avatar.png'} alt="Student" className="w-24 h-28 md:w-32 md:h-36 object-cover bg-red-600 border-none" />
+              </div>
+            </div>
+
+            {/* Academic Info */}
+            <div className="mb-6 border-b-4 border-gray-100 pb-6 text-sm md:text-base">
+              <h3 className="font-extrabold text-lg mb-2">Academic's Information</h3>
+              <div className="flex"><span className="w-32 md:w-40 inline-block">Current Level:</span> <span className="font-bold">{studentDetails.level}</span></div>
+              <div className="flex"><span className="w-32 md:w-40 inline-block">Programme:</span> <span className="font-bold">{studentDetails.department}</span></div>
+            </div>
+
+            {/* Courses */}
+            {currentGroup && (
+              <div>
+                <h3 className="font-extrabold text-lg mb-2">Courses</h3>
+                <table className="w-full text-left text-sm md:text-base mb-6">
+                  <thead>
+                    <tr className="font-bold">
+                      <th className="py-2 w-16">S/No.</th>
+                      <th className="py-2 w-24">Code</th>
+                      <th className="py-2">Course Title</th>
+                      <th className="py-2 text-center w-20">Score</th>
+                      <th className="py-2 text-left w-24">Remark</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-surface-100 print:divide-gray-200 bg-white">
+                  <tbody>
                     {currentGroup.grades.map((g, i) => (
-                      <tr key={i} className="hover:bg-surface-50/50 transition-colors print:hover:bg-white">
-                        <td className="px-6 py-4 print:px-2 print:py-1 border-b print:border-gray-200">
-                          <span className="text-sm print:text-[10px] font-mono font-bold text-surface-900 print:text-black">{g.course_code}</span>
-                        </td>
-                        <td className="px-6 py-4 print:px-2 print:py-1 border-b print:border-gray-200 text-sm print:text-[10px] text-surface-700 print:text-black font-medium">{g.course_name}</td>
-                        <td className="px-6 py-4 print:px-2 print:py-1 border-b print:border-gray-200 text-center text-sm print:text-[10px] font-bold text-surface-600 print:text-black">{g.units}</td>
-                        <td className="px-6 py-4 print:px-2 print:py-1 border-b print:border-gray-200 text-center text-sm print:text-[10px] font-mono font-bold text-surface-900 print:text-black">{g.score}</td>
-                        <td className="px-6 py-4 print:px-2 print:py-1 border-b print:border-gray-200 text-center">
-                          <span className="font-bold text-sm print:text-[10px] text-surface-900 print:text-black">
-                            {g.grade}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 print:px-2 print:py-1 border-b print:border-gray-200 text-center text-sm print:text-[10px] font-bold text-surface-900 print:text-black">{g.points.toFixed(1)}</td>
+                      <tr key={i} className="font-semibold">
+                        <td className="py-1.5">{i + 1}.</td>
+                        <td className="py-1.5">{g.course_code}</td>
+                        <td className="py-1.5">{g.course_name}</td>
+                        <td className="py-1.5 text-center">{g.score}</td>
+                        <td className="py-1.5 text-left uppercase">{g.grade === 'F' || g.grade === 'ABS' ? 'FAIL' : 'PASS'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
 
-              {/* Semester-specific Resit Courses */}
-              {currentGroup.grades.filter(g => g.grade === 'F' || g.grade === 'ABS').length > 0 && (
-                <div className="mt-4 print:mt-2 p-4 print:p-2 bg-danger-50 print:bg-white text-danger-700 print:text-black border border-danger-100 print:border-none rounded-xl font-medium text-sm print:text-[10px]">
-                  <span className="font-bold uppercase tracking-wider text-danger-800 print:text-black text-[10px] print:text-[8px] block mb-1">Resit Course(s) for this Semester:</span>
-                  {currentGroup.grades.filter(g => g.grade === 'F' || g.grade === 'ABS').map(c => c.course_code).join(', ')}
-                </div>
-              )}
-              
-              {/* Global Academic Standing Inference */}
-              <div className="mt-12 print:mt-4 border-t-2 border-surface-200 print:border-gray-300 pt-6 print:pt-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="text-[10px] print:text-[8px] font-bold uppercase tracking-wider text-surface-500">Current Academic Standing</h4>
-                    <p className="text-xl print:text-sm font-bold uppercase mt-1 text-surface-900 print:text-black">
-                      {studentDetails.academic_status === 'normal' ? 'Pass / Proceed' :
-                       studentDetails.academic_status === 'reseat' ? 'Resit Required' :
-                       studentDetails.academic_status === 'repeat' ? 'Repeat Level' :
-                       studentDetails.academic_status === 'withdrawn' ? 'Withdrawn' : 'Good Standing'}
-                    </p>
+                <div className="border-t-2 border-dashed border-gray-800 pt-4 mb-16 font-bold text-sm md:text-base">
+                  <div className="flex justify-between max-w-2xl">
+                    <div>
+                      <p className="mb-1">Total Score : {currentGroup.grades.reduce((sum, g) => sum + g.score, 0)}</p>
+                      <p>CANDIDATE STATUS : <span className="uppercase">{studentDetails.academic_status === 'normal' ? 'PASSED' : studentDetails.academic_status === 'reseat' ? 'RESIT' : studentDetails.academic_status === 'repeat' ? 'REPEAT' : studentDetails.academic_status === 'withdrawn' ? 'WITHDRAWN' : 'PASSED'}</span></p>
+                    </div>
+                    <div>
+                      <p>Course Spread : {currentGroup.grades.length}</p>
+                    </div>
                   </div>
-                  {studentDetails.reseat_courses?.length > 0 && (
-                     <div className="text-right max-w-xs">
-                       <h4 className="text-[10px] print:text-[8px] font-bold uppercase tracking-wider text-surface-500">Total Outstanding Resits</h4>
-                       <p className="font-bold text-danger-600 print:text-black mt-1 leading-tight text-sm print:text-[10px]">
-                         {studentDetails.reseat_courses.join(', ')}
-                       </p>
-                     </div>
-                  )}
+                </div>
+
+                {/* Signatures */}
+                <div className="flex justify-between items-end mb-8 text-sm md:text-base font-bold">
+                  <div className="text-center w-56 md:w-64">
+                    <div className="border-t border-dashed border-gray-800 pt-1">
+                      Exams Officer, Signature & Date
+                    </div>
+                  </div>
+                  <div className="text-center w-56 md:w-64">
+                    <div className="border-t border-dashed border-gray-800 pt-1">
+                      Director SON, Signature & Date
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="text-xs font-bold border-t-2 border-gray-800 pt-2 pb-2">
+                  <p className="mb-2">Printed on : {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })} - {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).toLowerCase()}</p>
+                  <p className="text-[9px] md:text-[10px] text-center w-full block uppercase font-normal tracking-widest border-t-2 border-gray-400 pt-2 mt-2">
+                    THIS IS AN ONLINE SLIP. IT IS FOR REFERENCE ONLY.
+                  </p>
                 </div>
               </div>
-
-              {/* Print Footer */}
-              <div className="hidden print:flex items-end justify-between mt-16 pt-8 print:mt-8 print:pt-4 border-t border-gray-300">
-                <div className="text-center w-48">
-                  <div className="border-b border-gray-400 mb-1 h-6"></div>
-                  <p className="text-[9px] font-bold text-gray-600 uppercase">Student Signature & Date</p>
-                </div>
-                <div className="text-center w-48">
-                  <div className="border-b border-gray-400 mb-1 h-6"></div>
-                  <p className="text-[9px] font-bold text-gray-600 uppercase">Head of Department</p>
-                </div>
-              </div>
-
-            </motion.div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </AppLayout>
