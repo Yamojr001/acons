@@ -68,8 +68,9 @@ Route::middleware(['identify.tenant', 'auth', 'tenant.access'])->group(function 
         Route::get('/course-registration',[\App\Http\Controllers\Student\CourseRegistrationController::class, 'index'])->name('course-registration');
         Route::post('/course-registration',[\App\Http\Controllers\Student\CourseRegistrationController::class, 'store'])->name('course-registration.store');
         Route::get('/fees',               [\App\Http\Controllers\Student\PaymentController::class, 'index'])->name('fees');
+        Route::get('/registration',       [\App\Http\Controllers\Student\RegistrationController::class, 'index'])->name('registration');
         Route::post('/payments/initialize/{invoice}', [\App\Http\Controllers\Student\PaymentController::class, 'initialize'])->name('payments.initialize');
-        Route::post('/payments/verify/{reference}',   [\App\Http\Controllers\Student\PaymentController::class, 'verify'])->name('payments.verify');
+        Route::match(['get', 'post'], '/payments/verify/{reference}',   [\App\Http\Controllers\Student\PaymentController::class, 'verify'])->name('payments.verify');
         Route::get('/results',            [\App\Http\Controllers\Student\ResultController::class, 'index'])->name('results');
         Route::get('/announcements',      [\App\Http\Controllers\Student\AnnouncementController::class, 'index'])->name('announcements');
         Route::get('/profile',            [\App\Http\Controllers\Student\ProfileController::class, 'edit'])->name('profile');
@@ -164,6 +165,7 @@ Route::middleware(['identify.tenant', 'auth', 'tenant.access'])->group(function 
         // Provost has read access to registrar views
         Route::get('/registrar/dashboard',          [\App\Http\Controllers\Registrar\DashboardController::class, 'index'])->name('registrar.dashboard');
         Route::get('/registrar/students',           [\App\Http\Controllers\Registrar\StudentController::class, 'index'])->name('registrar.students');
+        Route::get('/registrar/students/export/{format}', [\App\Http\Controllers\Registrar\StudentController::class, 'export'])->name('registrar.students.export');
         Route::get('/registrar/students/{student}', [\App\Http\Controllers\Registrar\StudentController::class, 'show'])->name('registrar.students.show');
         Route::get('/registrar/lecturers',          [\App\Http\Controllers\Registrar\DashboardController::class, 'lecturers'])->name('registrar.lecturers');
         Route::get('/registrar/admissions',         [\App\Http\Controllers\Registrar\DashboardController::class, 'admissions'])->name('registrar.admissions');
@@ -223,11 +225,27 @@ Route::middleware(['identify.tenant', 'auth', 'tenant.access'])->group(function 
     });
 
     /*
+    |── EXAM OFFICER ────────────────────────────────────────────────────────
+    */
+    Route::middleware(['role:exam_officer'])
+        ->prefix('exam-office')->name('exam_officer.')->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\ExamOfficer\DashboardController::class, 'index'])->name('dashboard');
+    });
+
+    /*
     |── SCHOOL ADMIN ────────────────────────────────────────────────────────
     */
     Route::middleware(['role:school_admin'])
         ->prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\School\DashboardController::class, 'index'])->name('dashboard');
+    });
+
+    /*
+    |── SUPER ADMIN (system diagnostics only — single-institution deployment) ─
+    */
+    Route::middleware(['role:super_admin'])
+        ->prefix('superadmin')->name('superadmin.')->group(function () {
+        Route::get('/system-health', [\App\Http\Controllers\SuperAdmin\SystemHealthController::class, 'index'])->name('system-health');
     });
 
     /*

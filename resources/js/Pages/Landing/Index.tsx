@@ -57,16 +57,28 @@ export default function Landing({ tenant, stats, auth, admission_form }: Landing
 
   const programs = [
     {
-      title: 'National Diploma in Nursing',
-      duration: '4 Years (ND/HND Track)',
-      desc: 'A comprehensive modern curriculum fully aligned with the unified ND/HND Nursing Council guidelines designed to produce world-class registered nurse professionals.',
-      features: ['Unified ND/HND Track', 'Clinical Practicums', 'NMCN Accredited', 'Expert Mentoring']
+      title: 'Basic Nursing Programme',
+      duration: '3 Years',
+      desc: 'A foundational clinical nursing curriculum designed to produce world-class registered nurse professionals through rigorous coursework and hospital rotations.',
+      features: ['Clinical Practicums', 'NMCN Accredited', 'Expert Mentoring', 'Hospital Rotations']
     },
     {
-      title: 'National Diploma in Midwifery',
-      duration: '4 Years (ND/HND Track)',
-      desc: 'Advanced modern track focusing on high-fidelity clinical midwifery simulation, maternal health systems, and modern postnatal procedures.',
-      features: ['Unified ND/HND Track', 'Maternal Simulation', 'Hospital Rotations', 'Neo-natal Care']
+      title: 'Basic Midwifery Programme',
+      duration: '3 Years',
+      desc: 'A foundational track focusing on maternal health systems, high-fidelity clinical midwifery simulation, and modern postnatal procedures.',
+      features: ['Maternal Simulation', 'Hospital Rotations', 'Neo-natal Care', 'NMCN Accredited']
+    },
+    {
+      title: 'ND Nursing Programme',
+      duration: '4 Years',
+      desc: 'A comprehensive modern curriculum fully aligned with National Diploma Nursing Council guidelines, combining classroom instruction with supervised clinical practice.',
+      features: ['Clinical Practicums', 'NMCN Accredited', 'Expert Mentoring', 'Community Health Rotations']
+    },
+    {
+      title: 'HND Nursing Programme',
+      duration: '2 Years (Post-ND)',
+      desc: 'An advanced clinical track for ND graduates, emphasizing leadership, advanced clinical practice, and research-driven nursing care.',
+      features: ['Advanced Clinical Practice', 'Nursing Leadership', 'Research Project', 'NMCN Accredited']
     }
   ]
 

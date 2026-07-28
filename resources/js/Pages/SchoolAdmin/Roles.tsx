@@ -10,7 +10,7 @@ export default function Roles({ roles, groupedPermissions }: any) {
   const [newRoleName, setNewRoleName] = useState('')
   const [selectedPerms, setSelectedPerms] = useState<number[]>([])
 
-  const coreRoles = ['super_admin', 'school_admin', 'teacher', 'lecturer', 'student', 'registrar', 'bursar', 'admissions_officer', 'exam_officer', 'hod', 'dean', 'accountant']
+  const coreRoles = ['super_admin', 'school_admin', 'provost', 'registrar', 'bursar', 'admission_officer', 'exam_officer', 'hod', 'lecturer', 'student']
 
   const togglePerm = (id: number) => {
     setSelectedPerms(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id])

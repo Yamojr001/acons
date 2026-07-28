@@ -73,7 +73,7 @@ class RoleController extends Controller
     public function update(Request $request, Role $role)
     {
         // Prevent editing core system roles totally via this interface, or allow only permissions modification
-        $coreRoles = ['super_admin', 'school_admin', 'teacher', 'lecturer', 'student', 'registrar', 'bursar', 'admissions_officer', 'exam_officer', 'hod', 'dean', 'accountant'];
+        $coreRoles = ['super_admin', 'school_admin', 'provost', 'registrar', 'bursar', 'admission_officer', 'exam_officer', 'hod', 'lecturer', 'student'];
         
         $request->validate([
             'name' => 'sometimes|string|max:100|unique:roles,name,' . $role->id,
@@ -95,7 +95,7 @@ class RoleController extends Controller
 
     public function destroy(Role $role)
     {
-        $coreRoles = ['super_admin', 'school_admin', 'teacher', 'lecturer', 'student', 'registrar', 'bursar', 'admissions_officer', 'exam_officer', 'hod', 'dean', 'accountant'];
+        $coreRoles = ['super_admin', 'school_admin', 'provost', 'registrar', 'bursar', 'admission_officer', 'exam_officer', 'hod', 'lecturer', 'student'];
         
         if (in_array($role->name, $coreRoles)) {
             return back()->withErrors(['error' => 'Core system roles cannot be deleted.']);

@@ -85,7 +85,7 @@ export default function Students({ students, classrooms, filters }: StudentsProp
                   <tr key={student.id} className="hover:bg-surface-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <Avatar name={student.user?.name} size="sm" />
+                        <Avatar name={student.user?.name ?? 'Student'} size="sm" />
                         <div>
                           <p className="font-semibold text-surface-900">{student.user?.name}</p>
                           <p className="text-xs text-surface-500">{student.user?.email}</p>

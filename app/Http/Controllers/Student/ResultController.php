@@ -50,8 +50,11 @@ class ResultController extends Controller
                 return $g->registration->semester->academicSession->name . ' - ' . $g->registration->semester->name;
             })->map(function($grades, $sessionName) {
                 $semesterLoad = $grades->sum(fn($g) => $g->registration->course->credit_units);
+                $first = $grades->first();
                 return [
                     'session_name' => $sessionName,
+                    'academic_session_name' => $first->registration->semester->academicSession->name,
+                    'semester_name' => $first->registration->semester->name,
                     'semester_load' => $semesterLoad,
                     'grades' => $grades->map(fn($g) => [
                         'course_code' => $g->registration->course->code,

@@ -325,6 +325,7 @@ export default function FeeIndex({ fees, departments, academic_sessions, auth }:
                           <option value="acceptance">Acceptance Fee</option>
                           <option value="hostel">Hostel Accommodation</option>
                           <option value="dues">Semester Dues</option>
+                          <option value="registration">Registration Fee</option>
                           <option value="other">Other / Custom</option>
                         </select>
                       </div>

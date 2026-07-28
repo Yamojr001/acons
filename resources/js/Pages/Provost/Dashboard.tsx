@@ -263,8 +263,8 @@ export default function ProvostDashboard({ stats, current_semester, pending_cour
       >
         {[
           { href: '/provost/results', icon: <Award size={20} />, label: 'Release Results', color: 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' },
-          { href: '/registrar/dashboard', icon: <Users size={20} />, label: 'Registrar Portal', color: 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' },
-          { href: '/bursary/dashboard', icon: <Wallet size={20} />, label: 'Bursary Portal', color: 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' },
+          { href: '/provost/registrar/dashboard', icon: <Users size={20} />, label: 'Registrar Portal', color: 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' },
+          { href: '/provost/bursary/dashboard', icon: <Wallet size={20} />, label: 'Bursary Portal', color: 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' },
           { href: '/provost/announcements', icon: <Megaphone size={20} />, label: 'Announcements', color: 'bg-brand-50 border-brand-200 text-brand-700 hover:bg-brand-100' },
         ].map(item => (
           <Link

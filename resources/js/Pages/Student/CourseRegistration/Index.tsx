@@ -28,6 +28,7 @@ interface CourseRegistrationProps extends PageProps {
   unitsRegisteredThisYear: number
   eligibleLevels: string[]
   selectedLevel: string
+  studentDetails: { name: string; matric_number: string; department: string }
 }
 
 export default function CourseRegistration({ 
@@ -37,8 +38,11 @@ export default function CourseRegistration({
   maxCreditUnitsPerYear, 
   minCreditUnitsPerYear, 
   unitsRegisteredThisYear, 
-  selectedLevel 
+  selectedLevel,
+  studentDetails,
+  auth,
 }: CourseRegistrationProps) {
+  const tenant = auth?.tenant
   
   // Total assigned credits for the current semester
   const totalCredits = registeredCourses.reduce((sum, r) => sum + (r.course?.credit_units ?? 0), 0)
@@ -52,7 +56,7 @@ export default function CourseRegistration({
       <Head title="My Assigned Courses" />
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-display font-bold text-surface-900">My Assigned Courses</h1>
           <p className="text-sm text-surface-500 mt-1">First Semester, Academic Session {currentSemester?.academicSession?.name}</p>
@@ -70,7 +74,7 @@ export default function CourseRegistration({
       </div>
 
       {/* Curriculum policy notification */}
-      <div className="mb-8 p-5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-150 rounded-2xl flex gap-4 text-emerald-800 text-xs shadow-sm">
+      <div className="print:hidden mb-8 p-5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-150 rounded-2xl flex gap-4 text-emerald-800 text-xs shadow-sm">
         <CheckCircle size={22} className="text-emerald-600 flex-shrink-0 mt-0.5" />
         <div>
           <p className="font-bold uppercase tracking-wider text-[10px] text-emerald-700">ACONS Curriculum & Automatic Enrollment Policy</p>
@@ -80,7 +84,7 @@ export default function CourseRegistration({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="print:hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Hand: Course Schedule List */}
         <div className="lg:col-span-2 space-y-4">
           <Card className="border border-surface-150 shadow-sm">
@@ -174,6 +178,70 @@ export default function CourseRegistration({
               </p>
             </div>
           </Card>
+        </div>
+      </div>
+
+      {/* Print-only Official Course Form with institutional letterhead */}
+      <div className="hidden print:block bg-white p-8 md:p-12 w-full max-w-4xl mx-auto font-sans text-black relative">
+        <div className="flex items-start justify-between border-b-4 border-gray-200 pb-2 mb-4">
+          <div className="flex items-start gap-4 w-full">
+            <img src={tenant?.logo_path || '/logo.png'} alt="Logo" className="w-[100px] h-[100px] object-contain flex-shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />
+            <div className="flex-1 text-center pt-2 relative">
+              <h1 className="text-[18px] md:text-[22px] font-black text-[#1a237e] tracking-tight leading-tight">{(tenant?.name || 'Ameenatu College of Nursing Sciences (ACONS)').toUpperCase()}</h1>
+              {tenant?.address && <h2 className="text-[15px] md:text-[17px] font-bold text-[#5c6bc0] leading-tight mt-1">{tenant.address}</h2>}
+              <h3 className="text-[14px] md:text-[15px] font-bold text-[#3949ab] italic leading-tight mt-0.5">Official Course Registration Form</h3>
+              <div className="md:absolute right-0 top-8 text-right text-xs font-bold text-[#1976d2] space-y-1 mt-2 md:mt-0 flex flex-col items-center md:items-end">
+                {tenant?.email && <span>{tenant.email}</span>}
+                {tenant?.phone && <span>{tenant.phone}</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="text-center font-bold text-sm mb-1">{currentSemester?.academicSession?.name}</div>
+        <div className="text-center font-semibold text-xs mb-6 text-gray-600">{currentSemester?.name}</div>
+
+        <div className="mb-6 border-b-4 border-gray-100 pb-6 text-sm">
+          <div className="flex"><span className="w-40 inline-block">Registration No.:</span> <span className="font-bold">{studentDetails?.matric_number}</span></div>
+          <div className="flex"><span className="w-40 inline-block">Name:</span> <span className="font-bold uppercase">{studentDetails?.name}</span></div>
+          <div className="flex"><span className="w-40 inline-block">Programme:</span> <span className="font-bold">{studentDetails?.department}</span></div>
+          <div className="flex"><span className="w-40 inline-block">Level:</span> <span className="font-bold">{selectedLevel}</span></div>
+        </div>
+
+        <table className="w-full text-left text-sm mb-8">
+          <thead>
+            <tr className="font-bold border-b-2 border-gray-800">
+              <th className="py-2 w-16">S/No.</th>
+              <th className="py-2 w-24">Code</th>
+              <th className="py-2">Course Title</th>
+              <th className="py-2 text-center w-16">Units</th>
+              <th className="py-2 text-left w-24">Type</th>
+            </tr>
+          </thead>
+          <tbody>
+            {registeredCourses.map(({ id, course }, i) => (
+              <tr key={id} className="font-semibold border-b border-gray-200">
+                <td className="py-1.5">{i + 1}.</td>
+                <td className="py-1.5">{course?.code}</td>
+                <td className="py-1.5">{course?.name}</td>
+                <td className="py-1.5 text-center">{course?.credit_units}</td>
+                <td className="py-1.5 text-left uppercase">{course?.type}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="flex justify-between items-end mb-8 text-sm font-bold">
+          <div className="text-center w-56">
+            <div className="border-t border-dashed border-gray-800 pt-1">Student's Signature & Date</div>
+          </div>
+          <div className="text-center w-56">
+            <div className="border-t border-dashed border-gray-800 pt-1">Course Adviser, Signature & Date</div>
+          </div>
+        </div>
+
+        <div className="text-xs font-bold border-t-2 border-gray-800 pt-2 pb-2">
+          <p>Printed on : {new Date().toLocaleDateString('en-GB')}</p>
         </div>
       </div>
     </AppLayout>

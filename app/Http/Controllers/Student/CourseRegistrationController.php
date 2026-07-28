@@ -104,7 +104,12 @@ class CourseRegistrationController extends Controller
             'minCreditUnitsPerYear' => $tenant->settings['min_credit_units_per_year'] ?? 30,
             'unitsRegisteredThisYear' => $unitsRegisteredThisYear,
             'eligibleLevels' => $eligibleLevels,
-            'selectedLevel' => $selectedLevel
+            'selectedLevel' => $selectedLevel,
+            'studentDetails' => [
+                'name' => $student->user->name,
+                'matric_number' => $student->matriculation_number,
+                'department' => $student->department->name ?? 'N/A',
+            ],
         ]);
     }
 

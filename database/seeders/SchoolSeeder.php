@@ -35,14 +35,14 @@ class SchoolSeeder extends Seeder
             'primary_color' => '#2e5fa9',
             'secondary_color' => '#a31d1d',
             'tagline' => 'Leading in Nursing Education, Leading in Health Care Delivery',
-            'phone' => '08036894451',
+            'phone' => '07065754443',
             'email' => 'info@ameenatu.edu.ng',
             'address' => 'Dutse, Jigawa State',
             'settings' => [
                 'max_credit_units_per_year' => 48,
                 'min_credit_units_per_year' => 30,
                 'grading_scale' => '5.0',
-                'payment_gateway' => 'remita'
+                'payment_gateway' => 'zainpay'
             ]
         ]);
         $tenant->save();
@@ -72,7 +72,7 @@ class SchoolSeeder extends Seeder
         $midwiferyDept = Department::create([
             'tenant_id' => $tenant->id,
             'faculty_id' => $faculty->id,
-            'name' => 'National Diploma in Midwifery',
+            'name' => 'Midwifery',
             'code' => 'NDM'
         ]);
 
@@ -82,7 +82,7 @@ class SchoolSeeder extends Seeder
         $nursingProgram = Program::create([
             'tenant_id' => $tenant->id,
             'department_id' => $nursingDept->id,
-            'name' => 'National Diploma in Nursing',
+            'name' => 'ND Nursing Programme',
             'degree_type' => 'ND/HND',
             'duration_years' => 4
         ]);
@@ -90,9 +90,25 @@ class SchoolSeeder extends Seeder
         $midwiferyProgram = Program::create([
             'tenant_id' => $tenant->id,
             'department_id' => $midwiferyDept->id,
-            'name' => 'National Diploma in Midwifery',
-            'degree_type' => 'ND/HND',
-            'duration_years' => 4
+            'name' => 'Basic Midwifery Programme',
+            'degree_type' => 'Basic',
+            'duration_years' => 3
+        ]);
+
+        Program::create([
+            'tenant_id' => $tenant->id,
+            'department_id' => $nursingDept->id,
+            'name' => 'Basic Nursing Programme',
+            'degree_type' => 'Basic',
+            'duration_years' => 3
+        ]);
+
+        Program::create([
+            'tenant_id' => $tenant->id,
+            'department_id' => $nursingDept->id,
+            'name' => 'HND Nursing Programme',
+            'degree_type' => 'HND',
+            'duration_years' => 2
         ]);
 
         // Aliases for compatibility

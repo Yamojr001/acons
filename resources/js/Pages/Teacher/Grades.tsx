@@ -7,8 +7,9 @@ import { Button, Card, Badge } from '@/Components/UI'
 import { PageHeader, Select } from '@/Components/UI/Advanced'
 import { cn, debounce } from '@/lib/utils'
 import type { PageProps, Exam, Student } from '@/types'
+import type { FormDataConvertible } from '@inertiajs/core'
 
-interface GradeEntry { student_id: number; score: number | ''; grade_letter: string; remarks: string; saved: boolean; error?: string }
+interface GradeEntry { [key: string]: FormDataConvertible; student_id: number; score: number | ''; grade_letter: string; remarks: string; saved: boolean; error?: string }
 
 interface TeacherGradesProps extends PageProps {
   exams: Exam[]

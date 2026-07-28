@@ -29,6 +29,7 @@ export default function StudentIndex({ students, departments, filters, auth }: P
   const [level, setLevel] = useState(filters.level || 'all')
   const [exportOpen, setExportOpen] = useState(false)
   const isProvost = (auth?.user?.role as string) === 'provost'
+  const basePath = isProvost ? '/provost/registrar/students' : '/registrar/students'
   const [isFirstRender, setIsFirstRender] = useState(true)
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export default function StudentIndex({ students, departments, filters, auth }: P
 
     const delayDebounceFn = setTimeout(() => {
       router.get(
-        '/registrar/students', 
+        basePath, 
         { search, department_id: dept, level }, 
         { preserveState: true, replace: true }
       )
@@ -50,17 +51,17 @@ export default function StudentIndex({ students, departments, filters, auth }: P
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    router.get('/registrar/students', { search, department_id: dept, level }, { preserveState: true })
+    router.get(basePath, { search, department_id: dept, level }, { preserveState: true })
   }
 
   const handleDeptChange = (val: string) => {
     setDept(val)
-    router.get('/registrar/students', { search, department_id: val, level }, { preserveState: true })
+    router.get(basePath, { search, department_id: val, level }, { preserveState: true })
   }
 
   const handleLevelChange = (val: string) => {
     setLevel(val)
-    router.get('/registrar/students', { search, department_id: dept, level: val }, { preserveState: true })
+    router.get(basePath, { search, department_id: dept, level: val }, { preserveState: true })
   }
 
   return (
@@ -95,7 +96,7 @@ export default function StudentIndex({ students, departments, filters, auth }: P
                        className="absolute right-0 mt-2 w-48 bg-white border border-surface-150 rounded-xl shadow-lg z-20 py-1 overflow-hidden"
                      >
                        <a 
-                         href="/registrar/students/export/pdf" 
+                         href={`${basePath}/export/pdf`} 
                          target="_blank" 
                          className="flex items-center px-4 py-2.5 text-sm text-surface-700 hover:bg-surface-50 transition-colors"
                          onClick={() => setExportOpen(false)}
@@ -103,14 +104,14 @@ export default function StudentIndex({ students, departments, filters, auth }: P
                          Download PDF Report
                        </a>
                        <a 
-                         href="/registrar/students/export/csv" 
+                         href={`${basePath}/export/csv`} 
                          className="flex items-center px-4 py-2.5 text-sm text-surface-700 hover:bg-surface-50 transition-colors"
                          onClick={() => setExportOpen(false)}
                        >
                          Download CSV (Excel)
                        </a>
                        <a 
-                         href="/registrar/students/export/xlsx" 
+                         href={`${basePath}/export/xlsx`} 
                          className="flex items-center px-4 py-2.5 text-sm text-surface-700 hover:bg-surface-50 transition-colors"
                          onClick={() => setExportOpen(false)}
                        >

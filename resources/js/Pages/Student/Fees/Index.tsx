@@ -22,7 +22,7 @@ interface StudentInvoice {
 
 interface FeesProps {
   invoices: StudentInvoice[]
-  activeGateway: 'remita' | 'paystack' | 'monnify'
+  activeGateway: 'remita' | 'paystack' | 'monnify' | 'zainpay'
 }
 
 export default function FeesIndex({ invoices, activeGateway }: FeesProps) {
@@ -45,7 +45,16 @@ export default function FeesIndex({ invoices, activeGateway }: FeesProps) {
       const data = await response.json()
 
       // 2. Route to appropriate Gateway Simulation
-      if (data.gateway === 'remita') {
+      if (data.gateway === 'zainpay') {
+        if (data.error || !data.redirect_url) {
+          alert(data.error || 'Zainpay could not start this payment. Please try again.')
+          setProcessingId(null)
+          return
+        }
+        // Zainpay uses a hosted checkout page — send the browser there directly.
+        window.location.href = data.redirect_url
+        return
+      } else if (data.gateway === 'remita') {
         alert(`REMITA TSA GATEWAY\nRRR Generated: ${data.rrr}\nAmount: NGN ${data.amount}\nReference: ${data.reference}\n\n(Simulating Successful Payment...)`)
       } else if (data.gateway === 'monnify') {
         // @ts-ignore
@@ -125,7 +134,7 @@ export default function FeesIndex({ invoices, activeGateway }: FeesProps) {
               All <strong>Tuition</strong> and <strong>Acceptance</strong> fees must be paid in full before you can access the Course Registration portal.
             </p>
             <p className="text-sm text-surface-600">
-              Payments processed via {activeGateway === 'remita' ? 'Remita (TSA)' : activeGateway === 'monnify' ? 'Monnify' : 'Paystack'} reflect immediately.
+              Payments processed via {activeGateway === 'remita' ? 'Remita (TSA)' : activeGateway === 'monnify' ? 'Monnify' : activeGateway === 'zainpay' ? 'Zainpay' : 'Paystack'} reflect immediately.
             </p>
           </Card>
         </div>

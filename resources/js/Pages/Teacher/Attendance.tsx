@@ -10,7 +10,7 @@ import type { PageProps, ClassRoom, Student } from '@/types'
 
 type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused'
 
-interface AttendanceStudent extends Student {
+interface AttendanceStudent extends Omit<Student, 'user'> {
   user: { name: string; avatar: string | null }
   today_status?: AttendanceStatus
 }

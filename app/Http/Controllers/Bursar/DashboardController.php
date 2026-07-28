@@ -403,7 +403,7 @@ class DashboardController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'fee_type' => 'required|string|in:tuition,departmental,acceptance,hostel,dues,other',
+            'fee_type' => 'required|string|in:tuition,departmental,acceptance,hostel,dues,registration,other',
             'amount' => 'required|numeric|min:0.01',
             'academic_session_id' => 'required|exists:academic_sessions,id',
             'department_id' => 'nullable|exists:departments,id',
@@ -437,7 +437,7 @@ class DashboardController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'fee_type' => 'required|string|in:tuition,departmental,acceptance,hostel,dues,other',
+            'fee_type' => 'required|string|in:tuition,departmental,acceptance,hostel,dues,registration,other',
             'amount' => 'required|numeric|min:0.01',
             'academic_session_id' => 'required|exists:academic_sessions,id',
             'department_id' => 'nullable|exists:departments,id',

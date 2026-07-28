@@ -28,7 +28,7 @@ export default function StudentDashboard({
   const totalOutstanding = outstandingFees.reduce((sum, f) => sum + f.amount, 0)
 
   return (
-    <AppLayout title="Academic Portal">
+    <AppLayout title="Student Dashboard">
       <Head title="Student Dashboard" />
 
       {/* 1. Profile Header Section */}

@@ -35,7 +35,7 @@ export default function ResultEntry({ courses, students, selectedCourseId, selec
   
   const { data, setData, post, processing } = useForm({
     course_id: selectedCourseId,
-    results: localResults
+    results: localResults as unknown as Record<string, any>[]
   })
 
   useEffect(() => {
@@ -99,7 +99,7 @@ export default function ResultEntry({ courses, students, selectedCourseId, selec
     setIsSaving(true)
     router.post(`/lecturer/courses/${selectedCourseId}/grades`, {
       course_id: selectedCourseId,
-      results: localResults
+      results: localResults as unknown as Record<string, any>[]
     }, {
       preserveState: true,
       preserveScroll: true,

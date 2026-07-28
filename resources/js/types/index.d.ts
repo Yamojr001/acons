@@ -1,6 +1,6 @@
 import { PageProps as InertiaPageProps } from '@inertiajs/core'
 
-export type UserRole = 'super_admin' | 'school_admin' | 'teacher' | 'lecturer' | 'student' | 'registrar' | 'bursar' | 'admissions_officer' | 'exam_officer' | 'hod' | 'dean'
+export type UserRole = 'super_admin' | 'school_admin' | 'lecturer' | 'student' | 'registrar' | 'bursar' | 'admission_officer' | 'exam_officer' | 'hod' | 'provost'
 
 export interface Tenant {
     id: number; name: string; subdomain: string

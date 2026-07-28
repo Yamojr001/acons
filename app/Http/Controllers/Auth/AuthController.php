@@ -97,7 +97,7 @@ class AuthController extends Controller {
 
     private function dashboardRoute(?string $role): string {
         return match($role) {
-            User::ROLE_SUPER_ADMIN       => '/superadmin/dashboard',
+            User::ROLE_SUPER_ADMIN       => '/superadmin/system-health',
             User::ROLE_SCHOOL_ADMIN      => '/admin/dashboard',
             User::ROLE_LECTURER          => '/lecturer/dashboard',
             User::ROLE_TEACHER           => '/lecturer/dashboard',

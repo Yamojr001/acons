@@ -37,6 +37,7 @@ export default function AdminDashboard({ role, stats, recent_payments = [], depa
   const isProvost = role === 'provost'
   const isAdmissionOfficer = role === 'admission_officer'
   const isHOD = role === 'hod'
+  const isExamOfficer = role === 'exam_officer'
 
   let metrics = []
   if (isProvost) {
@@ -58,6 +59,13 @@ export default function AdminDashboard({ role, stats, recent_payments = [], depa
       { label: 'Pending Clearance', value: stats.pending_clearance || 0, icon: <BookOpen size={20} />, color: 'warning' },
       { label: 'Cleared Students', value: stats.cleared || 0, icon: <GraduationCap size={20} />, color: 'success' },
       { label: 'Clearance Rejected', value: stats.rejected || 0, icon: <XCircle size={20} />, color: 'danger' },
+    ]
+  } else if (isExamOfficer) {
+    metrics = [
+      { label: 'Total Courses', value: stats.total_courses || 0, icon: <BookOpen size={20} />, color: 'brand' },
+      { label: 'Pending Submission', value: stats.pending_submission || 0, icon: <TrendingUp size={20} />, color: 'warning' },
+      { label: 'Awaiting Final Approval', value: stats.awaiting_final_approval || 0, icon: <ShieldCheck size={20} />, color: 'info' },
+      { label: 'Published Results', value: stats.published_results || 0, icon: <GraduationCap size={20} />, color: 'success' },
     ]
   } else {
     metrics = [
@@ -106,7 +114,7 @@ export default function AdminDashboard({ role, stats, recent_payments = [], depa
       <div className="grid grid-cols-1 gap-8">
         {/* Financial / Admission Breakdown */}
         <div className="space-y-8">
-          {(!isAdmissionOfficer && !isHOD) ? (
+          {(!isAdmissionOfficer && !isHOD && !isExamOfficer) ? (
             <>
               <Card>
                 <div className="flex items-center justify-between mb-6">
@@ -176,8 +184,8 @@ export default function AdminDashboard({ role, stats, recent_payments = [], depa
           ) : (
             <Card padding="none" className="overflow-hidden">
                <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between">
-                  <h3 className="font-bold text-surface-900">Recent Applications</h3>
-                  <Link href="/admissions/manage" className="text-xs font-bold text-brand-600 hover:text-brand-700">View All</Link>
+                  <h3 className="font-bold text-surface-900">{isExamOfficer ? 'Recent Grade Submissions' : 'Recent Applications'}</h3>
+                  <Link href={isExamOfficer ? '/exam-office/dashboard' : '/admissions/manage'} className="text-xs font-bold text-brand-600 hover:text-brand-700">View All</Link>
                </div>
                <div className="divide-y divide-surface-100">
                   {recent_applications.map((app) => (
@@ -188,12 +196,12 @@ export default function AdminDashboard({ role, stats, recent_payments = [], depa
                          </div>
                          <div>
                             <p className="text-sm font-bold text-surface-900">{app.applicant_name || app.student?.user?.name}</p>
-                            <p className="text-[10px] text-surface-400 font-medium">{formatDate(app.created_at)}</p>
+                            <p className="text-[10px] text-surface-400 font-medium">{isExamOfficer && app.course ? `${app.course} · ` : ''}{formatDate(app.created_at)}</p>
                          </div>
                       </div>
                       <div className="text-right">
-                         <Badge variant={app.status === 'admitted' ? 'success' : app.status === 'pending' ? 'warning' : 'neutral'} className="text-[10px] py-0 capitalize">
-                           {app.status}
+                         <Badge variant={['admitted', 'approved'].includes(app.status) ? 'success' : ['pending', 'submitted', 'hod_approved'].includes(app.status) ? 'warning' : 'neutral'} className="text-[10px] py-0 capitalize">
+                           {app.status?.replace('_', ' ')}
                          </Badge>
                       </div>
                     </div>

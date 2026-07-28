@@ -8,7 +8,7 @@ import { Plus, Search, UserCheck, MoreHorizontal, Eye, Pencil, Trash2, BookOpen,
 import AppLayout from '@/Layouts/AppLayout'
 import { Button, Card, Badge, Avatar, EmptyState } from '@/Components/UI'
 import { PageHeader, DataTable, Column, Pagination, SearchInput, ConfirmDialog } from '@/Components/UI/Advanced'
-import { formatDate, staggerContainer, staggerItem } from '@/lib/utils'
+import { formatDate, formatCurrency, statusColor, staggerContainer, staggerItem } from '@/lib/utils'
 import type { PageProps, Teacher, PaginatedData, ClassRoom, Subject } from '@/types'
 
 interface TeachersPageProps extends PageProps {

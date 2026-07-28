@@ -89,6 +89,34 @@ class PaymentController extends Controller
             ]);
         }
 
+        if ($gateway === 'zainpay') {
+            $callbackUrl = route('student.payments.verify', $reference);
+
+            $response = \Illuminate\Support\Facades\Http::withToken(config('services.zainpay.public_key'))
+                ->post(config('services.zainpay.base_url', 'https://api.zainpay.ng') . '/zainbox/card/initialize/payment', [
+                    'amount'       => (string) $payment->amount,
+                    'emailAddress' => $request->user()->email,
+                    'txnRef'       => $reference,
+                    'zainboxCode'  => config('services.zainpay.zainbox_code'),
+                    'callBackUrl'  => $callbackUrl,
+                ])->json();
+
+            if (!isset($response['code']) || $response['code'] !== '00') {
+                $payment->update(['status' => 'failed']);
+                return response()->json([
+                    'gateway' => 'zainpay',
+                    'error' => $response['description'] ?? 'Zainpay initialization failed. Please try again.',
+                ], 422);
+            }
+
+            return response()->json([
+                'gateway' => 'zainpay',
+                'reference' => $reference,
+                'amount' => $payment->amount,
+                'redirect_url' => $response['data']['url'] ?? null,
+            ]);
+        }
+
         // Default: Paystack
         return response()->json([
             'gateway' => 'paystack',
@@ -100,15 +128,32 @@ class PaymentController extends Controller
     }
 
     /**
-     * Webhook/Callback simulation to verify payment and clear the invoice
+     * Verifies the payment and clears the invoice. For Zainpay, this genuinely
+     * checks the transaction status via the Zainpay API rather than trusting
+     * the client. Other gateways here remain simulated (see comment below) —
+     * that's a pre-existing limitation, not something specific to this fix.
      */
     public function verify(Request $request, $reference)
     {
         $payment = Payment::where('reference', $reference)->firstOrFail();
 
-        // In a real application, we would call the gateway API to verify the transaction status.
-        // For this implementation, we will simulate a successful verification.
-        
+        if ($payment->payment_gateway === 'zainpay') {
+            $response = \Illuminate\Support\Facades\Http::withToken(config('services.zainpay.public_key'))
+                ->get(config('services.zainpay.base_url', 'https://api.zainpay.ng') . '/zainbox/transactions/' . $reference)
+                ->json();
+
+            $verified = isset($response['data']['status']) && strtolower($response['data']['status']) === 'success';
+
+            if (!$verified) {
+                $payment->update(['status' => 'failed']);
+                return redirect()->route('student.fees')->with('error', 'Payment could not be verified. If you were charged, please contact the Bursary.');
+            }
+        }
+        // NOTE: Remita/Paystack/Monnify/sandbox paths below remain a simulated
+        // "always succeed" verification (pre-existing behavior, not introduced
+        // by this fix) — a real deployment should verify each of those against
+        // its respective gateway API before marking an invoice paid.
+
         $payment->update(['status' => 'successful']);
 
         $invoice = $payment->invoice; // Assuming relation exists

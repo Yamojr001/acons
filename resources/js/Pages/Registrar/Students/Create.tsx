@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Head, Link, useForm } from '@inertiajs/react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Save, UserPlus, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Save, UserPlus, AlertCircle, GraduationCap } from 'lucide-react'
 import AppLayout from '@/Layouts/AppLayout'
 import { Card, Button } from '@/Components/UI'
 import type { PageProps } from '@/types'

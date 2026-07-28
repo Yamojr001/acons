@@ -4,16 +4,18 @@ import { Loader2, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ─── Button ──────────────────────────────────────────────────────────────────
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline' | 'success' | 'warning'
-  size?: 'sm' | 'md' | 'lg'
+type ButtonHTMLProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onDrag' | 'onDragStart' | 'onDragEnd' | 'onAnimationStart' | 'onAnimationEnd' | 'onAnimationIteration'>
+interface ButtonProps extends ButtonHTMLProps {
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline' | 'success' | 'warning' | 'brand' | 'neutral' | 'white'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   loading?: boolean
   icon?: ReactNode
   iconLeft?: ReactNode
   iconRight?: ReactNode
+  as?: 'button' | 'span'
 }
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', loading, icon, iconLeft, iconRight, children, className, disabled, ...props }, ref) => {
+  ({ variant = 'primary', size = 'md', loading, icon, iconLeft, iconRight, children, className, disabled, as = 'button', ...props }, ref) => {
     const v = {
       primary:   'bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700 shadow-sm focus-visible:outline-brand-500',
       secondary: 'bg-surface-100 text-surface-700 hover:bg-surface-200 active:bg-surface-300',
@@ -22,26 +24,31 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       outline:   'border border-surface-300 text-surface-700 hover:bg-surface-50 hover:border-surface-400',
       success:   'bg-success-500 text-white hover:bg-success-600 shadow-sm',
       warning:   'bg-warning-500 text-white hover:bg-warning-600 shadow-sm',
+      brand:     'bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700 shadow-sm focus-visible:outline-brand-500',
+      neutral:   'bg-surface-100 text-surface-700 hover:bg-surface-200 active:bg-surface-300',
+      white:     'bg-white text-surface-700 hover:bg-surface-50 shadow-sm border border-surface-200',
     }
     const s = {
+      xs: 'px-2.5 py-1 text-xs rounded-md gap-1',
       sm: 'px-3 py-1.5 text-xs rounded-lg gap-1.5',
       md: 'px-5 py-2.5 text-sm rounded-xl gap-2',
       lg: 'px-7 py-3.5 text-base rounded-xl gap-2.5',
     }
+    const MotionTag = as === 'span' ? motion.span : motion.button
     return (
-      <motion.button
+      <MotionTag
         ref={ref as any}
         whileHover={{ scale: disabled || loading ? 1 : 1.015 }}
         whileTap={{ scale: disabled || loading ? 1 : 0.97 }}
         transition={{ duration: 0.1 }}
         className={cn('inline-flex items-center justify-center font-medium select-none cursor-pointer transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none', v[variant], s[size], className)}
-        disabled={disabled || loading}
-        {...props}
+        {...(as === 'button' ? { disabled: disabled || loading } : {})}
+        {...(props as any)}
       >
-        {loading ? <Loader2 className="animate-spin" size={size === 'sm' ? 12 : size === 'lg' ? 18 : 14} /> : (iconLeft ?? icon)}
+        {loading ? <Loader2 className="animate-spin" size={size === 'sm' || size === 'xs' ? 12 : size === 'lg' ? 18 : 14} /> : (iconLeft ?? icon)}
         {children}
         {!loading && iconRight}
-      </motion.button>
+      </MotionTag>
     )
   }
 )
@@ -76,28 +83,54 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 Input.displayName = 'Input'
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
-interface CardProps extends HTMLAttributes<HTMLDivElement> { hover?: boolean; padding?: 'none' | 'sm' | 'md' | 'lg' }
+type CardHTMLProps = Omit<HTMLAttributes<HTMLDivElement>, 'onDrag' | 'onDragStart' | 'onDragEnd' | 'onAnimationStart' | 'onAnimationEnd' | 'onAnimationIteration'>
+interface CardProps extends CardHTMLProps { hover?: boolean; padding?: 'none' | 'sm' | 'md' | 'lg' }
 export const Card = ({ hover, padding = 'md', children, className, ...props }: CardProps) => {
   const p = { none: '', sm: 'p-4', md: 'p-6', lg: 'p-8' }
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.4,0,0.2,1] }}
       className={cn('bg-white rounded-2xl border border-surface-200 shadow-card', hover && 'transition-all duration-250 hover:shadow-card-hover hover:-translate-y-0.5 cursor-pointer', p[padding], className)}
-      {...props}>{children}
+      {...(props as any)}>{children}
     </motion.div>
   )
 }
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
-interface BadgeProps { variant?: 'success'|'warning'|'danger'|'brand'|'neutral'|'info'; dot?: boolean; children: ReactNode; className?: string }
-export const Badge = ({ variant = 'neutral', dot, children, className }: BadgeProps) => {
-  const v = { success: 'bg-success-100 text-success-700', warning: 'bg-warning-50 text-warning-600', danger: 'bg-danger-100 text-danger-600', brand: 'bg-brand-100 text-brand-700', neutral: 'bg-surface-100 text-surface-600', info: 'bg-blue-100 text-blue-700' }
-  const d = { success: 'bg-success-500', warning: 'bg-warning-500', danger: 'bg-danger-500', brand: 'bg-brand-500', neutral: 'bg-surface-400', info: 'bg-blue-500' }
+interface BadgeProps {
+  variant?: 'success'|'warning'|'danger'|'brand'|'neutral'|'info'|'outline'|'primary'|'secondary'|'ghost'
+  size?: 'sm' | 'md'
+  dot?: boolean; children: ReactNode; className?: string
+}
+export const Badge = ({ variant = 'neutral', size = 'md', dot, children, className }: BadgeProps) => {
+  const v = {
+    success: 'bg-success-100 text-success-700', warning: 'bg-warning-50 text-warning-600', danger: 'bg-danger-100 text-danger-600',
+    brand: 'bg-brand-100 text-brand-700', neutral: 'bg-surface-100 text-surface-600', info: 'bg-blue-100 text-blue-700',
+    outline: 'bg-transparent border border-surface-300 text-surface-600', primary: 'bg-brand-100 text-brand-700',
+    secondary: 'bg-surface-100 text-surface-700', ghost: 'bg-transparent text-surface-600',
+  }
+  const d = {
+    success: 'bg-success-500', warning: 'bg-warning-500', danger: 'bg-danger-500', brand: 'bg-brand-500', neutral: 'bg-surface-400',
+    info: 'bg-blue-500', outline: 'bg-surface-400', primary: 'bg-brand-500', secondary: 'bg-surface-400', ghost: 'bg-surface-400',
+  }
+  const sizeClass = size === 'sm' ? 'px-2 py-0 text-[10px]' : 'px-2.5 py-0.5 text-xs'
   return (
-    <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium', v[variant], className)}>
+    <span className={cn('inline-flex items-center gap-1 rounded-full font-medium', sizeClass, v[variant], className)}>
       {dot && <span className={cn('w-1.5 h-1.5 rounded-full', d[variant])} />}{children}
     </span>
   )
 }
+
+// ─── NairaIcon ───────────────────────────────────────────────────────────────
+// lucide-react has no ₦ glyph; this mimics its sizing so it drops into icon slots.
+interface NairaIconProps { size?: number; className?: string }
+export const NairaIcon = ({ size = 17, className }: NairaIconProps) => (
+  <span
+    className={cn('inline-flex items-center justify-center leading-none font-bold', className)}
+    style={{ width: size, height: size, fontSize: Math.round(size * 0.85) }}
+  >
+    ₦
+  </span>
+)
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 interface AvatarProps { name: string; src?: string | null; size?: 'xs'|'sm'|'md'|'lg'|'xl'; className?: string }

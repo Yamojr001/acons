@@ -8,7 +8,7 @@ import {
   CreditCard, Trophy, Wallet, Building2, CheckCircle
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
-import { Avatar, Badge } from '@/Components/UI'
+import { Avatar, Badge, NairaIcon } from '@/Components/UI'
 import type { PageProps } from '@/types'
 
 const navConfig: Record<string, Array<{ label: string; href: string; icon: ReactNode }>> = {
@@ -20,15 +20,11 @@ const navConfig: Record<string, Array<{ label: string; href: string; icon: React
     { label: 'Departments',       href: '/provost/registrar/faculties',  icon: <School size={17} /> },
     { label: 'Academic Calendar', href: '/provost/registrar/calendar',   icon: <Calendar size={17} /> },
     { label: 'Admissions',        href: '/provost/registrar/admissions', icon: <FileText size={17} /> },
-    { label: 'Fee Schedules',     href: '/provost/bursary/fees',         icon: <DollarSign size={17} /> },
+    { label: 'Fee Schedules',     href: '/provost/bursary/fees',         icon: <NairaIcon size={17} /> },
     { label: 'Financial Reports', href: '/provost/bursary/reports',      icon: <Wallet size={17} /> },
     { label: 'Notices',           href: '/provost/announcements',        icon: <Megaphone size={17} /> },
   ],
   super_admin: [
-    { label: 'Dashboard',   href: '/superadmin/dashboard',   icon: <LayoutDashboard size={17} /> },
-    { label: 'Schools',     href: '/superadmin/schools',     icon: <School size={17} /> },
-    { label: 'Plans',       href: '/superadmin/plans',       icon: <CreditCard size={17} /> },
-    { label: 'Analytics',   href: '/superadmin/analytics',   icon: <BarChart3 size={17} /> },
     { label: 'System',      href: '/superadmin/system-health', icon: <Activity size={17} /> },
   ],
   school_admin: [
@@ -54,7 +50,7 @@ const navConfig: Record<string, Array<{ label: string; href: string; icon: React
   ],
   bursar: [
     { label: 'Dashboard',     href: '/bursary/dashboard',      icon: <LayoutDashboard size={17} /> },
-    { label: 'Fee Schedules', href: '/bursary/fees',           icon: <DollarSign size={17} /> },
+    { label: 'Fee Schedules', href: '/bursary/fees',           icon: <NairaIcon size={17} /> },
     { label: 'Transaction Logs', href: '/bursary/payments',    icon: <Wallet size={17} /> },
     { label: 'Expenses',      href: '/bursary/expenses',       icon: <CreditCard size={17} /> },
     { label: 'Financial Reports', href: '/bursary/reports',    icon: <BarChart3 size={17} /> },
@@ -75,6 +71,9 @@ const navConfig: Record<string, Array<{ label: string; href: string; icon: React
     { label: 'Course Offerings', href: '/hod/courses',         icon: <BookOpen size={17} /> },
     { label: 'Grades Approval', href: '/hod/results',          icon: <CheckCircle size={17} /> },
   ],
+  exam_officer: [
+    { label: 'Dashboard',     href: '/exam-office/dashboard',  icon: <LayoutDashboard size={17} /> },
+  ],
   lecturer: [
     { label: 'Dashboard',     href: '/lecturer/dashboard',     icon: <LayoutDashboard size={17} /> },
     { label: 'Courses',       href: '/lecturer/my-courses',    icon: <BookOpen size={17} /> },
@@ -85,6 +84,7 @@ const navConfig: Record<string, Array<{ label: string; href: string; icon: React
   student: [
     { label: 'Dashboard',     href: '/student/dashboard',      icon: <LayoutDashboard size={17} /> },
     { label: 'My Courses',     href: '/student/course-registration', icon: <BookOpen size={17} /> },
+    { label: 'Registration',  href: '/student/registration',   icon: <ClipboardList size={17} /> },
     { label: 'My Results',    href: '/student/results',        icon: <Trophy size={17} /> },
     { label: 'Bursary / Fees',href: '/student/fees',           icon: <CreditCard size={17} /> },
     { label: 'Notices',       href: '/student/announcements',  icon: <Megaphone size={17} /> },
@@ -92,8 +92,8 @@ const navConfig: Record<string, Array<{ label: string; href: string; icon: React
   ],
 }
 
-const roleBadge: Record<string, 'danger'|'brand'|'success'|'warning'|'neutral'> = {
-  super_admin: 'danger', provost: 'brand', registrar: 'brand', bursar: 'neutral', admission_officer: 'danger', hod: 'warning', lecturer: 'success', student: 'warning'
+const roleBadge: Record<string, 'danger'|'brand'|'success'|'warning'|'neutral'|'info'> = {
+  super_admin: 'danger', provost: 'brand', registrar: 'brand', bursar: 'neutral', admission_officer: 'danger', hod: 'warning', exam_officer: 'info', lecturer: 'success', student: 'warning'
 }
 
 interface SidebarProps {
@@ -189,12 +189,17 @@ function Sidebar({ open, onClose, tenant, user, currentPath }: SidebarProps) {
   )
 }
 
-function Topbar({ onMenuClick, title, user }: { onMenuClick: () => void; title?: string; user: any }) {
+function Topbar({ onMenuClick, title, user, tenant }: { onMenuClick: () => void; title?: string; user: any; tenant?: any }) {
   return (
     <header className="h-16 shadow-sm flex items-center px-4 lg:px-6 gap-4 sticky top-0 z-20 text-white" 
       style={{ background: 'var(--color-tenant-primary, #2e5fa9)' }}>
       <button onClick={onMenuClick} className="lg:hidden p-2 rounded-xl text-white/80 hover:bg-white/20 transition-colors"><Menu size={20} /></button>
       {title && <h1 className="text-lg font-semibold text-white hidden sm:block">{title}</h1>}
+      {tenant?.email && (
+        <a href={`mailto:${tenant.email}`} className="hidden md:block text-sm text-white/80 hover:text-white transition-colors truncate">
+          {tenant.email}
+        </a>
+      )}
       <div className="flex items-center gap-2 ml-auto">
         <button className="p-2 rounded-xl text-white/80 hover:bg-white/20 transition-colors relative">
           <Bell size={20} />
@@ -230,7 +235,7 @@ export default function AppLayout({ children, title }: { children: ReactNode; ti
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} tenant={tenant} user={user} currentPath={currentPath} />
       </div>
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Topbar onMenuClick={() => setSidebarOpen(true)} title={title} user={user} />
+        <Topbar onMenuClick={() => setSidebarOpen(true)} title={title} user={user} tenant={tenant} />
         <main className="flex-1 overflow-y-auto scrollbar-thin">
           <motion.div key={currentPath} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, ease: [0.4,0,0.2,1] }}

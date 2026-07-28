@@ -1,17 +1,23 @@
-# EduSaaS — Hostinger Edition
-**Multi-Tenant School Management Platform**
-> Laravel 11 · React 19 · Inertia.js · MySQL 8 · Stripe · Paystack · Monnify · Framer Motion
+# Ameenatu College of Nursing Sciences (ACONS) — Portal
+
+**Single-Institution Academic Management System**
+> Laravel 11 · React 19 · Inertia.js · MySQL 8 · Zainpay · Framer Motion
+
+This system is built exclusively for Ameenatu College of Nursing Sciences (ACONS). It is a
+single-institution deployment — there is no multi-school signup, subdomain routing, or
+billing/plan management. The application always resolves to the one ACONS tenant record
+in the database (see `App\Services\TenantResolver`).
 
 ---
 
 ## 🚀 Quick Start — Local Development
 
 ### Prerequisites
-- PHP 8.3+ · Composer 2.x · Node.js 20+ · MySQL 8.0 · Redis (optional)
+- PHP 8.3+ · Composer 2.x · Node.js 20+ · MySQL 8.0 · Redis (optional, for queue/cache)
 
 ### 1. Install
 ```bash
-git clone <your-repo> edusaas && cd edusaas
+git clone <your-repo> acons && cd acons
 composer install
 npm install
 cp .env.example .env
@@ -22,9 +28,8 @@ php artisan key:generate
 ```env
 APP_ENV=local
 APP_URL=http://localhost:8000
-APP_PLATFORM_DOMAIN=localhost
 DB_CONNECTION=mysql
-DB_DATABASE=edusaas
+DB_DATABASE=acons
 DB_USERNAME=root
 DB_PASSWORD=your_password
 QUEUE_CONNECTION=database
@@ -32,7 +37,7 @@ QUEUE_CONNECTION=database
 
 ### 3. Database
 ```bash
-mysql -u root -p -e "CREATE DATABASE edusaas CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u root -p -e "CREATE DATABASE acons CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 php artisan migrate --seed
 ```
 
@@ -43,95 +48,65 @@ npm run dev                # Terminal 2 — Vite hot reload
 php artisan queue:work     # Terminal 3 — Job queue
 ```
 
-### 5. Access School Portal
-Add to `/etc/hosts`:
-```
-127.0.0.1  greenfield.localhost
-```
-Visit: **http://greenfield.localhost:8000**
+### 5. Access the Portal
+No subdomain or `/etc/hosts` entry is required — the app always serves the ACONS tenant.
+Visit: **http://localhost:8000**
 
 ---
 
-## 🔐 Demo Credentials
+## 🎓 Portals & Roles
 
-| Role | Email | Password | URL |
-|------|-------|----------|-----|
-| Super Admin | admin@edusaas.com | SuperAdmin@2024! | localhost:8000/superadmin/dashboard |
-| School Admin | admin@greenfield.edu.ng | Admin@123 | greenfield.localhost:8000/admin/dashboard |
-| Teacher | emeka@greenfield.edu.ng | Teacher@123 | greenfield.localhost:8000/teacher/dashboard |
-| Student | amara.obi@greenfield.edu.ng | Student@123 | greenfield.localhost:8000/student/dashboard |
-| Parent | parent.amara.obi@greenfield.edu.ng | Parent@123 | greenfield.localhost:8000/parent/dashboard |
+| Role | Portal | Notes |
+|------|--------|-------|
+| Super Admin | `/superadmin/system-health` | System diagnostics only — no school/billing management |
+| Provost | `/provost/dashboard` | Institution-wide oversight, results sign-off, announcements |
+| Registrar | `/registrar/dashboard` | Admissions, student records, staff (lecturer) management |
+| Bursar | `/bursary/dashboard` | Fee schedules, payments, financial reports |
+| HOD | `/hod/dashboard` | Department oversight, staff & clearance approvals |
+| Lecturer | `/lecturer/dashboard` | Attendance, grade entry, course/class management |
+| Admission Officer | `/admissions/dashboard` | Applicant review & admission processing |
+| Student | `/student/dashboard` | Results, fees, registration, course enrolment |
+| School Admin | `/admin/dashboard` | Legacy generic admin surface |
 
 ---
 
-## 🏗️ Project Structure
+## 🏗️ Project Structure (high level)
 
 ```
-edusaas/
-├── app/
-│   ├── Http/
-│   │   ├── Controllers/
-│   │   │   ├── Auth/AuthController.php
-│   │   │   ├── Admin/AllAdminControllers.php      ← Super Admin
-│   │   │   ├── School/DashboardController.php
-│   │   │   ├── School/AllSchoolControllers.php    ← Settings, Fees, Exams, Grades...
-│   │   │   ├── School/StudentController.php
-│   │   │   ├── Teacher/AllTeacherControllers.php
-│   │   │   ├── Student/AllStudentControllers.php
-│   │   │   ├── Parent/AllParentControllers.php
-│   │   │   ├── LandingController.php
-│   │   │   └── WebhookController.php
-│   │   └── Middleware/
-│   │       ├── AllMiddleware.php   ← IdentifyTenant, SecurityHeaders, EnsureTenantAccess, RoleMiddleware
-│   │       └── HandleInertiaRequests.php
-│   ├── Models/AllModels.php        ← All Eloquent models with TenantScope
-│   ├── Scopes/TenantScope.php
-│   ├── Traits/BelongsToTenant.php
-│   └── Services/
-│       ├── PaymentService.php     ← Stripe + Paystack + Monnify
-│       └── TenantResolver.php     ← Hostname → Tenant lookup with cache
-│
-├── resources/js/
-│   ├── app.tsx                    ← Inertia entry point
-│   ├── Components/UI/index.tsx    ← Button, Card, Badge, Avatar, StatCard...
-│   ├── Components/UI/Advanced.tsx ← Modal, DataTable, FileUpload, Toggle, Tabs...
-│   ├── Layouts/
-│   │   ├── AppLayout.tsx          ← Animated sidebar per role
-│   │   └── GuestLayout.tsx        ← Auth pages with branding panel
-│   └── Pages/
-│       ├── Auth/Login.tsx
-│       ├── Landing/Index.tsx      ← Dynamic branded landing page
-│       ├── SuperAdmin/Dashboard.tsx
-│       ├── SchoolAdmin/Dashboard.tsx
-│       ├── SchoolAdmin/Students.tsx
-│       ├── SchoolAdmin/StudentCreate.tsx   ← Multi-step form
-│       ├── SchoolAdmin/Teachers.tsx
-│       ├── SchoolAdmin/Fees.tsx
-│       ├── SchoolAdmin/Payments.tsx
-│       ├── SchoolAdmin/Settings.tsx        ← Branding, domain, portal fee
-│       ├── SchoolAdmin/Reports.tsx         ← Financial + Academic
-│       ├── Teacher/Dashboard.tsx
-│       ├── Teacher/Attendance.tsx          ← Touch-friendly toggle buttons
-│       ├── Teacher/Grades.tsx              ← Auto grade letter + bulk save
-│       ├── Student/Dashboard.tsx           ← Attendance ring, fee alert
-│       ├── Student/Fees.tsx                ← Gateway selection modal
-│       ├── Student/AllStudentPages.tsx     ← Results, Attendance, Announcements
-│       ├── Parent/Dashboard.tsx            ← Multi-child tabs
-│       ├── Shared/Profile.tsx
-│       └── Error.tsx
-│
-├── database/
-│   ├── migrations/2024_01_01_000001_create_all_tables.php
-│   └── seeders/DatabaseSeeder.php
-│
-├── routes/
-│   ├── web.php                    ← All routes by role
-│   └── console.php                ← Scheduled tasks
-│
-├── nginx/edusaas.conf             ← Production Nginx config
-├── scripts/provision_domain.sh    ← Auto SSL for custom domains
-├── .github/workflows/deploy.yml   ← CI/CD pipeline
-└── tests/Feature/EduSaaSTest.php
+app/
+├── Http/
+│   ├── Controllers/
+│   │   ├── Auth/AuthController.php
+│   │   ├── SuperAdmin/SystemHealthController.php
+│   │   ├── Provost/, Registrar/, Bursar/, HOD/, Lecturer/, Student/
+│   │   ├── School/         ← legacy generic admin controllers
+│   │   ├── LandingController.php
+│   │   └── WebhookController.php
+│   └── Middleware/
+│       ├── IdentifyTenant.php      ← always resolves the single ACONS tenant
+│       ├── EnsureTenantAccess.php
+│       ├── RoleMiddleware.php
+│       └── HandleInertiaRequests.php
+├── Models/                 ← Eloquent models (Tenant, Student, Program, Department...)
+└── Services/
+    ├── PaymentService.php  ← Zainpay integration
+    └── TenantResolver.php  ← always resolves the ACONS tenant record
+
+resources/js/
+├── app.tsx                 ← Inertia entry point
+├── Components/UI/          ← Button, Card, Badge, Avatar, NairaIcon, StatCard...
+├── Layouts/
+│   ├── AppLayout.tsx       ← Role-based sidebar + topbar (institutional email/branding)
+│   └── GuestLayout.tsx
+└── Pages/
+    ├── Auth/, Landing/
+    ├── SuperAdmin/SystemHealth.tsx
+    ├── Provost/, Registrar/, Bursar/, HOD/, Lecturer/, Student/
+    └── SchoolAdmin/        ← legacy generic admin pages
+
+database/
+├── migrations/
+└── seeders/SchoolSeeder.php   ← seeds the ACONS tenant, departments, programmes, courses
 ```
 
 ---
@@ -140,7 +115,6 @@ edusaas/
 
 | Threat | Protection |
 |--------|-----------|
-| Cross-tenant data leak | `TenantScope` on ALL Eloquent models, `EnsureTenantAccess` middleware |
 | SQL Injection | Eloquent ORM + parameterized queries only |
 | CSRF | Laravel default on all POST/PUT/DELETE |
 | XSS | React auto-escaping + CSP headers via `SecurityHeaders` middleware |
@@ -150,109 +124,53 @@ edusaas/
 | HSTS | Enabled in production with preload |
 | Clickjacking | `X-Frame-Options: SAMEORIGIN` |
 | File uploads | MIME type + extension + size validation |
-| Webhook forgery | Stripe signature + Paystack HMAC-SHA512 verification |
+| Webhook forgery | Zainpay signature verification |
+| Unauthorized access | Denied users are redirected to *their own* dashboard with a clear message, never left on a confusing/generic page |
 
 ---
 
-## 💳 Payment Gateways
+## 💳 Payment Gateway — Zainpay
 
-### Paystack (Recommended for Nigeria)
 ```env
-PAYSTACK_PUBLIC_KEY=pk_live_xxx
-PAYSTACK_SECRET_KEY=sk_live_xxx
-PAYSTACK_PAYMENT_URL=https://api.paystack.co
+ZAINPAY_PUBLIC_KEY=xxx
+ZAINPAY_SECRET_KEY=xxx
+ZAINPAY_BASE_URL=https://api.zainpay.ng
 ```
-Webhook URL: `https://yourdomain.com/webhooks/paystack`
+Webhook URL: `https://yourdomain.com/webhooks/zainpay`
 
-### Monnify (Bank Transfer + USSD)
-```env
-MONNIFY_API_KEY=MK_PROD_xxx
-MONNIFY_SECRET_KEY=xxx
-MONNIFY_CONTRACT_CODE=xxx
-MONNIFY_BASE_URL=https://api.monnify.com
-```
-Webhook URL: `https://yourdomain.com/webhooks/monnify`
-
-### Stripe (International Cards)
-```env
-STRIPE_PUBLIC_KEY=pk_live_xxx
-STRIPE_SECRET_KEY=sk_live_xxx
-STRIPE_WEBHOOK_SECRET=whsec_xxx
-```
-Webhook URL: `https://yourdomain.com/webhooks/stripe`
+The tenant's `settings.payment_gateway` is set to `zainpay`. Currency is displayed in
+Naira (₦) throughout the portal.
 
 ---
 
-## 🌐 Hostinger VPS Deployment
-
-```bash
-# 1. Server setup (Ubuntu 22.04)
-apt update && apt upgrade -y
-add-apt-repository ppa:ondrej/php -y
-apt install php8.3 php8.3-fpm php8.3-mysql php8.3-curl php8.3-xml \
-    php8.3-mbstring php8.3-zip php8.3-bcmath php8.3-gd php8.3-redis \
-    nginx mysql-server redis-server supervisor -y
-
-# 2. Deploy
-cd /var/www && git clone <repo> edusaas && cd edusaas
-composer install --no-dev --optimize-autoloader
-npm ci && npm run build
-cp .env.example .env  # Edit with production values
-php artisan key:generate
-php artisan migrate --force --seed
-php artisan storage:link
-php artisan config:cache && php artisan route:cache && php artisan view:cache
-
-# 3. Nginx (copy nginx/edusaas.conf to /etc/nginx/sites-enabled/)
-# 4. Wildcard SSL
-certbot certonly --manual --preferred-challenges dns -d yourdomain.com -d *.yourdomain.com
-
-# 5. Supervisor for queue worker
-# See scripts/provision_domain.sh for custom domain SSL automation
-```
-
----
-
-## 📋 Features
+## 📋 Feature Highlights
 
 ### All Roles
 - Animated sidebar navigation per role
+- Institutional email visible in the dashboard header
 - Real-time flash notifications (success/error/warning)
 - Mobile-responsive (collapsible sidebar)
-- Dynamic school branding (logo, colors applied instantly)
-- Secure session management
 
 ### Super Admin
-- Create & manage all schools (subdomain + plan)
-- Platform-wide analytics (MRR, school growth)
-- Subscription plan management
-- System health check dashboard
+- System health/diagnostics dashboard only (database, cache, queue, storage checks)
 
-### School Admin
-- Multi-step student registration with guardian linking
-- Teacher management with subject/class assignment
-- Bulk fee assignment (by class, all students, individual)
-- Portal maintenance fee automation on registration
-- Custom domain setup with DNS verification
-- Financial reports with collection rates per class
-- Academic reports with grade distribution & top performers
-- Attendance reports with export
-- Announcements with email/SMS delivery
+### Registrar
+- Admissions processing, student record management
+- Staff (lecturer) creation and management
 
-### Teacher
-- Touch-friendly attendance marking (Present/Absent/Late/Excused per student)
-- Grade entry table with auto grade letter calculation
-- Bulk grade save
-- Class overview with student lists
+### Bursar
+- Fee schedule management (₦ Naira)
+- Payment tracking and financial reports
+
+### Provost
+- Institution-wide dashboard and oversight
+- Results sign-off, announcements
+
+### Lecturer / HOD
+- Attendance marking, grade entry
+- Department/course/staff oversight (HOD)
 
 ### Student
-- Dashboard with attendance ring, upcoming exams, fee alert
-- Multi-gateway payment (Paystack/Monnify/Stripe)
-- Full result history with charts
-- Monthly attendance calendar view
-
-### Parent
-- Multi-child selector tabs
-- Per-child results, attendance, fees view
-- Pay fees for any child
-- School notices
+- Dashboard with academic session & semester context
+- Registration fee payment, course enrolment
+- Academic record / transcript with institutional letterhead

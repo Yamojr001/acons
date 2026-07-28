@@ -11,6 +11,8 @@ import type { PageProps } from '@/types'
 
 interface ResultGroup {
   session_name: string
+  academic_session_name: string
+  semester_name: string
   semester_load: number
   grades: Array<{
     course_code: string
@@ -38,7 +40,8 @@ interface Props extends PageProps {
   }
 }
 
-export default function StudentResults({ groupedResults, studentDetails }: Props) {
+export default function StudentResults({ groupedResults, studentDetails, auth }: Props) {
+  const tenant = auth?.tenant
   const groups = Object.values(groupedResults)
   
   // By default select the most recent session/semester
@@ -93,35 +96,42 @@ export default function StudentResults({ groupedResults, studentDetails }: Props
         <div className="bg-white p-8 md:p-12 print:p-0 print:border-none print:shadow-none w-full max-w-4xl mx-auto mb-10 shadow-sm border border-surface-150 font-sans text-black relative">
           {/* Watermark Logo */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden z-0 print:opacity-[0.03] opacity-5">
-             <img src="/logo.png" className="w-[500px] h-[500px] object-contain" alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
+             <img src={tenant?.logo_path || '/logo.png'} className="w-[500px] h-[500px] object-contain" alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
           </div>
 
           <div className="relative z-10">
             {/* Header */}
             <div className="flex items-start justify-between border-b-4 border-gray-200 pb-2 mb-4">
               <div className="flex items-start gap-4 w-full">
-                <img src="/logo.png" alt="Logo" className="w-[100px] h-[100px] object-contain flex-shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                <img src={tenant?.logo_path || '/logo.png'} alt="Logo" className="w-[100px] h-[100px] object-contain flex-shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />
                 <div className="flex-1 text-center pt-2 relative">
-                  <h1 className="text-[18px] md:text-[22px] font-black text-[#1a237e] tracking-tight leading-tight">COLLEGE OF NURSING SCIENCES, BABURA, JIGAWA STATE</h1>
-                  <h2 className="text-[15px] md:text-[17px] font-bold text-[#5c6bc0] leading-tight mt-1">SCHOOL OF NURSING, BABURA</h2>
-                  <h3 className="text-[14px] md:text-[15px] font-bold text-[#3949ab] italic leading-tight mt-0.5">Result Slip</h3>
+                  <h1 className="text-[18px] md:text-[22px] font-black text-[#1a237e] tracking-tight leading-tight">{(tenant?.name || 'Ameenatu College of Nursing Sciences (ACONS)').toUpperCase()}</h1>
+                  {tenant?.address && <h2 className="text-[15px] md:text-[17px] font-bold text-[#5c6bc0] leading-tight mt-1">{tenant.address}</h2>}
+                  <h3 className="text-[14px] md:text-[15px] font-bold text-[#3949ab] italic leading-tight mt-0.5">Academic Transcript / Result Slip</h3>
                   
                   <div className="md:absolute right-0 top-8 text-right text-xs font-bold text-[#1976d2] space-y-1 mt-2 md:mt-0 flex flex-col items-center md:items-end">
-                    <div className="flex items-center gap-1.5">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
-                      <span>www.consbabura.edu.ng</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                      <span>son@consbabura.edu.ng</span>
-                    </div>
+                    {tenant?.email && (
+                      <div className="flex items-center gap-1.5">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        <span>{tenant.email}</span>
+                      </div>
+                    )}
+                    {tenant?.phone && (
+                      <div className="flex items-center gap-1.5">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                        <span>{tenant.phone}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="text-center font-bold text-sm md:text-md mb-6">
-              {currentGroup?.session_name || '2023/2024 Academic Session'}
+            <div className="text-center font-bold text-sm md:text-md mb-1">
+              {currentGroup?.academic_session_name || currentGroup?.session_name || 'Academic Session'}
+            </div>
+            <div className="text-center font-semibold text-xs md:text-sm mb-6 text-gray-600">
+              {currentGroup?.semester_name || 'Semester'}
             </div>
 
             {/* Student Info */}
@@ -140,6 +150,8 @@ export default function StudentResults({ groupedResults, studentDetails }: Props
             {/* Academic Info */}
             <div className="mb-6 border-b-4 border-gray-100 pb-6 text-sm md:text-base">
               <h3 className="font-extrabold text-lg mb-2">Academic's Information</h3>
+              <div className="flex"><span className="w-32 md:w-40 inline-block">Academic Session:</span> <span className="font-bold">{currentGroup?.academic_session_name || 'N/A'}</span></div>
+              <div className="flex"><span className="w-32 md:w-40 inline-block">Semester:</span> <span className="font-bold">{currentGroup?.semester_name || 'N/A'}</span></div>
               <div className="flex"><span className="w-32 md:w-40 inline-block">Current Level:</span> <span className="font-bold">{studentDetails.level}</span></div>
               <div className="flex"><span className="w-32 md:w-40 inline-block">Programme:</span> <span className="font-bold">{studentDetails.department}</span></div>
             </div>

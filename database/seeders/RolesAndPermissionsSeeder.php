@@ -127,5 +127,14 @@ class RolesAndPermissionsSeeder extends Seeder
             'register courses', 'view own records', 'pay own fees', 'view own timetable',
             'view announcements'
         ]);
+
+        // Exam Officer (Examinations & results compilation)
+        $roleExamOfficer = Role::create(['name' => 'exam_officer', 'guard_name' => 'web']);
+        $roleExamOfficer->givePermissionTo([
+            'view students', 'view courses', 'view course_registrations',
+            'view grades', 'upload course grades', 'approve senate grades',
+            'view timetables', 'create timetables', 'edit timetables',
+            'view announcements', 'create announcements'
+        ]);
     }
 }
