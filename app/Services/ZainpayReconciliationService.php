@@ -69,10 +69,12 @@ class ZainpayReconciliationService
 
             $this->ensureAdmissionApplicationExists($applicant);
 
-            Log::info("Zainpay: Successfully reconciled Applicant ID {$applicant->id} ({$applicant->full_name}) as paid.", [
-                'txnRef' => $txnRef,
-                'amount' => $finalAmount
-            ]);
+            try {
+                Log::info("Zainpay: Successfully reconciled Applicant ID {$applicant->id} ({$applicant->full_name}) as paid.", [
+                    'txnRef' => $txnRef,
+                    'amount' => $finalAmount
+                ]);
+            } catch (\Throwable) {}
 
             return [
                 'type' => 'applicant',
@@ -131,9 +133,11 @@ class ZainpayReconciliationService
                 }
             }
 
-            Log::info("Zainpay: Successfully reconciled Student Payment ID {$payment->id} as successful.", [
-                'txnRef' => $txnRef
-            ]);
+            try {
+                Log::info("Zainpay: Successfully reconciled Student Payment ID {$payment->id} as successful.", [
+                    'txnRef' => $txnRef
+                ]);
+            } catch (\Throwable) {}
 
             return [
                 'type' => 'payment',
