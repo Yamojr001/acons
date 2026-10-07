@@ -194,8 +194,9 @@ class PublicApplicantController extends Controller
             return back()->withErrors(['payment' => 'ZainPay initialization failed: ' . ($response['description'] ?? 'Unknown error. Check your ZainPay credentials.')]);
         }
 
-        // Stash ref in session for verification fallback
+        // Stash ref in session and persist in DB for verification/reconciliation fallback
         session(['zainpay_txn_' . $applicant->id => $txnRef]);
+        $applicant->update(['payment_reference' => $txnRef]);
 
         $redirectUrl = is_array($response['data'] ?? null)
             ? ($response['data']['url'] ?? $response['data']['paymentUrl'] ?? '')
@@ -213,28 +214,76 @@ class PublicApplicantController extends Controller
             return redirect()->route('admissions.login')->with('success', 'Fee already cleared. Please log in.');
         }
 
-        $txnRef  = $request->query('txnRef', session('zainpay_txn_' . $applicant->id));
+        $txnRef  = $request->query('txnRef', session('zainpay_txn_' . $applicant->id, $applicant->payment_reference));
         $mode    = config('services.zainpay.mode', 'sandbox');
         $baseUrl = $mode === 'production' ? 'https://api.zainpay.ng' : 'https://sandbox.zainpay.ng';
+        $pubKey  = config('services.zainpay.public_key');
+        $zainboxCode = config('services.zainpay.zainbox_code');
 
         if (!$txnRef) {
             return redirect()->route('admissions.pay', $applicant->id)
                 ->with('error', 'Payment reference missing. Please try again.');
         }
 
+        $isVerified = false;
+        $amountPaid = 14700.00;
+
+        // 1. Verify via virtual-account wallet deposit verification v2
         try {
-            $verify = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
+            $verify = Http::timeout(30)->withToken($pubKey)
                 ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$txnRef}")
                 ->json();
-        } catch (\Exception $e) {
-            return redirect()->route('admissions.pay', $applicant->id)
-                ->with('error', 'Could not verify payment. Please contact support.');
+
+            if (($verify['code'] ?? '') === '00' && strtolower($verify['data']['status'] ?? '') === 'success') {
+                $isVerified = true;
+                $rawAmount = (float) ($verify['data']['amount'] ?? $verify['data']['depositedAmount'] ?? 14700);
+                $amountPaid = $rawAmount > 100000 ? round($rawAmount / 100, 2) : $rawAmount;
+            }
+        } catch (\Exception $e) {}
+
+        // 2. Fallback: Verify via Zainpay hanging card transaction reconcile endpoint
+        if (!$isVerified) {
+            try {
+                $cardReconcile = Http::timeout(30)->withToken($pubKey)
+                    ->get("{$baseUrl}/virtual-account/wallet/transaction/reconcile/card-payment", [
+                        'txnRef' => $txnRef,
+                    ])->json();
+
+                if (($cardReconcile['code'] ?? '') === '00') {
+                    $txnStatus = strtolower($cardReconcile['data']['txnStatus'] ?? '');
+                    if (in_array($txnStatus, ['success', 'successful'])) {
+                        $isVerified = true;
+                    }
+                }
+            } catch (\Exception $e) {}
         }
 
-        if (($verify['code'] ?? '') === '00' && strtolower($verify['data']['status'] ?? '') === 'success') {
+        // 3. Fallback: Search Zainbox card transactions by reference
+        if (!$isVerified && !empty($zainboxCode)) {
+            try {
+                $cardTxns = Http::timeout(30)->withToken($pubKey)
+                    ->get("{$baseUrl}/zainbox/card/transactions/{$zainboxCode}", [
+                        'txnRef' => $txnRef,
+                    ])->json();
+
+                if (($cardTxns['code'] ?? '') === '00' && !empty($cardTxns['data'])) {
+                    foreach ($cardTxns['data'] as $cardTxn) {
+                        $txnStatus = strtolower($cardTxn['txnStatus'] ?? '');
+                        if (in_array($txnStatus, ['success', 'successful'])) {
+                            $isVerified = true;
+                            $rawAmount = (float) ($cardTxn['amount'] ?? 14700);
+                            $amountPaid = $rawAmount > 100000 ? round($rawAmount / 100, 2) : $rawAmount;
+                            break;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {}
+        }
+
+        if ($isVerified) {
             $applicant->update([
                 'payment_status'    => 'paid',
-                'amount_paid'       => 14700.00,
+                'amount_paid'       => $amountPaid > 0 ? $amountPaid : 14700.00,
                 'payment_reference' => $txnRef,
             ]);
 

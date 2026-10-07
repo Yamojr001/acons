@@ -60,6 +60,12 @@ class ZainpayReconciliationService
         }
 
         if ($applicant) {
+            if ($applicant->payment_status === 'paid') {
+                // Ensure AdmissionApplication exists even if applicant was already marked paid
+                $this->ensureAdmissionApplicationExists($applicant);
+                return null;
+            }
+
             $finalAmount = $amount > 0 ? $amount : 14700.00;
             $applicant->update([
                 'payment_status'    => 'paid',
@@ -104,6 +110,10 @@ class ZainpayReconciliationService
         }
 
         if ($payment) {
+            if ($payment->status === 'successful') {
+                return null;
+            }
+
             $payment->update([
                 'status' => 'successful',
                 'metadata' => array_merge($payment->metadata ?? [], [
@@ -151,7 +161,188 @@ class ZainpayReconciliationService
     }
 
     /**
-     * Reconcile recent transactions directly from Zainpay's history API.
+     * Reconcile card payment transactions for this Zainbox (/zainbox/card/transactions/{zainboxCode}).
+     */
+    public function reconcileCardTransactions(int $count = 50, ?string $email = null, ?string $txnRef = null): array
+    {
+        if (empty($this->zainboxCode) || empty($this->publicKey)) {
+            return [];
+        }
+
+        $params = ['count' => $count];
+        if (!empty($email)) {
+            $params['email'] = trim($email);
+        }
+        if (!empty($txnRef)) {
+            $params['txnRef'] = trim($txnRef);
+        }
+
+        try {
+            $response = Http::timeout(30)
+                ->withToken($this->publicKey)
+                ->get("{$this->baseUrl}/zainbox/card/transactions/{$this->zainboxCode}", $params)
+                ->json();
+        } catch (\Exception $e) {
+            return [];
+        }
+
+        if (($response['code'] ?? '') !== '00' || !isset($response['data']) || !is_array($response['data'])) {
+            return [];
+        }
+
+        $reconciled = [];
+        foreach ($response['data'] as $item) {
+            $status = strtolower($item['txnStatus'] ?? $item['status'] ?? '');
+            if (!in_array($status, ['success', 'successful', 'completed'])) {
+                continue;
+            }
+
+            $itemTxnRef  = $item['txnRef'] ?? $item['paymentRef'] ?? '';
+            $itemEmail   = $item['emailAddress'] ?? $item['email'] ?? null;
+            $rawAmount   = (float) ($item['amount'] ?? 0);
+            $amountNaira = $rawAmount > 100000 ? round($rawAmount / 100, 2) : $rawAmount;
+            $gatewayRef  = $item['paymentRef'] ?? null;
+
+            $matched = $this->handleSuccessfulPayment($itemTxnRef, $itemEmail, $amountNaira, $gatewayRef);
+            if ($matched) {
+                $reconciled[] = $matched;
+            }
+        }
+
+        return $reconciled;
+    }
+
+    /**
+     * Verify and reconcile a specific transaction reference against Zainpay.
+     */
+    public function verifyAndReconcileTxnRef(string $txnRef): ?array
+    {
+        if (empty($txnRef) || empty($this->publicKey)) {
+            return null;
+        }
+
+        // 1. Try verify v2
+        try {
+            $verify = Http::timeout(25)
+                ->withToken($this->publicKey)
+                ->get("{$this->baseUrl}/virtual-account/wallet/deposit/verify/v2/{$txnRef}")
+                ->json();
+
+            if (($verify['code'] ?? '') === '00' && strtolower($verify['data']['status'] ?? '') === 'success') {
+                $data = $verify['data'];
+                $rawAmount = (float) ($data['amount'] ?? $data['depositedAmount'] ?? 14700);
+                $amountNaira = $rawAmount > 100000 ? round($rawAmount / 100, 2) : $rawAmount;
+                $email = $data['customer']['email'] ?? $data['emailNotification'] ?? $data['emailAddress'] ?? null;
+
+                return $this->handleSuccessfulPayment($txnRef, $email, $amountNaira, $data['paymentRef'] ?? null);
+            }
+        } catch (\Exception) {}
+
+        // 2. Try hanging card-payment reconcile endpoint
+        try {
+            $reconcile = Http::timeout(25)
+                ->withToken($this->publicKey)
+                ->get("{$this->baseUrl}/virtual-account/wallet/transaction/reconcile/card-payment", [
+                    'txnRef' => $txnRef,
+                ])->json();
+
+            if (($reconcile['code'] ?? '') === '00' && in_array(strtolower($reconcile['data']['txnStatus'] ?? ''), ['success', 'successful'])) {
+                $data = $reconcile['data'];
+                return $this->handleSuccessfulPayment($txnRef, null, 14700.00, $data['paymentRef'] ?? null);
+            }
+        } catch (\Exception) {}
+
+        return null;
+    }
+
+    /**
+     * Reconcile a specific applicant by ID or JAMB number.
+     */
+    public function reconcileApplicantById(int|string $identifier, bool $force = false): array
+    {
+        $applicant = Applicant::where('id', $identifier)
+            ->orWhere('jamb_number', $identifier)
+            ->first();
+
+        if (!$applicant) {
+            return [
+                'success' => false,
+                'error'   => "Applicant with ID or JAMB Number '{$identifier}' not found in database.",
+            ];
+        }
+
+        if ($applicant->payment_status === 'paid' && !$force) {
+            $this->ensureAdmissionApplicationExists($applicant);
+            return [
+                'success' => true,
+                'message' => "Applicant #{$applicant->id} ({$applicant->full_name}) is already marked as PAID.",
+                'applicant' => $applicant,
+            ];
+        }
+
+        if ($force) {
+            $ref = $applicant->payment_reference ?: ('ACON_ADM_' . $applicant->id . '_' . time());
+            $applicant->update([
+                'payment_status'    => 'paid',
+                'amount_paid'       => 14700.00,
+                'payment_reference' => $ref,
+            ]);
+            $this->ensureAdmissionApplicationExists($applicant);
+
+            return [
+                'success' => true,
+                'forced'  => true,
+                'message' => "Applicant #{$applicant->id} ({$applicant->full_name}) successfully force-marked as PAID.",
+                'applicant' => $applicant,
+            ];
+        }
+
+        // 1. Check card transactions for this applicant's email
+        if (!empty($applicant->email)) {
+            $this->reconcileCardTransactions(30, $applicant->email);
+            $applicant->refresh();
+            if ($applicant->payment_status === 'paid') {
+                return [
+                    'success' => true,
+                    'message' => "Matched payment on Zainpay via email '{$applicant->email}'! Applicant is now PAID.",
+                    'applicant' => $applicant,
+                ];
+            }
+        }
+
+        // 2. If applicant has a payment_reference, verify directly
+        if (!empty($applicant->payment_reference)) {
+            $this->verifyAndReconcileTxnRef($applicant->payment_reference);
+            $applicant->refresh();
+            if ($applicant->payment_status === 'paid') {
+                return [
+                    'success' => true,
+                    'message' => "Verified reference '{$applicant->payment_reference}' on Zainpay! Applicant is now PAID.",
+                    'applicant' => $applicant,
+                ];
+            }
+        }
+
+        // 3. Scan recent 50 card transactions generally
+        $this->reconcileCardTransactions(50);
+        $applicant->refresh();
+        if ($applicant->payment_status === 'paid') {
+            return [
+                'success' => true,
+                'message' => "Matched in Zainpay card transactions! Applicant is now PAID.",
+                'applicant' => $applicant,
+            ];
+        }
+
+        return [
+            'success' => false,
+            'error'   => "Payment for Applicant #{$applicant->id} ({$applicant->full_name}) could not be automatically confirmed on Zainpay Sandbox yet.\nRun with --force to clear them immediately if you confirmed the payment: php artisan zainpay:reconcile --applicant={$applicant->id} --force",
+            'applicant' => $applicant,
+        ];
+    }
+
+    /**
+     * Reconcile recent transactions across Card and Bank Deposit APIs.
      */
     public function reconcileHistory(int $count = 50): array
     {
@@ -159,80 +350,78 @@ class ZainpayReconciliationService
             return ['success' => false, 'error' => 'Zainpay credentials not configured.'];
         }
 
+        $reconciled = [];
+
+        // ─── A. Reconcile Card Transactions (Most common for web admissions) ───
+        $cardReconciled = $this->reconcileCardTransactions($count);
+        $reconciled = array_merge($reconciled, $cardReconciled);
+
+        // ─── B. Reconcile Bank Transfer / Virtual Account Transactions ────────
         try {
-            $response = Http::timeout(45)
+            $response = Http::timeout(30)
                 ->withToken($this->publicKey)
                 ->get("{$this->baseUrl}/zainbox/transactions/{$this->zainboxCode}?count={$count}")
                 ->json();
-        } catch (\Exception $e) {
-            return ['success' => false, 'error' => 'Failed to reach Zainpay: ' . $e->getMessage()];
-        }
 
-        if (($response['code'] ?? '') !== '00' || !isset($response['data']) || !is_array($response['data'])) {
-            return ['success' => false, 'error' => $response['description'] ?? 'No transactions returned.'];
-        }
-
-        $reconciled = [];
-
-        foreach ($response['data'] as $item) {
-            $txnRef = $item['transactionRef'] ?? '';
-            if (empty($txnRef)) {
-                continue;
-            }
-
-            // Parse amount (Zainbox history is often reported in kobo, e.g. 1442950.00 = ₦14,429.50)
-            $rawAmount = (float) ($item['amount'] ?? 0);
-            $amountNaira = $rawAmount > 100000 ? round($rawAmount / 100, 2) : $rawAmount;
-
-            // Check if already paid in DB
-            if (preg_match('/ACON_ADM_(\d+)/', $txnRef, $m)) {
-                $checkApplicant = Applicant::find($m[1]);
-                if ($checkApplicant && $checkApplicant->payment_status === 'paid') {
-                    continue; // Already reconciled
-                }
-            }
-
-            // Attempt matching with available reference
-            $match = $this->handleSuccessfulPayment($txnRef, null, $amountNaira, $item['accountNumber'] ?? null);
-
-            // If not matched immediately by reference, verify transaction details to fetch customer email
-            if (!$match) {
-                try {
-                    $verify = Http::timeout(20)
-                        ->withToken($this->publicKey)
-                        ->get("{$this->baseUrl}/virtual-account/wallet/deposit/verify/v2/{$txnRef}")
-                        ->json();
-
-                    if (($verify['code'] ?? '') === '00' && isset($verify['data'])) {
-                        $customerEmail = $verify['data']['customer']['email'] 
-                            ?? $verify['data']['emailNotification'] 
-                            ?? $verify['data']['emailAddress'] 
-                            ?? null;
-
-                        if ($customerEmail) {
-                            $match = $this->handleSuccessfulPayment(
-                                $txnRef,
-                                $customerEmail,
-                                $amountNaira,
-                                $verify['data']['paymentRef'] ?? null
-                            );
-                        }
+            if (($response['code'] ?? '') === '00' && isset($response['data']) && is_array($response['data'])) {
+                foreach ($response['data'] as $item) {
+                    $txnRef = $item['transactionRef'] ?? '';
+                    if (empty($txnRef)) {
+                        continue;
                     }
-                } catch (\Exception) {
-                    // Continue to next transaction
+
+                    $rawAmount = (float) ($item['amount'] ?? 0);
+                    $amountNaira = $rawAmount > 100000 ? round($rawAmount / 100, 2) : $rawAmount;
+
+                    $match = $this->handleSuccessfulPayment($txnRef, null, $amountNaira, $item['accountNumber'] ?? null);
+
+                    if (!$match) {
+                        $match = $this->verifyAndReconcileTxnRef($txnRef);
+                    }
+
+                    if ($match) {
+                        $reconciled[] = $match;
+                    }
                 }
             }
+        } catch (\Exception) {}
 
-            if ($match) {
-                $reconciled[] = $match;
+        // ─── C. Proactively check pending applicants in DB ───────────────────
+        $pendingApplicants = Applicant::where('payment_status', 'pending')
+            ->latest()
+            ->take(20)
+            ->get();
+
+        foreach ($pendingApplicants as $pending) {
+            if (!empty($pending->email)) {
+                $matched = $this->reconcileCardTransactions(10, $pending->email);
+                if (!empty($matched)) {
+                    $reconciled = array_merge($reconciled, $matched);
+                }
+            }
+            if (!empty($pending->payment_reference)) {
+                $matched = $this->verifyAndReconcileTxnRef($pending->payment_reference);
+                if ($matched) {
+                    $reconciled[] = $matched;
+                }
             }
         }
+
+        // Deduplicate reconciled records by (type, id)
+        $unique = [];
+        foreach ($reconciled as $rec) {
+            $key = ($rec['type'] ?? '') . '_' . ($rec['id'] ?? '');
+            if (!isset($unique[$key])) {
+                $unique[$key] = $rec;
+            }
+        }
+        $finalReconciled = array_values($unique);
 
         return [
             'success' => true,
-            'total_checked' => count($response['data']),
-            'reconciled_count' => count($reconciled),
-            'reconciled_records' => $reconciled,
+            'total_checked' => $count,
+            'reconciled_count' => count($finalReconciled),
+            'reconciled_records' => $finalReconciled,
         ];
     }
 

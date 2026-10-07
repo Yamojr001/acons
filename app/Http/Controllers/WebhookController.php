@@ -54,7 +54,9 @@ class WebhookController extends Controller {
         $status = strtolower($body['status'] ?? '');
         $data = $body['data'] ?? $body;
 
-        Log::info('Zainpay webhook incoming payload', ['body' => $body]);
+        try {
+            Log::info('Zainpay webhook incoming payload', ['body' => $body]);
+        } catch (\Throwable) {}
 
         // Check if manual or automated history reconcile requested via webhook
         if ($request->has('reconcile') || ($body['action'] ?? '') === 'reconcile') {
@@ -101,7 +103,9 @@ class WebhookController extends Controller {
                     'history_scan' => $historyScan
                 ]);
             } catch (\Exception $e) {
-                Log::error('Zainpay webhook processing error: ' . $e->getMessage(), ['exception' => $e]);
+                try {
+                    Log::error('Zainpay webhook processing error: ' . $e->getMessage(), ['exception' => $e]);
+                } catch (\Throwable) {}
                 return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
             }
         }
