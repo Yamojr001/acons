@@ -14,6 +14,7 @@ class ReconcileZainpayPayments extends Command
      */
     protected $signature = 'zainpay:reconcile 
         {--count=50 : Number of recent transactions to inspect}
+        {--window=40 : Time window in minutes to match transactions against applicant timestamp (default: 40)}
         {--applicant= : Reconcile a specific applicant by ID or JAMB number}
         {--email= : Customer email to search and reconcile in Zainpay}
         {--ref= : Specific transaction reference to verify and reconcile}
@@ -31,12 +32,14 @@ class ReconcileZainpayPayments extends Command
      */
     public function handle(ZainpayReconciliationService $service): int
     {
+        $window = (int) ($this->option('window') ?: 40);
+
         // ─── Case 1: Specific Applicant Lookup / Force Clear ─────────────────
         if ($applicantInput = $this->option('applicant')) {
             $force = (bool) $this->option('force');
-            $this->info("Reconciling applicant '{$applicantInput}'..." . ($force ? " (FORCED)" : ""));
+            $this->info("Reconciling applicant '{$applicantInput}' (Window: {$window}m)..." . ($force ? " (FORCED)" : ""));
 
-            $result = $service->reconcileApplicantById($applicantInput, $force);
+            $result = $service->reconcileApplicantById($applicantInput, $force, $window);
 
             if (!($result['success'] ?? false)) {
                 $this->error($result['error'] ?? 'Applicant reconciliation failed.');
@@ -46,18 +49,21 @@ class ReconcileZainpayPayments extends Command
             $applicant = $result['applicant'];
             $this->info($result['message']);
 
-            $this->table(
-                ['Field', 'Value'],
-                [
-                    ['Applicant ID', $applicant->id],
-                    ['Full Name', $applicant->full_name],
-                    ['JAMB Number', $applicant->jamb_number],
-                    ['Email', $applicant->email],
-                    ['Payment Status', $applicant->payment_status],
-                    ['Amount Paid', '₦' . number_format((float) $applicant->amount_paid, 2)],
-                    ['Payment Reference', $applicant->payment_reference ?? 'N/A'],
-                ]
-            );
+            $rows = [
+                ['Applicant ID', $applicant->id],
+                ['Full Name', $applicant->full_name],
+                ['JAMB Number', $applicant->jamb_number],
+                ['Email', $applicant->email],
+                ['Payment Status', $applicant->payment_status],
+                ['Amount Paid', '₦' . number_format((float) $applicant->amount_paid, 2)],
+                ['Payment Reference', $applicant->payment_reference ?? 'N/A'],
+            ];
+
+            if (isset($result['transaction']['diffMinutes'])) {
+                $rows[] = ['Time Difference', $result['transaction']['diffMinutes'] . ' minutes'];
+            }
+
+            $this->table(['Field', 'Value'], $rows);
 
             return Command::SUCCESS;
         }
@@ -103,9 +109,9 @@ class ReconcileZainpayPayments extends Command
 
         // ─── Case 4: Default Full History & Pending Applicants Scan ─────────
         $count = (int) $this->option('count');
-        $this->info("Fetching up to {$count} recent transactions across Card and Bank APIs...");
+        $this->info("Fetching up to {$count} recent transactions across Card and Bank APIs (Window: {$window}m)...");
 
-        $result = $service->reconcileHistory($count);
+        $result = $service->reconcileHistory($count, $window);
 
         if (!($result['success'] ?? false)) {
             $this->error('Reconciliation failed: ' . ($result['error'] ?? 'Unknown error'));

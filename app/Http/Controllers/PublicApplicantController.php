@@ -280,6 +280,21 @@ class PublicApplicantController extends Controller
             } catch (\Exception $e) {}
         }
 
+        // 4. Fallback: Match by amount (₦14,700) and timestamp within 40-minute window
+        if (!$isVerified) {
+            try {
+                $reconcileService = app(\App\Services\ZainpayReconciliationService::class);
+                $refTime = $applicant->created_at ?: now();
+                $matchedTx = $reconcileService->findMatchingTransactionByAmountAndTimestamp(14700.00, $refTime, 40);
+
+                if ($matchedTx) {
+                    $isVerified = true;
+                    $txnRef = $matchedTx['txnRef'] ?: ($txnRef ?: ('ACON_ADM_' . $applicant->id . '_' . time()));
+                    $amountPaid = 14700.00;
+                }
+            } catch (\Exception $e) {}
+        }
+
         if ($isVerified) {
             $applicant->update([
                 'payment_status'    => 'paid',

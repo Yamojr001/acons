@@ -10,6 +10,7 @@ use App\Models\StudentInvoice;
 use App\Models\User;
 use App\Models\Transaction;
 use App\Models\Fee;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -256,9 +257,176 @@ class ZainpayReconciliationService
     }
 
     /**
+     * Determine if a transaction amount matches the expected amount (allowing for kobo conversion and processing fee charges).
+     */
+    public function isAmountMatch(float $txnAmount, float $expectedAmount = 14700.00): bool
+    {
+        if ($txnAmount <= 0) {
+            return false;
+        }
+
+        // Convert kobo to naira if > 100000 (e.g. 1470000 kobo = 14700 naira)
+        if ($txnAmount > 100000) {
+            $txnAmount = round($txnAmount / 100, 2);
+        }
+
+        // Exact match
+        if (abs($txnAmount - $expectedAmount) < 1.0) {
+            return true;
+        }
+
+        // Net-of-fees/charges match (e.g. 14,429.50 after Zainpay processing fees)
+        if ($txnAmount >= ($expectedAmount * 0.90) && $txnAmount <= ($expectedAmount * 1.05)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Parse date string or transaction reference into Carbon instance.
+     */
+    public function parseTransactionCarbon(?string $dateStr, ?string $refStr = null): ?Carbon
+    {
+        // 1. Try extracting Unix timestamp from ref (e.g. ACON_ADM_1_1791355864)
+        if ($refStr && preg_match('/_(\d{9,11})/', $refStr, $m)) {
+            try {
+                return Carbon::createFromTimestamp((int) $m[1]);
+            } catch (\Throwable) {}
+        }
+
+        if (empty($dateStr)) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($dateStr, config('app.timezone', 'Africa/Lagos'));
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Search Zainpay Card & Bank transaction history for a transaction matching 
+     * the expected amount within a specified time window (default: 40 minutes).
+     */
+    public function findMatchingTransactionByAmountAndTimestamp(
+        float $expectedAmount,
+        Carbon $referenceTime,
+        int $windowMinutes = 40
+    ): ?array {
+        if (empty($this->zainboxCode) || empty($this->publicKey)) {
+            return null;
+        }
+
+        $candidates = [];
+
+        // ─── 1. Inspect Card Transactions ────────────────────────────────────
+        try {
+            $cardRes = Http::timeout(30)
+                ->withToken($this->publicKey)
+                ->get("{$this->baseUrl}/zainbox/card/transactions/{$this->zainboxCode}?count=50")
+                ->json();
+
+            if (($cardRes['code'] ?? '') === '00' && !empty($cardRes['data']) && is_array($cardRes['data'])) {
+                foreach ($cardRes['data'] as $tx) {
+                    $status = strtolower($tx['txnStatus'] ?? $tx['status'] ?? '');
+                    if (!in_array($status, ['success', 'successful', 'completed'])) {
+                        continue;
+                    }
+
+                    $rawAmount = (float) ($tx['amount'] ?? 0);
+                    if (!$this->isAmountMatch($rawAmount, $expectedAmount)) {
+                        continue;
+                    }
+
+                    $dateStr = $tx['createdOn'] ?? $tx['txnDate'] ?? $tx['paymentDate'] ?? $tx['date'] ?? null;
+                    $refStr  = $tx['txnRef'] ?? $tx['paymentRef'] ?? '';
+                    $txCarbon = $this->parseTransactionCarbon($dateStr, $refStr);
+
+                    if (!$txCarbon) {
+                        continue;
+                    }
+
+                    $diffSeconds = abs($txCarbon->getTimestamp() - $referenceTime->getTimestamp());
+                    $diffMinutes = round($diffSeconds / 60, 1);
+
+                    // Allow window (and handle potential 1hr UTC/WAT difference)
+                    $isWithinWindow = ($diffMinutes <= $windowMinutes) || (abs($diffMinutes - 60) <= $windowMinutes);
+
+                    if ($isWithinWindow) {
+                        $actualDiff = ($diffMinutes <= $windowMinutes) ? $diffMinutes : round(abs($diffMinutes - 60), 1);
+                        $candidates[] = [
+                            'txnRef'      => $tx['txnRef'] ?? $tx['paymentRef'] ?? '',
+                            'paymentRef'  => $tx['paymentRef'] ?? null,
+                            'email'       => $tx['emailAddress'] ?? $tx['email'] ?? null,
+                            'amount'      => $rawAmount > 100000 ? round($rawAmount / 100, 2) : $rawAmount,
+                            'diffMinutes' => $actualDiff,
+                            'txDate'      => $txCarbon->toDateTimeString(),
+                            'source'      => 'card',
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable) {}
+
+        // ─── 2. Inspect Bank / Deposit Transactions ──────────────────────────
+        try {
+            $bankRes = Http::timeout(30)
+                ->withToken($this->publicKey)
+                ->get("{$this->baseUrl}/zainbox/transactions/{$this->zainboxCode}?count=50")
+                ->json();
+
+            if (($bankRes['code'] ?? '') === '00' && !empty($bankRes['data']) && is_array($bankRes['data'])) {
+                foreach ($bankRes['data'] as $tx) {
+                    $rawAmount = (float) ($tx['amount'] ?? 0);
+                    if (!$this->isAmountMatch($rawAmount, $expectedAmount)) {
+                        continue;
+                    }
+
+                    $dateStr = $tx['transactionDate'] ?? $tx['paymentDate'] ?? $tx['date'] ?? null;
+                    $refStr  = $tx['transactionRef'] ?? '';
+                    $txCarbon = $this->parseTransactionCarbon($dateStr, $refStr);
+
+                    if (!$txCarbon) {
+                        continue;
+                    }
+
+                    $diffSeconds = abs($txCarbon->getTimestamp() - $referenceTime->getTimestamp());
+                    $diffMinutes = round($diffSeconds / 60, 1);
+
+                    $isWithinWindow = ($diffMinutes <= $windowMinutes) || (abs($diffMinutes - 60) <= $windowMinutes);
+
+                    if ($isWithinWindow) {
+                        $actualDiff = ($diffMinutes <= $windowMinutes) ? $diffMinutes : round(abs($diffMinutes - 60), 1);
+                        $candidates[] = [
+                            'txnRef'      => $tx['transactionRef'] ?? '',
+                            'paymentRef'  => $tx['accountNumber'] ?? null,
+                            'email'       => null,
+                            'amount'      => $rawAmount > 100000 ? round($rawAmount / 100, 2) : $rawAmount,
+                            'diffMinutes' => $actualDiff,
+                            'txDate'      => $txCarbon->toDateTimeString(),
+                            'source'      => 'bank',
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable) {}
+
+        if (empty($candidates)) {
+            return null;
+        }
+
+        // Pick candidate closest in time
+        usort($candidates, fn($a, $b) => $a['diffMinutes'] <=> $b['diffMinutes']);
+
+        return $candidates[0];
+    }
+
+    /**
      * Reconcile a specific applicant by ID or JAMB number.
      */
-    public function reconcileApplicantById(int|string $identifier, bool $force = false): array
+    public function reconcileApplicantById(int|string $identifier, bool $force = false, int $windowMinutes = 40): array
     {
         $applicant = Applicant::where('id', $identifier)
             ->orWhere('jamb_number', $identifier)
@@ -323,7 +491,28 @@ class ZainpayReconciliationService
             }
         }
 
-        // 3. Scan recent 50 card transactions generally
+        // 3. Match using Amount (₦14,700) and Timestamp within 40-minute window
+        $refTime = $applicant->created_at ?: now();
+        $matchedTx = $this->findMatchingTransactionByAmountAndTimestamp(14700.00, $refTime, $windowMinutes);
+
+        if ($matchedTx) {
+            $txnRef = $matchedTx['txnRef'] ?: ('ACON_ADM_' . $applicant->id . '_' . time());
+            $applicant->update([
+                'payment_status'    => 'paid',
+                'amount_paid'       => 14700.00,
+                'payment_reference' => $txnRef,
+            ]);
+            $this->ensureAdmissionApplicationExists($applicant);
+
+            return [
+                'success' => true,
+                'message' => "Verified on Zainpay using Amount (₦14,700.00) and Timestamp within {$windowMinutes} mins (diff: {$matchedTx['diffMinutes']} mins, time: {$matchedTx['txDate']})! Applicant is now PAID.",
+                'applicant' => $applicant,
+                'transaction' => $matchedTx,
+            ];
+        }
+
+        // 4. Scan recent 50 card transactions generally
         $this->reconcileCardTransactions(50);
         $applicant->refresh();
         if ($applicant->payment_status === 'paid') {
@@ -336,7 +525,7 @@ class ZainpayReconciliationService
 
         return [
             'success' => false,
-            'error'   => "Payment for Applicant #{$applicant->id} ({$applicant->full_name}) could not be automatically confirmed on Zainpay Sandbox yet.\nRun with --force to clear them immediately if you confirmed the payment: php artisan zainpay:reconcile --applicant={$applicant->id} --force",
+            'error'   => "Payment for Applicant #{$applicant->id} ({$applicant->full_name}) could not be confirmed on Zainpay within the {$windowMinutes}-minute window.\nRun with --force to clear them immediately if you confirmed the payment: php artisan zainpay:reconcile --applicant={$applicant->id} --force",
             'applicant' => $applicant,
         ];
     }
@@ -344,7 +533,7 @@ class ZainpayReconciliationService
     /**
      * Reconcile recent transactions across Card and Bank Deposit APIs.
      */
-    public function reconcileHistory(int $count = 50): array
+    public function reconcileHistory(int $count = 50, int $windowMinutes = 40): array
     {
         if (empty($this->zainboxCode) || empty($this->publicKey)) {
             return ['success' => false, 'error' => 'Zainpay credentials not configured.'];
@@ -389,18 +578,38 @@ class ZainpayReconciliationService
         // ─── C. Proactively check pending applicants in DB ───────────────────
         $pendingApplicants = Applicant::where('payment_status', 'pending')
             ->latest()
-            ->take(20)
+            ->take(30)
             ->get();
 
         foreach ($pendingApplicants as $pending) {
+            // 1. By email
             if (!empty($pending->email)) {
                 $matched = $this->reconcileCardTransactions(10, $pending->email);
                 if (!empty($matched)) {
                     $reconciled = array_merge($reconciled, $matched);
+                    continue;
                 }
             }
+
+            // 2. By reference
             if (!empty($pending->payment_reference)) {
                 $matched = $this->verifyAndReconcileTxnRef($pending->payment_reference);
+                if ($matched) {
+                    $reconciled[] = $matched;
+                    continue;
+                }
+            }
+
+            // 3. By Amount (₦14,700) and 40-minute timestamp window
+            $refTime = $pending->created_at ?: now();
+            $matchedTx = $this->findMatchingTransactionByAmountAndTimestamp(14700.00, $refTime, $windowMinutes);
+            if ($matchedTx) {
+                $matched = $this->handleSuccessfulPayment(
+                    $matchedTx['txnRef'] ?: ('ACON_ADM_' . $pending->id . '_' . time()),
+                    $matchedTx['email'] ?: $pending->email,
+                    14700.00,
+                    $matchedTx['paymentRef'] ?? null
+                );
                 if ($matched) {
                     $reconciled[] = $matched;
                 }
