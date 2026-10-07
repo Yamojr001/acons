@@ -148,7 +148,14 @@ class PublicApplicantController extends Controller
     public function showPaymentPage(Applicant $applicant)
     {
         if ($applicant->payment_status === 'paid') {
-            return redirect()->route('admissions.login')->with('success', 'Your fee is already cleared. Please log in.');
+            try {
+                Auth::guard('applicant')->login($applicant);
+                request()->session()->regenerate();
+                return redirect()->route('admissions.dashboard')
+                    ->with('success', 'Your fee is already cleared. Welcome to your portal.');
+            } catch (\Throwable) {
+                return redirect()->route('admissions.login')->with('success', 'Your fee is already cleared. Please log in.');
+            }
         }
 
         $tenant = app('currentTenant');
@@ -211,7 +218,14 @@ class PublicApplicantController extends Controller
     public function zainpayVerify(Request $request, Applicant $applicant)
     {
         if ($applicant->payment_status === 'paid') {
-            return redirect()->route('admissions.login')->with('success', 'Fee already cleared. Please log in.');
+            try {
+                Auth::guard('applicant')->login($applicant);
+                $request->session()->regenerate();
+                return redirect()->route('admissions.dashboard')
+                    ->with('success', 'Fee already cleared. Welcome to your portal.');
+            } catch (\Throwable) {
+                return redirect()->route('admissions.login')->with('success', 'Fee already cleared. Please log in.');
+            }
         }
 
         $txnRef  = $request->query('txnRef', session('zainpay_txn_' . $applicant->id, $applicant->payment_reference));
@@ -304,8 +318,17 @@ class PublicApplicantController extends Controller
 
             $this->createAdmissionApplication($applicant);
 
-            return redirect()->route('admissions.login')
-                ->with('success', 'Payment successful! Log in with your JAMB Number and Phone Number.');
+            // Automatically log in the applicant and take them directly to their portal
+            try {
+                Auth::guard('applicant')->login($applicant);
+                $request->session()->regenerate();
+
+                return redirect()->route('admissions.dashboard')
+                    ->with('success', 'Payment confirmed! Welcome to your applicant clearance portal.');
+            } catch (\Throwable) {
+                return redirect()->route('admissions.login')
+                    ->with('success', 'Payment successful! Log in with your JAMB Number and Phone Number.');
+            }
         }
 
         return redirect()->route('admissions.pay', $applicant->id)
