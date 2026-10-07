@@ -3,7 +3,7 @@ import { Head, router } from '@inertiajs/react'
 import { motion } from 'framer-motion'
 import { 
   LogOut, CheckCircle, Clock, Calendar, 
-  MapPin, Printer, ClipboardCheck, Phone, ShieldAlert, Sparkles, Award
+  MapPin, Printer, ClipboardCheck, Phone, ShieldAlert, Sparkles, Award, FileText
 } from 'lucide-react'
 
 interface DashboardProps {
@@ -256,6 +256,12 @@ export default function Dashboard({ tenant, applicant, academicSession, admissio
               </div>
 
               <div className="shrink-0 flex flex-wrap gap-2">
+                <a 
+                  href={route('admissions.receipt', applicant.id)}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition-colors font-bold text-xs border border-emerald-200 shadow-sm"
+                >
+                  <FileText size={14} /> Official Payment Receipt
+                </a>
                 <button 
                   onClick={() => setPrintMode(true)}
                   className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors font-bold text-xs border border-blue-100"
@@ -296,7 +302,12 @@ export default function Dashboard({ tenant, applicant, academicSession, admissio
                   <div className="absolute -left-[31px] w-4 h-4 rounded-full bg-emerald-500 border-4 border-white ring-2 ring-emerald-500/20" />
                   <div className="space-y-1">
                     <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">Application Fee Settled <CheckCircle size={12} /></span>
-                    <p className="text-xs text-surface-500 font-medium">₦14,700 processing fee paid successfully. Clearance Code: <strong className="font-bold text-surface-800">{applicant.payment_reference}</strong>.</p>
+                    <p className="text-xs text-surface-500 font-medium">
+                      ₦14,700 processing fee paid successfully. Clearance Code: <strong className="font-bold text-surface-800">{applicant.payment_reference}</strong>. 
+                      <a href={route('admissions.receipt', applicant.id)} className="text-emerald-700 font-bold underline ml-1.5 hover:text-emerald-800">
+                        View e-Receipt &rarr;
+                      </a>
+                    </p>
                   </div>
                 </div>
 

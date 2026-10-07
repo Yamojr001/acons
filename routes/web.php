@@ -42,6 +42,7 @@ Route::middleware(['identify.tenant'])->group(function () {
     Route::get('/admissions/apply',               [PublicApplicantController::class, 'showApplyForm'])->name('admissions.apply');
     Route::post('/admissions/apply',              [PublicApplicantController::class, 'submitApplyForm'])->name('admissions.apply.submit');
     Route::get('/admissions/pay/{applicant}',     [PublicApplicantController::class, 'showPaymentPage'])->name('admissions.pay');
+    Route::get('/admissions/receipt/{applicant}', [PublicApplicantController::class, 'showReceipt'])->name('admissions.receipt');
     Route::post('/admissions/pay/zainpay/init/{applicant}', [PublicApplicantController::class, 'zainpayInit'])->name('admissions.pay.zainpay.init');
     Route::match(['get', 'post'], '/admissions/pay/zainpay/verify/{applicant}', [PublicApplicantController::class, 'zainpayVerify'])->name('admissions.pay.verify');
     Route::post('/admissions/pay/authorize/{applicant}', [PublicApplicantController::class, 'authorizePayment'])->name('admissions.pay.authorize');

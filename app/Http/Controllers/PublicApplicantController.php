@@ -151,11 +151,10 @@ class PublicApplicantController extends Controller
             try {
                 Auth::guard('applicant')->login($applicant);
                 request()->session()->regenerate();
-                return redirect()->route('admissions.dashboard')
-                    ->with('success', 'Your fee is already cleared. Welcome to your portal.');
-            } catch (\Throwable) {
-                return redirect()->route('admissions.login')->with('success', 'Your fee is already cleared. Please log in.');
-            }
+            } catch (\Throwable) {}
+
+            return redirect()->route('admissions.receipt', $applicant->id)
+                ->with('success', 'Your fee is already cleared. Here is your official e-Receipt.');
         }
 
         $tenant = app('currentTenant');
@@ -173,7 +172,7 @@ class PublicApplicantController extends Controller
     public function zainpayInit(Applicant $applicant)
     {
         if ($applicant->payment_status === 'paid') {
-            return Inertia::location(route('admissions.login'));
+            return Inertia::location(route('admissions.receipt', $applicant->id));
         }
 
         $txnRef      = 'ACON_ADM_' . $applicant->id . '_' . time();
@@ -221,11 +220,10 @@ class PublicApplicantController extends Controller
             try {
                 Auth::guard('applicant')->login($applicant);
                 $request->session()->regenerate();
-                return redirect()->route('admissions.dashboard')
-                    ->with('success', 'Fee already cleared. Welcome to your portal.');
-            } catch (\Throwable) {
-                return redirect()->route('admissions.login')->with('success', 'Fee already cleared. Please log in.');
-            }
+            } catch (\Throwable) {}
+
+            return redirect()->route('admissions.receipt', $applicant->id)
+                ->with('success', 'Fee already cleared. Here is your official e-Receipt.');
         }
 
         $txnRef  = $request->query('txnRef', session('zainpay_txn_' . $applicant->id, $applicant->payment_reference));
@@ -318,21 +316,48 @@ class PublicApplicantController extends Controller
 
             $this->createAdmissionApplication($applicant);
 
-            // Automatically log in the applicant and take them directly to their portal
+            // Automatically log in the applicant and take them directly to their payment receipt
             try {
                 Auth::guard('applicant')->login($applicant);
                 $request->session()->regenerate();
+            } catch (\Throwable) {}
 
-                return redirect()->route('admissions.dashboard')
-                    ->with('success', 'Payment confirmed! Welcome to your applicant clearance portal.');
-            } catch (\Throwable) {
-                return redirect()->route('admissions.login')
-                    ->with('success', 'Payment successful! Log in with your JAMB Number and Phone Number.');
-            }
+            return redirect()->route('admissions.receipt', $applicant->id)
+                ->with('success', 'Payment confirmed! Here is your official e-Receipt.');
         }
 
         return redirect()->route('admissions.pay', $applicant->id)
             ->with('error', 'Payment not confirmed yet. Please complete payment or contact support if you were charged.');
+    }
+
+    /**
+     * Show authentic Remita-style electronic payment receipt (e-Receipt).
+     */
+    public function showReceipt(Applicant $applicant): Response
+    {
+        if ($applicant->payment_status !== 'paid') {
+            return redirect()->route('admissions.pay', $applicant->id)
+                ->with('error', 'Please complete the application fee payment first to view your receipt.');
+        }
+
+        // Auto-authenticate applicant if not logged in
+        if (!Auth::guard('applicant')->check() || Auth::guard('applicant')->id() !== $applicant->id) {
+            try {
+                Auth::guard('applicant')->login($applicant);
+                request()->session()->regenerate();
+            } catch (\Throwable) {}
+        }
+
+        $tenant = app('currentTenant');
+        $academicSession = \App\Models\AcademicSession::where('tenant_id', $tenant->id ?? 1)->where('is_current', true)->first();
+
+        return Inertia::render('Public/Admissions/Receipt', [
+            'tenant'          => $tenant,
+            'applicant'       => $applicant,
+            'academicSession' => $academicSession,
+            'fee_amount'      => (float) ($applicant->amount_paid ?: 14700.00),
+            'amount_in_words' => 'Fourteen Thousand Seven Hundred Naira Only',
+        ]);
     }
 
     /**
@@ -373,7 +398,7 @@ class PublicApplicantController extends Controller
     public function authorizePayment(Request $request, Applicant $applicant)
     {
         if ($applicant->payment_status === 'paid') {
-            return redirect()->route('admissions.login')->with('success', 'Fee already authorized.');
+            return redirect()->route('admissions.receipt', $applicant->id)->with('success', 'Fee already authorized.');
         }
 
         $applicant->update([
@@ -384,8 +409,13 @@ class PublicApplicantController extends Controller
 
         $this->createAdmissionApplication($applicant);
 
-        return redirect()->route('admissions.login')
-            ->with('success', 'Payment authorized! Log in with your JAMB Number and Phone Number.');
+        try {
+            Auth::guard('applicant')->login($applicant);
+            $request->session()->regenerate();
+        } catch (\Throwable) {}
+
+        return redirect()->route('admissions.receipt', $applicant->id)
+            ->with('success', 'Payment authorized! Here is your official e-Receipt.');
     }
 
     /**
