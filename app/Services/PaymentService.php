@@ -188,8 +188,12 @@ class PaymentService
             throw new \RuntimeException('Zainpay: ' . ($response['description'] ?? 'Initialization failed'));
         }
 
+        $redirectUrl = is_array($response['data'] ?? null)
+            ? ($response['data']['url'] ?? $response['data']['paymentUrl'] ?? '')
+            : ($response['data'] ?? '');
+
         return [
-            'redirect_url' => $response['data']['url'] ?? '',
+            'redirect_url' => $redirectUrl,
             'reference'    => $reference,
         ];
     }
@@ -197,11 +201,14 @@ class PaymentService
     private function verifyZainpay(string $reference): bool
     {
         try {
+            $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
             $response = Http::withToken(config('services.zainpay.public_key'))
-                ->get(config('services.zainpay.base_url', 'https://api.zainpay.ng') . '/zainbox/transactions/' . $reference)
+                ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$reference}")
                 ->json();
 
-            return isset($response['data']['status']) && strtolower($response['data']['status']) === 'success';
+            return ($response['code'] ?? '') === '00' &&
+                   isset($response['data']['status']) &&
+                   strtolower($response['data']['status']) === 'success';
         } catch (\Exception) {
             return false;
         }

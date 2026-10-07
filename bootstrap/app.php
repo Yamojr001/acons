@@ -37,6 +37,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'webhooks/*',
+            'admissions/pay/zainpay/verify/*',
+            'student/payments/verify/*',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

@@ -181,7 +181,7 @@ class PublicApplicantController extends Controller
                 'emailAddress'  => $applicant->email ?: $applicant->jamb_number . '@acons.edu.ng',
                 'mobileNumber'  => $applicant->phone_number,
                 'zainboxCode'   => config('services.zainpay.zainbox_code'),
-                'callBackUrl'   => $callbackUrl . '?txnRef=' . $txnRef,
+                'callBackUrl'   => $callbackUrl,
             ])->json();
 
         if (($response['code'] ?? '') !== '00') {
@@ -191,7 +191,11 @@ class PublicApplicantController extends Controller
         // Stash ref in session for verification fallback
         session(['zainpay_txn_' . $applicant->id => $txnRef]);
 
-        return Inertia::location($response['data']);
+        $redirectUrl = is_array($response['data'] ?? null)
+            ? ($response['data']['url'] ?? $response['data']['paymentUrl'] ?? '')
+            : ($response['data'] ?? '');
+
+        return Inertia::location($redirectUrl);
     }
 
     /**
@@ -214,14 +218,14 @@ class PublicApplicantController extends Controller
 
         try {
             $verify = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
-                ->get("{$baseUrl}/zainbox/payment/verify/{$txnRef}")
+                ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$txnRef}")
                 ->json();
         } catch (\Exception $e) {
             return redirect()->route('admissions.pay', $applicant->id)
                 ->with('error', 'Could not verify payment. Please contact support.');
         }
 
-        if (($verify['code'] ?? '') === '00' && ($verify['data']['status'] ?? '') === 'success') {
+        if (($verify['code'] ?? '') === '00' && strtolower($verify['data']['status'] ?? '') === 'success') {
             $applicant->update([
                 'payment_status'    => 'paid',
                 'amount_paid'       => 14700.00,

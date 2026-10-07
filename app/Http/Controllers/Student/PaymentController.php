@@ -109,11 +109,15 @@ class PaymentController extends Controller
                 ], 422);
             }
 
+            $redirectUrl = is_array($response['data'] ?? null)
+                ? ($response['data']['url'] ?? $response['data']['paymentUrl'] ?? null)
+                : ($response['data'] ?? null);
+
             return response()->json([
                 'gateway' => 'zainpay',
                 'reference' => $reference,
                 'amount' => $payment->amount,
-                'redirect_url' => $response['data']['url'] ?? null,
+                'redirect_url' => $redirectUrl,
             ]);
         }
 
@@ -138,11 +142,14 @@ class PaymentController extends Controller
         $payment = Payment::where('reference', $reference)->firstOrFail();
 
         if ($payment->payment_gateway === 'zainpay') {
+            $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
             $response = \Illuminate\Support\Facades\Http::withToken(config('services.zainpay.public_key'))
-                ->get(config('services.zainpay.base_url', 'https://api.zainpay.ng') . '/zainbox/transactions/' . $reference)
+                ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$reference}")
                 ->json();
 
-            $verified = isset($response['data']['status']) && strtolower($response['data']['status']) === 'success';
+            $verified = ($response['code'] ?? '') === '00' && 
+                        isset($response['data']['status']) && 
+                        strtolower($response['data']['status']) === 'success';
 
             if (!$verified) {
                 $payment->update(['status' => 'failed']);
