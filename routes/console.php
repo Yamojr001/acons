@@ -10,3 +10,6 @@ Schedule::command('attendance:send-alerts --threshold=75')->weeklyOn(1, '08:00')
 
 // Prune old activity logs monthly
 Schedule::command('activitylog:clean --days=90')->monthly();
+
+// Automatically reconcile any missed or hanging Zainpay payments
+Schedule::command('zainpay:reconcile')->everyFifteenMinutes();

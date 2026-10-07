@@ -1,11 +1,15 @@
 <?php
 namespace App\Http\Controllers;
 use App\Services\PaymentService;
+use App\Services\ZainpayReconciliationService;
 use Illuminate\Http\{Request,Response,JsonResponse};
 use Illuminate\Support\Facades\Log;
 
 class WebhookController extends Controller {
-    public function __construct(private PaymentService $ps) {}
+    public function __construct(
+        private PaymentService $ps,
+        private ZainpayReconciliationService $zainpayReconciliation
+    ) {}
 
     public function stripe(Request $request): Response {
         $sig = $request->header('Stripe-Signature');
@@ -45,18 +49,63 @@ class WebhookController extends Controller {
     }
 
     public function zainpay(Request $request): JsonResponse {
-        $body = $request->json()->all();
-        // Add signature verification here if Zainpay provides one
-        // $sig = $request->header('x-zainpay-signature');
+        $body = $request->all();
+        $event = $body['event'] ?? null;
+        $status = strtolower($body['status'] ?? '');
+        $data = $body['data'] ?? $body;
 
-        if (($body['status'] ?? '') === 'success' || ($body['status'] ?? '') === 'completed') {
-            $data = $body['data'] ?? $body;
-            try { 
-                $this->ps->markSuccessful($data['txnRef'] ?? $data['reference'] ?? '', ['zainpay_ref' => $data['zainpayReference'] ?? '']); 
-            } catch (\Exception $e) { 
-                Log::error('Zainpay webhook processing: '.$e->getMessage()); 
+        Log::info('Zainpay webhook incoming payload', ['body' => $body]);
+
+        // Check if manual or automated history reconcile requested via webhook
+        if ($request->has('reconcile') || ($body['action'] ?? '') === 'reconcile') {
+            $result = $this->zainpayReconciliation->reconcileHistory();
+            return response()->json([
+                'status' => 'ok',
+                'message' => 'History reconciliation complete',
+                'details' => $result
+            ]);
+        }
+
+        $isSuccess = ($event === 'deposit.success') ||
+                     ($status === 'success' || $status === 'completed' || $status === '200 ok');
+
+        if ($isSuccess) {
+            $txnRef = $data['txnRef'] ?? $data['reference'] ?? $body['txnRef'] ?? ($data['paymentRef'] ?? '');
+            $email = $data['emailNotification'] ?? $data['emailAddress'] ?? $data['email'] ?? ($body['email'] ?? null);
+            
+            $rawAmount = (float) ($data['depositedAmount'] ?? $data['amount'] ?? 0);
+            $amountNaira = $rawAmount > 100000 ? round($rawAmount / 100, 2) : $rawAmount;
+            $gatewayRef = $data['paymentRef'] ?? $data['zainpayReference'] ?? null;
+
+            try {
+                $matched = $this->zainpayReconciliation->handleSuccessfulPayment(
+                    (string) $txnRef,
+                    $email ? (string) $email : null,
+                    $amountNaira,
+                    $gatewayRef ? (string) $gatewayRef : null
+                );
+
+                if ($matched) {
+                    return response()->json([
+                        'status' => 'ok',
+                        'message' => 'Payment matched and processed',
+                        'matched' => $matched
+                    ]);
+                }
+
+                // If immediate match failed, run a history scan to reconcile against latest settled deposits
+                $historyScan = $this->zainpayReconciliation->reconcileHistory(25);
+                return response()->json([
+                    'status' => 'ok',
+                    'message' => 'Processed with history scan',
+                    'history_scan' => $historyScan
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Zainpay webhook processing error: ' . $e->getMessage(), ['exception' => $e]);
+                return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
             }
         }
-        return response()->json(['status' => 'ok']);
+
+        return response()->json(['status' => 'ignored', 'reason' => 'Non-success event']);
     }
 }
