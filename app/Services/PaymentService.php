@@ -175,10 +175,14 @@ class PaymentService
     {
         $reference = 'ZNP_' . Str::uuid();
 
+        $userEmail = trim($fee->student->user->email ?? '');
+
         $response = Http::withToken(config('services.zainpay.public_key'))
             ->post(config('services.zainpay.base_url', 'https://api.zainpay.ng') . '/zainbox/card/initialize/payment', [
                 'amount'       => (string) $fee->amount,
-                'emailAddress' => $fee->student->user->email,
+                'emailAddress' => $userEmail,
+                'email'        => $userEmail,
+                'mobileNumber' => $fee->student->user->phone ?? '08000000000',
                 'txnRef'       => $reference,
                 'zainboxCode'  => config('services.zainpay.zainbox_code'),
                 'callBackUrl'  => $callbackUrl . '?gateway=zainpay&ref=' . $reference,

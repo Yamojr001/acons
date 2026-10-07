@@ -174,12 +174,18 @@ class PublicApplicantController extends Controller
         $mode        = config('services.zainpay.mode', 'sandbox');
         $baseUrl     = $mode === 'production' ? 'https://api.zainpay.ng' : 'https://sandbox.zainpay.ng';
 
+        $applicantEmail = trim($applicant->email ?? '');
+        if (empty($applicantEmail) || !filter_var($applicantEmail, FILTER_VALIDATE_EMAIL)) {
+            $applicantEmail = strtolower($applicant->jamb_number) . '@acons.edu.ng';
+        }
+
         $response = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
             ->post("{$baseUrl}/zainbox/card/initialize/payment", [
                 'amount'        => (string) 14700,
                 'txnRef'        => $txnRef,
-                'emailAddress'  => $applicant->email ?: $applicant->jamb_number . '@acons.edu.ng',
-                'mobileNumber'  => $applicant->phone_number,
+                'emailAddress'  => $applicantEmail,
+                'email'         => $applicantEmail,
+                'mobileNumber'  => $applicant->phone_number ?: '08000000000',
                 'zainboxCode'   => config('services.zainpay.zainbox_code'),
                 'callBackUrl'   => $callbackUrl,
             ])->json();

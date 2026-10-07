@@ -91,11 +91,14 @@ class PaymentController extends Controller
 
         if ($gateway === 'zainpay') {
             $callbackUrl = route('student.payments.verify', $reference);
+            $userEmail = trim($request->user()->email ?? '');
 
             $response = \Illuminate\Support\Facades\Http::withToken(config('services.zainpay.public_key'))
                 ->post(config('services.zainpay.base_url', 'https://api.zainpay.ng') . '/zainbox/card/initialize/payment', [
                     'amount'       => (string) $payment->amount,
-                    'emailAddress' => $request->user()->email,
+                    'emailAddress' => $userEmail,
+                    'email'        => $userEmail,
+                    'mobileNumber' => $request->user()->phone ?? '08000000000',
                     'txnRef'       => $reference,
                     'zainboxCode'  => config('services.zainpay.zainbox_code'),
                     'callBackUrl'  => $callbackUrl,
