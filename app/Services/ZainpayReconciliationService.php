@@ -76,6 +76,17 @@ class ZainpayReconciliationService
 
             $this->ensureAdmissionApplicationExists($applicant);
 
+            // Send transactional SMS notification via Sendar
+            if (!empty($applicant->phone_number)) {
+                try {
+                    $cleanRef = $txnRef ?: ($gatewayRef ?: $applicant->payment_reference);
+                    app(\App\Services\SmsService::class)->send(
+                        $applicant->phone_number,
+                        "Dear {$applicant->full_name}, your ACONS application fee of NGN 14,700 was confirmed on Zainpay. Ref: {$cleanRef}. Print receipt at: " . url('/admissions/login')
+                    );
+                } catch (\Throwable) {}
+            }
+
             try {
                 Log::info("Zainpay: Successfully reconciled Applicant ID {$applicant->id} ({$applicant->full_name}) as paid.", [
                     'txnRef' => $txnRef,

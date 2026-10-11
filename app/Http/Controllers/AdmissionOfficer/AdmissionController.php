@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\AdmissionOfficer;
 
 use App\Http\Controllers\Controller;
-use App\Models\{AdmissionApplication, AdmissionForm, AcademicSession, Announcement};
+use App\Models\{AdmissionApplication, AdmissionForm, AcademicSession, Announcement, BroadcastRecipient};
+use App\Jobs\SendBroadcastSmsJob;
+use App\Services\SmsService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Mail;
@@ -110,9 +112,17 @@ class AdmissionController extends Controller
     {
         $tenant = app('currentTenant');
         
-        // Fetch past announcements targeted at applicants or superadmin/admissions
+        // Fetch past announcements targeted at applicants with recipient delivery counts
         $announcements = Announcement::where('tenant_id', $tenant->id)
             ->where('audience', 'applicant')
+            ->withCount([
+                'recipients as total_recipients',
+                'recipients as sms_sent_count' => fn($q) => $q->where('sms_status', 'sent'),
+                'recipients as sms_failed_count' => fn($q) => $q->where('sms_status', 'failed'),
+                'recipients as sms_pending_count' => fn($q) => $q->where('sms_status', 'pending'),
+                'recipients as email_sent_count' => fn($q) => $q->where('email_status', 'sent'),
+                'recipients as email_failed_count' => fn($q) => $q->where('email_status', 'failed'),
+            ])
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
@@ -126,7 +136,7 @@ class AdmissionController extends Controller
         $request->validate([
             'subject' => 'required|string|max:255',
             'message' => 'required|string',
-            'target' => 'required|in:all,pending,admitted,rejected',
+            'target'  => 'required|in:all,pending,admitted,rejected',
             'channel' => 'required|in:email,sms,both'
         ]);
 
@@ -146,50 +156,193 @@ class AdmissionController extends Controller
         $applicants = $query->get();
 
         if ($applicants->isEmpty()) {
-            return back()->withErrors(['message' => 'No applicants match the selected target audience.']);
+            return back()->withErrors(['target' => 'No applicants match the selected target audience segment.']);
         }
 
-        // 2. Broadcast dispatches
-        $emailCount = 0;
-        $smsCount = 0;
+        $sendEmail = in_array($request->channel, ['email', 'both']);
+        $sendSms   = in_array($request->channel, ['sms', 'both']);
 
-        foreach ($applicants as $applicant) {
-            // Email dispatch
-            if (in_array($request->channel, ['email', 'both'])) {
-                try {
-                    Mail::to($applicant->applicant_email)->send(
-                        new ApplicantAnnouncementMail(
-                            $applicant->applicant_name,
-                            $request->subject,
-                            $request->message
-                        )
-                    );
-                    $emailCount++;
-                } catch (\Exception $e) {
-                    Log::error("Failed sending email announcement to {$applicant->applicant_email}: " . $e->getMessage());
-                }
-            }
-
-            // SMS dispatch simulation
-            if (in_array($request->channel, ['sms', 'both'])) {
-                $phone = $applicant->data['phone'] ?? $applicant->data['phone_number'] ?? 'N/A';
-                Log::info("Simulating SMS Broadcast to {$applicant->applicant_name} ({$phone}): {$request->message}");
-                $smsCount++;
-            }
-        }
-
-        // 3. Save Announcement log
-        Announcement::create([
-            'tenant_id' => $tenant->id,
-            'created_by' => auth()->id() ?? 1,
-            'title' => $request->subject,
-            'body' => "Broadcasted to {$request->target} via {$request->channel}. Emails sent: {$emailCount}, SMS simulated: {$smsCount}. Message: " . $request->message,
-            'audience' => 'applicant',
-            'send_email' => in_array($request->channel, ['email', 'both']),
-            'send_sms' => in_array($request->channel, ['sms', 'both']),
-            'published_at' => now()
+        // 2. Create Announcement record
+        $announcement = Announcement::create([
+            'tenant_id'        => $tenant->id,
+            'created_by'       => auth()->id() ?? 1,
+            'title'            => $request->subject,
+            'body'             => $request->message,
+            'audience'         => 'applicant',
+            'send_email'       => $sendEmail,
+            'send_sms'         => $sendSms,
+            'total_recipients' => $applicants->count(),
+            'published_at'     => now(),
         ]);
 
-        return redirect()->back()->with('success', "Announcement broadcast completed! Emails sent: {$emailCount}, SMS simulated: {$smsCount}.");
+        // 3. Create individual tracking recipient records
+        $smsRecipientIds = [];
+        $smsService = app(SmsService::class);
+
+        foreach ($applicants as $applicant) {
+            $phone = $applicant->data['phone_number'] ?? $applicant->data['phone'] ?? null;
+            $email = $applicant->applicant_email;
+            $formattedPhone = $phone ? $smsService->formatPhoneNumber($phone) : null;
+
+            $recipient = BroadcastRecipient::create([
+                'tenant_id'        => $tenant->id,
+                'announcement_id'  => $announcement->id,
+                'recipient_type'   => AdmissionApplication::class,
+                'recipient_id'     => $applicant->id,
+                'recipient_name'   => $applicant->applicant_name,
+                'recipient_email'  => $email,
+                'recipient_phone'  => $phone,
+                'formatted_phone'  => $formattedPhone,
+                'sms_status'       => $sendSms ? 'pending' : 'skipped',
+                'email_status'     => $sendEmail ? 'pending' : 'skipped',
+            ]);
+
+            if ($sendSms) {
+                $smsRecipientIds[] = $recipient->id;
+            }
+        }
+
+        // 4. Dispatch Email if selected
+        $queuedEmails = 0;
+        if ($sendEmail) {
+            foreach ($applicants as $applicant) {
+                if (!empty($applicant->applicant_email)) {
+                    try {
+                        Mail::to($applicant->applicant_email)->queue(
+                            new ApplicantAnnouncementMail(
+                                $applicant->applicant_name,
+                                $request->subject,
+                                $request->message
+                            )
+                        );
+                        $queuedEmails++;
+                    } catch (\Throwable $e) {
+                        Log::error("Failed to queue email announcement to {$applicant->applicant_email}: " . $e->getMessage());
+                    }
+                }
+            }
+        }
+
+        // 5. Dispatch SMS if selected - use background queue when there are multiple receivers
+        if ($sendSms && !empty($smsRecipientIds)) {
+            if (config('queue.default') === 'database') {
+                SendBroadcastSmsJob::dispatch($announcement->id, $smsRecipientIds, $request->message);
+            } else {
+                SendBroadcastSmsJob::dispatchAfterResponse($announcement->id, $smsRecipientIds, $request->message);
+            }
+        }
+
+        $messageDetail = "Broadcast campaign dispatched to {$applicants->count()} applicant(s).";
+        if ($sendSms) {
+            $messageDetail .= " SMS queued via gateway.";
+        }
+        if ($sendEmail) {
+            $messageDetail .= " Emails queued ({$queuedEmails}).";
+        }
+
+        return redirect()->back()->with('success', $messageDetail);
+    }
+
+    /**
+     * Retry sending SMS ONLY to recipients who failed or did not receive it.
+     */
+    public function retryAnnouncementSms(Request $request, Announcement $announcement)
+    {
+        $tenant = app('currentTenant');
+        abort_if($announcement->tenant_id !== $tenant->id, 403);
+
+        // Find failed/unsent recipients strictly
+        $query = $announcement->recipients()->where('sms_status', '!=', 'sent');
+
+        if ($request->has('recipient_ids') && is_array($request->recipient_ids) && !empty($request->recipient_ids)) {
+            $query->whereIn('id', $request->recipient_ids);
+        }
+
+        $failedRecipients = $query->get();
+
+        if ($failedRecipients->isEmpty()) {
+            return back()->with('info', 'All target recipients have already received the broadcast SMS successfully. No retry required.');
+        }
+
+        $recipientIds = $failedRecipients->pluck('id')->toArray();
+
+        // Mark them back to pending and clear prior errors
+        $announcement->recipients()->whereIn('id', $recipientIds)->update([
+            'sms_status' => 'pending',
+            'sms_error'  => null,
+        ]);
+
+        // Dispatch background queue job
+        if (config('queue.default') === 'database') {
+            SendBroadcastSmsJob::dispatch($announcement->id, $recipientIds, $announcement->body);
+        } else {
+            SendBroadcastSmsJob::dispatchAfterResponse($announcement->id, $recipientIds, $announcement->body);
+        }
+
+        return back()->with('success', "SMS retry initiated for {$failedRecipients->count()} recipient(s) who did not receive the initial broadcast.");
+    }
+
+    /**
+     * Get detailed list of recipients and their delivery states for an announcement.
+     */
+    public function announcementRecipients(Announcement $announcement)
+    {
+        $tenant = app('currentTenant');
+        abort_if($announcement->tenant_id !== $tenant->id, 403);
+
+        $recipients = $announcement->recipients()
+            ->orderByRaw("CASE WHEN sms_status = 'failed' THEN 1 WHEN sms_status = 'pending' THEN 2 ELSE 3 END")
+            ->orderBy('recipient_name', 'asc')
+            ->get([
+                'id',
+                'announcement_id',
+                'recipient_name',
+                'recipient_email',
+                'recipient_phone',
+                'formatted_phone',
+                'sms_status',
+                'sms_error',
+                'sms_message_id',
+                'sms_batch_id',
+                'sms_sent_at',
+                'retry_count',
+                'last_attempt_at',
+            ]);
+
+        return response()->json([
+            'announcement' => [
+                'id' => $announcement->id,
+                'title' => $announcement->title,
+                'body' => $announcement->body,
+                'total_recipients' => $announcement->recipients()->count(),
+                'sms_sent_count' => $announcement->recipients()->where('sms_status', 'sent')->count(),
+                'sms_failed_count' => $announcement->recipients()->where('sms_status', 'failed')->count(),
+                'sms_pending_count' => $announcement->recipients()->where('sms_status', 'pending')->count(),
+            ],
+            'recipients' => $recipients,
+        ]);
+    }
+
+    /**
+     * Update an individual recipient's phone number and reset to pending for retry.
+     */
+    public function updateRecipientPhone(Request $request, BroadcastRecipient $recipient)
+    {
+        $tenant = app('currentTenant');
+        abort_if($recipient->tenant_id !== $tenant->id, 403);
+
+        $request->validate([
+            'phone' => 'required|string|min:10|max:15'
+        ]);
+
+        $formatted = app(SmsService::class)->formatPhoneNumber($request->phone);
+        $recipient->update([
+            'recipient_phone' => $request->phone,
+            'formatted_phone' => $formatted,
+            'sms_status'      => 'pending',
+            'sms_error'       => null,
+        ]);
+
+        return back()->with('success', "Phone number updated for {$recipient->recipient_name}.");
     }
 }

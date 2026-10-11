@@ -19,6 +19,8 @@ interface Props extends PageProps {
   }
   stats: {
     total: number
+    paid?: number
+    pending_payment?: number
     admitted: number
     rejected: number
     pending: number
@@ -26,6 +28,9 @@ interface Props extends PageProps {
   deptYearStats: Record<string, number>
   filters: {
     year?: string
+    payment_status?: string
+    status?: string
+    search?: string
   }
   availableYears: string[]
   departments: Array<{ id: number; name: string; code: string }>
@@ -180,14 +185,27 @@ export default function AdmissionIndex({
     })
   }
 
-  const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const year = e.target.value;
+  const [searchQuery, setSearchQuery] = useState(filters?.search || '')
+
+  const handleFilterChange = (key: string, value: string) => {
     const destRoute = isAdmissionOfficer ? 'admission_officer.manage' : 'registrar.admissions';
+    const newFilters: Record<string, any> = {
+      ...filters,
+      [key]: value || undefined,
+    };
+    if (value === '' || value === 'all') {
+      delete newFilters[key];
+    }
     router.get(
       route(destRoute),
-      { year: year || undefined },
+      newFilters,
       { preserveState: true, preserveScroll: true }
     );
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleFilterChange('search', searchQuery);
   };
 
   const handleAdmitSubmit = (e: React.FormEvent) => {
@@ -233,7 +251,12 @@ export default function AdmissionIndex({
           {!isProvost && (
             <div className="flex items-center gap-2">
               <a 
-                href={route(isAdmissionOfficer ? 'admission_officer.export' : 'registrar.admissions.export', { year: filters.year })}
+                href={route(isAdmissionOfficer ? 'admission_officer.export' : 'registrar.admissions.export', { 
+                  year: filters?.year,
+                  payment_status: filters?.payment_status,
+                  status: filters?.status,
+                  search: filters?.search
+                })}
                 download
                 className="inline-flex items-center gap-2 justify-center px-4 py-2 bg-white border border-surface-200 text-surface-600 rounded-xl text-xs font-bold hover:bg-surface-50 shadow-sm"
               >
@@ -252,34 +275,48 @@ export default function AdmissionIndex({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
         <Card>
-          <div className="flex items-center gap-3 mb-2 text-surface-500">
-            <FileText size={18} />
-            <span className="font-semibold text-sm">Total Applications</span>
+          <div className="flex items-center gap-2 mb-1.5 text-surface-500">
+            <FileText size={16} />
+            <span className="font-semibold text-xs">Total Apps</span>
           </div>
-          <div className="text-3xl font-bold text-surface-900">{stats.total}</div>
+          <div className="text-2xl font-bold text-surface-900">{stats.total}</div>
         </Card>
         <Card>
-          <div className="flex items-center gap-3 mb-2 text-success-500">
-            <CheckCircle size={18} />
-            <span className="font-semibold text-sm">Admitted</span>
+          <div className="flex items-center gap-2 mb-1.5 text-emerald-600">
+            <CheckCircle size={16} />
+            <span className="font-semibold text-xs">Fee Paid</span>
           </div>
-          <div className="text-3xl font-bold text-surface-900">{stats.admitted}</div>
+          <div className="text-2xl font-bold text-surface-900">{stats.paid ?? 0}</div>
         </Card>
         <Card>
-          <div className="flex items-center gap-3 mb-2 text-danger-500">
-            <XCircle size={18} />
-            <span className="font-semibold text-sm">Rejected</span>
+          <div className="flex items-center gap-2 mb-1.5 text-amber-600">
+            <Clock size={16} />
+            <span className="font-semibold text-xs">Fee Pending</span>
           </div>
-          <div className="text-3xl font-bold text-surface-900">{stats.rejected}</div>
+          <div className="text-2xl font-bold text-surface-900">{stats.pending_payment ?? 0}</div>
         </Card>
         <Card>
-          <div className="flex items-center gap-3 mb-2 text-warning-500">
-            <Clock size={18} />
-            <span className="font-semibold text-sm">Pending</span>
+          <div className="flex items-center gap-2 mb-1.5 text-success-500">
+            <CheckCircle size={16} />
+            <span className="font-semibold text-xs">Admitted</span>
           </div>
-          <div className="text-3xl font-bold text-surface-900">{stats.pending}</div>
+          <div className="text-2xl font-bold text-surface-900">{stats.admitted}</div>
+        </Card>
+        <Card>
+          <div className="flex items-center gap-2 mb-1.5 text-warning-500">
+            <Clock size={16} />
+            <span className="font-semibold text-xs">Under Review</span>
+          </div>
+          <div className="text-2xl font-bold text-surface-900">{stats.pending}</div>
+        </Card>
+        <Card>
+          <div className="flex items-center gap-2 mb-1.5 text-danger-500">
+            <XCircle size={16} />
+            <span className="font-semibold text-xs">Rejected</span>
+          </div>
+          <div className="text-2xl font-bold text-surface-900">{stats.rejected}</div>
         </Card>
       </div>
 
@@ -298,20 +335,60 @@ export default function AdmissionIndex({
       )}
 
       <Card padding="none" className="overflow-hidden">
-        <div className="p-4 border-b border-surface-100 bg-surface-50/50 flex flex-col sm:flex-row gap-4">
-           <div className="relative flex-1">
+        <div className="p-4 border-b border-surface-100 bg-surface-50/50 flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+           <form onSubmit={handleSearchSubmit} className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" size={16} />
               <input 
                 type="text" 
-                placeholder="Search applicants by name or application ID..." 
-                className="w-full pl-10 pr-4 py-2 bg-white border border-surface-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
+                placeholder="Search applicants by name, email, JAMB no, or ID..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-10 py-2 bg-white border border-surface-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
               />
-           </div>
-           <div className="w-full sm:w-auto">
+              {searchQuery && (
+                <button 
+                  type="button" 
+                  onClick={() => { setSearchQuery(''); handleFilterChange('search', ''); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
+           </form>
+
+           {/* Payment Status Filter */}
+           <div className="w-full md:w-auto">
               <select 
-                className="w-full sm:w-auto pl-4 pr-10 py-2 bg-white border border-surface-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
+                className="w-full md:w-auto pl-3 pr-8 py-2 bg-white border border-surface-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium text-surface-700"
+                value={filters?.payment_status || 'all'}
+                onChange={(e) => handleFilterChange('payment_status', e.target.value)}
+              >
+                <option value="all">All Payments</option>
+                <option value="paid">Fee Paid</option>
+                <option value="pending">Fee Pending</option>
+              </select>
+           </div>
+
+           {/* Admission Status Filter */}
+           <div className="w-full md:w-auto">
+              <select 
+                className="w-full md:w-auto pl-3 pr-8 py-2 bg-white border border-surface-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium text-surface-700"
+                value={filters?.status || 'all'}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+              >
+                <option value="all">All Review Statuses</option>
+                <option value="pending">Pending Review</option>
+                <option value="admitted">Admitted</option>
+                <option value="rejected">Rejected</option>
+              </select>
+           </div>
+
+           {/* Year Filter */}
+           <div className="w-full md:w-auto">
+              <select 
+                className="w-full md:w-auto pl-3 pr-8 py-2 bg-white border border-surface-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium text-surface-700"
                 value={filters?.year || ''}
-                onChange={handleYearChange}
+                onChange={(e) => handleFilterChange('year', e.target.value)}
               >
                 <option value="">All Years</option>
                 {availableYears?.map(year => (
@@ -326,9 +403,10 @@ export default function AdmissionIndex({
             <thead>
               <tr className="border-b border-surface-100 bg-surface-50/30">
                 <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-surface-500">Applicant</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-surface-500">Form Type</th>
+                <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-surface-500">Program / Form</th>
                 <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-surface-500">Applied Date</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-surface-500">Status</th>
+                <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-surface-500">Payment</th>
+                <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-surface-500">Review Status</th>
                 {!isProvost && (
                   <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-surface-500 text-right">Actions</th>
                 )}
@@ -342,12 +420,21 @@ export default function AdmissionIndex({
                       <Avatar name={app.applicant_name || 'Applicant'} size="sm" />
                       <div>
                         <p className="text-sm font-bold text-surface-900 leading-none">{app.applicant_name || 'N/A'}</p>
-                        <p className="text-[10px] text-surface-400 mt-1 uppercase tracking-wider font-semibold">ID: ADM-{app.id.toString().padStart(5, '0')}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] text-surface-400 uppercase tracking-wider font-semibold">
+                            ID: ADM-{app.id.toString().padStart(5, '0')}
+                          </span>
+                          {app.data?.jamb_number && (
+                            <span className="text-[10px] text-brand-600 bg-brand-50 border border-brand-100/60 px-1.5 py-0.5 rounded font-mono font-medium">
+                              {app.data.jamb_number}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-surface-600">
-                    {app.form?.title || 'General Admission'}
+                    {app.data?.program || app.form?.title || 'General Admission'}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 text-xs text-surface-500">
@@ -355,9 +442,14 @@ export default function AdmissionIndex({
                     </div>
                   </td>
                   <td className="px-6 py-4">
+                    <Badge variant={app.payment_status === 'paid' ? 'success' : 'warning'} className="capitalize">
+                      {app.payment_status === 'paid' ? 'Paid' : 'Unpaid'}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4">
                     <Badge variant={
-                       app.status === 'approved' || app.status === 'accepted' ? 'success' : 
-                       app.status === 'rejected' ? 'danger' : 'warning'
+                       app.status === 'approved' || app.status === 'accepted' || app.status === 'admitted' || app.status === 'cleared' ? 'success' : 
+                       app.status === 'rejected' || app.status === 'clearance_rejected' ? 'danger' : 'warning'
                     } className="capitalize">
                       {app.status}
                     </Badge>
@@ -399,8 +491,8 @@ export default function AdmissionIndex({
               ))}
               {applications.data.length === 0 && (
                 <tr>
-                   <td colSpan={5} className="px-6 py-12 text-center text-surface-400 italic text-sm">
-                      No admission applications received yet.
+                   <td colSpan={6} className="px-6 py-12 text-center text-surface-400 italic text-sm">
+                      No admission applications found matching the selected filters.
                    </td>
                 </tr>
               )}
@@ -439,14 +531,27 @@ export default function AdmissionIndex({
                       <p className="text-sm font-bold text-surface-800 mt-0.5">{selectedApp.applicant_email}</p>
                     </div>
                     <div className="bg-surface-50 p-3.5 rounded-xl border border-surface-100">
-                      <p className="text-[10px] uppercase font-bold text-surface-400">Application Status</p>
+                      <p className="text-[10px] uppercase font-bold text-surface-400">Payment Status</p>
+                      <div className="mt-0.5 flex items-center gap-2 flex-wrap">
+                        <Badge variant={selectedApp.payment_status === 'paid' ? 'success' : 'warning'}>
+                          {selectedApp.payment_status === 'paid' ? 'Fee Paid' : 'Fee Pending'}
+                        </Badge>
+                        {selectedApp.payment_reference && (
+                          <span className="text-[11px] text-surface-500 font-mono font-medium">
+                            {selectedApp.payment_reference}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="bg-surface-50 p-3.5 rounded-xl border border-surface-100">
+                      <p className="text-[10px] uppercase font-bold text-surface-400">Application Review</p>
                       <p className="text-sm font-bold mt-0.5 capitalize">
                         <Badge variant={selectedApp.status === 'admitted' || selectedApp.status === 'cleared' ? 'success' : selectedApp.status === 'rejected' ? 'danger' : 'warning'}>
                           {selectedApp.status}
                         </Badge>
                       </p>
                     </div>
-                    <div className="bg-surface-50 p-3.5 rounded-xl border border-surface-100">
+                    <div className="bg-surface-50 p-3.5 rounded-xl border border-surface-100 col-span-2">
                       <p className="text-[10px] uppercase font-bold text-surface-400">Date Applied</p>
                       <p className="text-sm font-bold text-surface-800 mt-0.5">{formatDate(selectedApp.created_at)}</p>
                     </div>

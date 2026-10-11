@@ -3,9 +3,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Traits\BelongsToTenant;
 
 class Grade extends Model {
-    use SoftDeletes;
+    use SoftDeletes, BelongsToTenant;
     protected $fillable = [
         'tenant_id', 
         'course_registration_id',

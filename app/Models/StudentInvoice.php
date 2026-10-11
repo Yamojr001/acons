@@ -4,9 +4,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Traits\BelongsToTenant;
 
 class StudentInvoice extends Model {
-    use SoftDeletes;
+    use SoftDeletes, BelongsToTenant;
     protected $fillable = ["tenant_id", "student_id", "fee_id", "amount_due", "amount_paid", "status"];
     public function student(): BelongsTo { return $this->belongsTo(Student::class); }
     public function fee(): BelongsTo { return $this->belongsTo(Fee::class); }

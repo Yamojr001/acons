@@ -223,6 +223,9 @@ Route::middleware(['identify.tenant', 'auth', 'tenant.access'])->group(function 
         Route::get('/admitted',                     [\App\Http\Controllers\AdmissionOfficer\AdmissionController::class, 'admittedList'])->name('admitted');
         Route::get('/announcements',                [\App\Http\Controllers\AdmissionOfficer\AdmissionController::class, 'announcementsIndex'])->name('announcements.index');
         Route::post('/announcements',               [\App\Http\Controllers\AdmissionOfficer\AdmissionController::class, 'announcementsStore'])->name('announcements.store');
+        Route::post('/announcements/{announcement}/retry-sms', [\App\Http\Controllers\AdmissionOfficer\AdmissionController::class, 'retryAnnouncementSms'])->name('announcements.retry_sms');
+        Route::get('/announcements/{announcement}/recipients', [\App\Http\Controllers\AdmissionOfficer\AdmissionController::class, 'announcementRecipients'])->name('announcements.recipients');
+        Route::post('/broadcast-recipients/{recipient}/update-phone', [\App\Http\Controllers\AdmissionOfficer\AdmissionController::class, 'updateRecipientPhone'])->name('broadcast_recipients.update_phone');
     });
 
     /*

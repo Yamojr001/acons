@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -139,6 +140,8 @@ class PublicApplicantController extends Controller
             'admission_status' => 'pending'
         ]);
 
+        $this->syncAdmissionApplication($applicant);
+
         return redirect()->route('admissions.pay', ['applicant' => $applicant->id]);
     }
 
@@ -177,8 +180,7 @@ class PublicApplicantController extends Controller
 
         $txnRef      = 'ACON_ADM_' . $applicant->id . '_' . time();
         $callbackUrl = route('admissions.pay.verify', $applicant->id);
-        $mode        = config('services.zainpay.mode', 'sandbox');
-        $baseUrl     = $mode === 'production' ? 'https://api.zainpay.ng' : 'https://sandbox.zainpay.ng';
+        $baseUrl     = rtrim(config('services.zainpay.base_url', 'https://sandbox.zainpay.ng'), '/');
 
         $applicantEmail = trim($applicant->email ?? '');
         if (empty($applicantEmail) || !filter_var($applicantEmail, FILTER_VALIDATE_EMAIL)) {
@@ -197,6 +199,12 @@ class PublicApplicantController extends Controller
             ])->json();
 
         if (($response['code'] ?? '') !== '00') {
+            Log::error('ZainPay initialization failed', [
+                'applicant_id' => $applicant->id,
+                'response'     => $response,
+                'baseUrl'      => $baseUrl,
+                'zainboxCode'  => config('services.zainpay.zainbox_code'),
+            ]);
             return back()->withErrors(['payment' => 'ZainPay initialization failed: ' . ($response['description'] ?? 'Unknown error. Check your ZainPay credentials.')]);
         }
 
@@ -227,8 +235,7 @@ class PublicApplicantController extends Controller
         }
 
         $txnRef  = $request->query('txnRef', session('zainpay_txn_' . $applicant->id, $applicant->payment_reference));
-        $mode    = config('services.zainpay.mode', 'sandbox');
-        $baseUrl = $mode === 'production' ? 'https://api.zainpay.ng' : 'https://sandbox.zainpay.ng';
+        $baseUrl = rtrim(config('services.zainpay.base_url', 'https://sandbox.zainpay.ng'), '/');
         $pubKey  = config('services.zainpay.public_key');
         $zainboxCode = config('services.zainpay.zainbox_code');
 
@@ -316,6 +323,16 @@ class PublicApplicantController extends Controller
 
             $this->createAdmissionApplication($applicant);
 
+            // Send transactional SMS notification via Sendar
+            if (!empty($applicant->phone_number)) {
+                try {
+                    app(\App\Services\SmsService::class)->send(
+                        $applicant->phone_number,
+                        "Dear {$applicant->full_name}, your ACONS application fee payment of NGN 14,700 was confirmed. Ref: {$txnRef}. Print your receipt at: " . url('/admissions/login')
+                    );
+                } catch (\Throwable) {}
+            }
+
             // Automatically log in the applicant and take them directly to their payment receipt
             try {
                 Auth::guard('applicant')->login($applicant);
@@ -361,35 +378,76 @@ class PublicApplicantController extends Controller
     }
 
     /**
-     * Create the AdmissionApplication record after successful payment.
+     * Create or update the AdmissionApplication record with payment tracking.
      */
-    private function createAdmissionApplication(Applicant $applicant): void
+    private function syncAdmissionApplication(Applicant $applicant): void
     {
         $tenant       = app('currentTenant');
-        $admissionForm = \App\Models\AdmissionForm::where('tenant_id', $tenant->id)->where('is_active', true)->first();
+        $tenantId     = $tenant ? $tenant->id : ($applicant->tenant_id ?: 1);
+        $admissionForm = \App\Models\AdmissionForm::where('tenant_id', $tenantId)->where('is_active', true)->first();
+        $formId = $admissionForm ? $admissionForm->id : 1;
 
-        \App\Models\AdmissionApplication::create([
-            'tenant_id'        => $tenant->id,
-            'admission_form_id' => $admissionForm ? $admissionForm->id : 1,
-            'applicant_name'   => $applicant->full_name,
-            'applicant_email'  => $applicant->email,
-            'status'           => 'pending',
-            'data'             => [
-                'jamb_number'         => $applicant->jamb_number,
-                'phone_number'        => $applicant->phone_number,
-                'jamb_score'          => $applicant->jamb_score,
-                'state_of_origin'     => $applicant->state_of_origin,
-                'lga'                 => $applicant->lga,
-                'gender'              => $applicant->sex,
-                'date_of_birth'       => $applicant->dob ? $applicant->dob->format('Y-m-d') : null,
-                'first_sitting_type'  => $applicant->first_sitting_type,
-                'first_sitting_no'    => $applicant->first_sitting_no,
-                'first_sitting_grades' => $applicant->first_sitting_grades,
-                'second_sitting_type' => $applicant->second_sitting_type,
-                'second_sitting_no'   => $applicant->second_sitting_no,
-                'second_sitting_grades' => $applicant->second_sitting_grades,
-            ],
-        ]);
+        $existing = \App\Models\AdmissionApplication::where('applicant_id', $applicant->id)
+            ->orWhere(function ($q) use ($applicant) {
+                if (!empty($applicant->email)) {
+                    $q->where('applicant_email', $applicant->email);
+                }
+                if (!empty($applicant->jamb_number)) {
+                    $q->orWhere('data->jamb_number', $applicant->jamb_number);
+                }
+            })
+            ->first();
+
+        $data = [
+            'payment_status'       => $applicant->payment_status ?: 'pending',
+            'payment_reference'    => $applicant->payment_reference,
+            'amount_paid'          => (float) ($applicant->amount_paid ?: 0),
+            'jamb_number'          => $applicant->jamb_number,
+            'phone_number'         => $applicant->phone_number,
+            'jamb_score'           => $applicant->jamb_score,
+            'state_of_origin'      => $applicant->state_of_origin,
+            'lga'                  => $applicant->lga,
+            'gender'               => $applicant->sex,
+            'date_of_birth'        => $applicant->dob ? $applicant->dob->format('Y-m-d') : null,
+            'first_sitting_type'   => $applicant->first_sitting_type,
+            'first_sitting_no'     => $applicant->first_sitting_no,
+            'first_sitting_grades' => $applicant->first_sitting_grades,
+            'second_sitting_type'  => $applicant->second_sitting_type,
+            'second_sitting_no'    => $applicant->second_sitting_no,
+            'second_sitting_grades'=> $applicant->second_sitting_grades,
+        ];
+
+        if ($existing) {
+            $mergedData = array_merge($existing->data ?: [], $data);
+            $existing->update([
+                'applicant_id'      => $applicant->id,
+                'applicant_name'    => $applicant->full_name,
+                'applicant_email'   => $applicant->email ?: ($applicant->jamb_number . '@acons.edu.ng'),
+                'payment_status'    => $applicant->payment_status ?: 'pending',
+                'amount_paid'       => (float) ($applicant->amount_paid ?: 0),
+                'payment_reference' => $applicant->payment_reference,
+                'data'              => $mergedData,
+            ]);
+        } else {
+            \App\Models\AdmissionApplication::create([
+                'tenant_id'         => $tenantId,
+                'admission_form_id' => $formId,
+                'applicant_id'      => $applicant->id,
+                'applicant_name'    => $applicant->full_name,
+                'applicant_email'   => $applicant->email ?: ($applicant->jamb_number . '@acons.edu.ng'),
+                'status'            => 'pending',
+                'payment_status'    => $applicant->payment_status ?: 'pending',
+                'amount_paid'       => (float) ($applicant->amount_paid ?: 0),
+                'payment_reference' => $applicant->payment_reference,
+                'data'              => $data,
+                'created_at'        => $applicant->created_at ?: now(),
+            ]);
+        }
+    }
+
+    private function createAdmissionApplication(Applicant $applicant): void
+    {
+        $this->syncAdmissionApplication($applicant);
     }
 
     /**
@@ -408,6 +466,16 @@ class PublicApplicantController extends Controller
         ]);
 
         $this->createAdmissionApplication($applicant);
+
+        // Send transactional SMS notification via Sendar
+        if (!empty($applicant->phone_number)) {
+            try {
+                app(\App\Services\SmsService::class)->send(
+                    $applicant->phone_number,
+                    "Dear {$applicant->full_name}, your ACONS application fee has been authorized. Ref: {$applicant->payment_reference}. Print your receipt at: " . url('/admissions/login')
+                );
+            } catch (\Throwable) {}
+        }
 
         try {
             Auth::guard('applicant')->login($applicant);

@@ -50,22 +50,24 @@ class ResultProcessingController extends Controller
                 }
             }
 
-            $students = CourseRegistration::where('course_id', $courseId)
-                ->where('semester_id', $currentSemester->id)
-                ->with(['student.user', 'grade'])
-                ->get()
-                ->map(function ($reg) {
-                    return [
-                        'registration_id' => $reg->id,
-                        'name' => $reg->student->user->name,
-                        'matric_number' => $reg->student->matriculation_number,
-                        'ca_score' => $reg->grade->ca_score ?? null,
-                        'exam_score' => $reg->grade->exam_score ?? null,
-                        'is_absent' => (bool) ($reg->grade->is_absent ?? false),
-                        'total_score' => $reg->grade->total_score ?? null,
-                        'grade' => $reg->grade->grade_letter ?? null,
-                    ];
-                });
+            if ($currentSemester) {
+                $students = CourseRegistration::where('course_id', $courseId)
+                    ->where('semester_id', $currentSemester->id)
+                    ->with(['student.user', 'grade'])
+                    ->get()
+                    ->map(function ($reg) {
+                        return [
+                            'registration_id' => $reg->id,
+                            'name' => $reg->student?->user?->name ?? 'Unknown Student',
+                            'matric_number' => $reg->student?->matriculation_number ?? 'N/A',
+                            'ca_score' => $reg->grade->ca_score ?? null,
+                            'exam_score' => $reg->grade->exam_score ?? null,
+                            'is_absent' => (bool) ($reg->grade->is_absent ?? false),
+                            'total_score' => $reg->grade->total_score ?? null,
+                            'grade' => $reg->grade->grade_letter ?? null,
+                        ];
+                    });
+            }
         }
 
         return Inertia::render('Lecturer/ResultEntry', [

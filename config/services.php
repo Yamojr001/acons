@@ -23,7 +23,13 @@ return [
         'public_key'   => env('ZAINPAY_PUBLIC_KEY'),
         'secret_key'   => env('ZAINPAY_SECRET_KEY'),
         'zainbox_code' => env('ZAINPAY_ZAINBOX_CODE'),
-        'mode'         => env('ZAINPAY_MODE', 'dev'),
-        'base_url'     => env('ZAINPAY_BASE_URL', 'https://api.zainpay.ng'),
+        'mode'         => env('ZAINPAY_MODE', 'sandbox'),
+        'base_url'     => env('ZAINPAY_BASE_URL', env('ZAINPAY_MODE') === 'production' ? 'https://api.zainpay.ng' : 'https://sandbox.zainpay.ng'),
+    ],
+    'sendar' => [
+        'api_key'     => env('SENDAR_API_KEY'),
+        'sender_id'   => env('SENDAR_SENDER_ID', 'ACONS'),
+        'base_url'    => env('SENDAR_BASE_URL', 'https://sms-submit.sendar.io/api'),
+        'wallet_type' => env('SENDAR_WALLET_TYPE', 'transactional'),
     ],
 ];

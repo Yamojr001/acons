@@ -98,4 +98,45 @@ class StudentController extends Controller
 
         abort(400, 'Invalid format');
     }
+
+    public function edit($id)
+    {
+        return redirect()->route('registrar.students.show', $id);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $tenant = app('currentTenant');
+        $student = Student::where('tenant_id', $tenant->id)->findOrFail($id);
+
+        $validated = $request->validate([
+            'phone_number'  => 'nullable|string|max:20',
+            'status'        => 'sometimes|required|in:active,suspended,graduated,withdrawn',
+            'current_level' => 'nullable|string|max:50',
+            'department_id' => 'nullable|exists:departments,id',
+            'program_id'    => 'nullable|exists:programs,id',
+        ]);
+
+        $student->update($validated);
+
+        if ($request->has('name') || $request->has('email')) {
+            $userValidated = $request->validate([
+                'name'  => 'required|string|max:255',
+                'email' => 'required|email|max:255|unique:users,email,' . $student->user_id,
+            ]);
+            $student->user->update($userValidated);
+        }
+
+        return redirect()->back()->with('success', 'Student record updated successfully.');
+    }
+
+    public function destroy($id)
+    {
+        $tenant = app('currentTenant');
+        $student = Student::where('tenant_id', $tenant->id)->findOrFail($id);
+        $student->update(['status' => 'withdrawn']);
+        $student->delete();
+
+        return redirect()->route('registrar.students.index')->with('success', 'Student record archived successfully.');
+    }
 }

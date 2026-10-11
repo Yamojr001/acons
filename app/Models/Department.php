@@ -4,9 +4,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Traits\BelongsToTenant;
 
 class Department extends Model {
-    use SoftDeletes;
+    use SoftDeletes, BelongsToTenant;
     protected $fillable = ["tenant_id", "faculty_id", "name", "code", "hod_id"];
     public function faculty(): BelongsTo { return $this->belongsTo(Faculty::class); }
     public function hod(): BelongsTo { return $this->belongsTo(User::class, "hod_id"); }

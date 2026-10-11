@@ -144,6 +144,10 @@ class PaymentController extends Controller
     {
         $payment = Payment::where('reference', $reference)->firstOrFail();
 
+        if ($payment->status === 'successful') {
+            return redirect()->route('student.fees')->with('info', 'This payment has already been verified and credited.');
+        }
+
         if ($payment->payment_gateway === 'zainpay') {
             $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
             $response = \Illuminate\Support\Facades\Http::withToken(config('services.zainpay.public_key'))

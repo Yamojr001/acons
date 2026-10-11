@@ -21,10 +21,13 @@ export default function Dashboard({ tenant, applicant, academicSession, admissio
     router.post(route('admissions.logout'))
   }
 
+  const isAdmittedOrCleared = ['admitted', 'cleared'].includes(applicant.admission_status)
+
   // Get active color matching admission status
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'admitted': return 'bg-emerald-500 border-emerald-500 text-emerald-700'
+      case 'admitted':
+      case 'cleared': return 'bg-emerald-500 border-emerald-500 text-emerald-700'
       case 'rejected': return 'bg-danger-500 border-danger-500 text-danger-700'
       case 'under_review': return 'bg-amber-500 border-amber-500 text-amber-700'
       default: return 'bg-surface-400 border-surface-400 text-surface-500'
@@ -215,7 +218,7 @@ export default function Dashboard({ tenant, applicant, academicSession, admissio
           <div className="max-w-4xl mx-auto pt-24 px-4 space-y-8 text-left">
             
             {/* Celebratory offer banner if status is Admitted */}
-            {applicant.admission_status === 'admitted' && (
+            {isAdmittedOrCleared && (
               <motion.div 
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -268,7 +271,7 @@ export default function Dashboard({ tenant, applicant, academicSession, admissio
                 >
                   <Printer size={14} /> Print Application Slip
                 </button>
-                {applicant.admission_status === 'admitted' && (
+                {isAdmittedOrCleared && (
                   <button 
                     onClick={() => setLetterMode(true)}
                     className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors font-bold text-xs border border-emerald-100"
@@ -314,16 +317,16 @@ export default function Dashboard({ tenant, applicant, academicSession, admissio
                 {/* Step 3: Academic review */}
                 <div className="relative">
                   <div className={`absolute -left-[31px] w-4 h-4 rounded-full border-4 border-white ring-2 ${
-                    applicant.admission_status === 'admitted' 
+                    isAdmittedOrCleared 
                       ? 'bg-emerald-500 ring-emerald-500/20' 
                       : 'bg-amber-500 ring-amber-500/20 animate-pulse'
                   }`} />
                   <div className="space-y-1">
                     <span className={`text-xs font-bold ${
-                      applicant.admission_status === 'admitted' ? 'text-emerald-600' : 'text-amber-600'
+                      isAdmittedOrCleared ? 'text-emerald-600' : 'text-amber-600'
                     }`}>Academic Review & Screening</span>
                     <p className="text-xs text-surface-500 font-medium">
-                      {applicant.admission_status === 'admitted' 
+                      {isAdmittedOrCleared 
                         ? 'Minimum of 5 credits in O\'Level subjects (English, Mathematics, Biology, Chemistry, Physics) cleared successfully.'
                         : 'Screener is verifying your O\'Level sittings and JAMB Score combination compliance.'
                       }
@@ -334,16 +337,16 @@ export default function Dashboard({ tenant, applicant, academicSession, admissio
                 {/* Step 4: Examination & Interview */}
                 <div className="relative">
                   <div className={`absolute -left-[31px] w-4 h-4 rounded-full border-4 border-white ring-2 ${
-                    applicant.admission_status === 'admitted' 
+                    isAdmittedOrCleared 
                       ? 'bg-emerald-500 ring-emerald-500/20' 
                       : 'bg-surface-300 ring-surface-200'
                   }`} />
                   <div className="space-y-1">
                     <span className={`text-xs font-bold ${
-                      applicant.admission_status === 'admitted' ? 'text-emerald-600' : 'text-surface-500'
+                      isAdmittedOrCleared ? 'text-emerald-600' : 'text-surface-500'
                     }`}>Entrance Exam & Campus Interview</span>
                     <p className="text-xs text-surface-500 font-medium">
-                      {applicant.admission_status === 'admitted'
+                      {isAdmittedOrCleared
                         ? 'Pre-registration interview cleared! Venue: ACONS Advanced Simulation Campus. Bring all physical WAEC/NECO certificates.'
                         : 'Invites for the physical entrance evaluation interview will be scheduled upon successful academic review clearance.'
                       }
@@ -354,16 +357,16 @@ export default function Dashboard({ tenant, applicant, academicSession, admissio
                 {/* Step 5: Offer */}
                 <div className="relative">
                   <div className={`absolute -left-[31px] w-4 h-4 rounded-full border-4 border-white ring-2 ${
-                    applicant.admission_status === 'admitted' 
+                    isAdmittedOrCleared 
                       ? 'bg-emerald-500 ring-emerald-500/20 animate-bounce' 
                       : 'bg-surface-300 ring-surface-200'
                   }`} />
                   <div className="space-y-1">
                     <span className={`text-xs font-bold ${
-                      applicant.admission_status === 'admitted' ? 'text-emerald-600' : 'text-surface-500'
+                      isAdmittedOrCleared ? 'text-emerald-600' : 'text-surface-500'
                     }`}>Admission Decision</span>
                     <p className="text-xs text-surface-500 font-medium">
-                      {applicant.admission_status === 'admitted'
+                      {isAdmittedOrCleared
                         ? 'Provisional Admission Offer clearance active! Congratulations!'
                         : 'Clearance decision pending.'
                       }

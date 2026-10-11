@@ -16,7 +16,7 @@ class ForcePasswordChange
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (Auth::check() && Auth::user()->force_password_change) {
+        if (Auth::check() && Auth::user()->force_password_change && Auth::user()->hasRole('student')) {
             // Check if current route is the force password change page, post, or logout
             if (!$request->is('student/force-password-change*') && !$request->is('logout*') && !$request->is('_inertia*')) {
                 return redirect()->route('student.password.force');

@@ -294,7 +294,7 @@ class DashboardController extends Controller
 
         Cache::forget('provost:dashboard:stats:' . app('currentTenant')->id);
 
-        return back()->with('success', "Results for {$course->code} — {$course->title} have been released to students.");
+        return back()->with('success', "Results for {$course->code} — " . ($course->name ?? $course->title) . " have been released to students.");
     }
 
     public function rejectCourse(Request $request, Course $course)

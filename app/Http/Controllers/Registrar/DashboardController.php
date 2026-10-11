@@ -130,32 +130,58 @@ class DashboardController extends Controller
     {
         $tenantId = app('currentTenant')->id;
         $year = $request->input('year');
+        $paymentStatus = $request->input('payment_status');
+        $status = $request->input('status');
+        $search = $request->input('search');
         
         $query = \App\Models\AdmissionApplication::where('tenant_id', $tenantId);
         
         if ($year) {
             $query->whereYear('created_at', $year);
         }
+
+        if ($paymentStatus && $paymentStatus !== 'all') {
+            $query->where('payment_status', $paymentStatus);
+        }
+
+        if ($status && $status !== 'all') {
+            if ($status === 'admitted') {
+                $query->whereIn('status', ['admitted', 'cleared', 'accepted', 'approved']);
+            } elseif ($status === 'rejected') {
+                $query->whereIn('status', ['rejected', 'clearance_rejected']);
+            } elseif ($status === 'pending') {
+                $query->whereIn('status', ['pending', 'under_review']);
+            } else {
+                $query->where('status', $status);
+            }
+        }
         
-        $search = $request->input('search');
         if ($search) {
             $query->where(function($q) use ($search) {
-                // If search is numeric or ADM-xxx, extract number to search ID
                 $searchId = preg_replace('/[^0-9]/', '', $search);
                 if (!empty($searchId)) {
                     $q->where('id', $searchId);
                 }
                 
                 $q->orWhere('applicant_name', 'like', "%{$search}%")
-                  ->orWhere('applicant_email', 'like', "%{$search}%");
+                  ->orWhere('applicant_email', 'like', "%{$search}%")
+                  ->orWhere('data->jamb_number', 'like', "%{$search}%")
+                  ->orWhere('data->phone_number', 'like', "%{$search}%");
             });
         }
         
+        $baseQuery = \App\Models\AdmissionApplication::where('tenant_id', $tenantId);
+        if ($year) {
+            $baseQuery->whereYear('created_at', $year);
+        }
+
         $stats = [
-            'total' => (clone $query)->count(),
-            'admitted' => (clone $query)->whereIn('status', ['admitted', 'cleared'])->count(),
-            'rejected' => (clone $query)->whereIn('status', ['rejected', 'clearance_rejected'])->count(),
-            'pending' => (clone $query)->whereIn('status', ['pending', 'under_review'])->count(),
+            'total' => (clone $baseQuery)->count(),
+            'paid' => (clone $baseQuery)->where('payment_status', 'paid')->count(),
+            'pending_payment' => (clone $baseQuery)->where('payment_status', 'pending')->count(),
+            'admitted' => (clone $baseQuery)->whereIn('status', ['admitted', 'cleared', 'accepted', 'approved'])->count(),
+            'rejected' => (clone $baseQuery)->whereIn('status', ['rejected', 'clearance_rejected'])->count(),
+            'pending' => (clone $baseQuery)->whereIn('status', ['pending', 'under_review'])->count(),
         ];
 
         $allApps = (clone $query)->with('form')->get();
@@ -185,7 +211,7 @@ class DashboardController extends Controller
             'applications' => $applications,
             'stats' => $stats,
             'deptYearStats' => $deptYearStats,
-            'filters' => request()->only(['year']),
+            'filters' => request()->only(['year', 'payment_status', 'status', 'search']),
             'availableYears' => $availableYears,
             'departments' => Department::get(['id', 'name', 'code']),
             'defaultClearanceSchedule' => $defaultClearanceSchedule
@@ -424,7 +450,18 @@ class DashboardController extends Controller
             // Log or ignore mail sending error to ensure flow completes
         }
 
-        return redirect()->back()->with('success', 'Admission offered successfully and clearance details emailed.');
+        // Send transactional SMS notification via Sendar
+        $phone = $application->data['phone_number'] ?? $application->data['phone'] ?? ($applicant?->phone_number ?? null);
+        if (!empty($phone)) {
+            try {
+                app(\App\Services\SmsService::class)->send(
+                    $phone,
+                    "Congratulations {$application->applicant_name}! You have been offered provisional admission into {$dept->name} ({$request->section}) at ACONS. Clearance starts {$request->clearance_schedule}."
+                );
+            } catch (\Throwable) {}
+        }
+
+        return redirect()->back()->with('success', 'Admission offered successfully and clearance details emailed & SMS sent.');
     }
 
     public function postReject(Request $request, AdmissionApplication $application)
@@ -643,14 +680,47 @@ class DashboardController extends Controller
     {
         $tenantId = app('currentTenant')->id;
         $year = $request->input('year');
+        $paymentStatus = $request->input('payment_status');
+        $status = $request->input('status');
+        $search = $request->input('search');
         
         $query = \App\Models\AdmissionApplication::where('tenant_id', $tenantId);
         
         if ($year) {
             $query->whereYear('created_at', $year);
         }
+
+        if ($paymentStatus && $paymentStatus !== 'all') {
+            $query->where('payment_status', $paymentStatus);
+        }
+
+        if ($status && $status !== 'all') {
+            if ($status === 'admitted') {
+                $query->whereIn('status', ['admitted', 'cleared', 'accepted', 'approved']);
+            } elseif ($status === 'rejected') {
+                $query->whereIn('status', ['rejected', 'clearance_rejected']);
+            } elseif ($status === 'pending') {
+                $query->whereIn('status', ['pending', 'under_review']);
+            } else {
+                $query->where('status', $status);
+            }
+        }
+
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $searchId = preg_replace('/[^0-9]/', '', $search);
+                if (!empty($searchId)) {
+                    $q->where('id', $searchId);
+                }
+                
+                $q->orWhere('applicant_name', 'like', "%{$search}%")
+                  ->orWhere('applicant_email', 'like', "%{$search}%")
+                  ->orWhere('data->jamb_number', 'like', "%{$search}%")
+                  ->orWhere('data->phone_number', 'like', "%{$search}%");
+            });
+        }
         
-        $applications = $query->with('form')->get();
+        $applications = $query->with(['form', 'admittedDepartment'])->latest()->get();
         
         $headers = [
             'Content-Type' => 'text/csv',
@@ -668,8 +738,11 @@ class DashboardController extends Controller
                 'Application ID', 
                 'Applicant Name', 
                 'Email', 
-                'Status', 
-                'Sex',
+                'Review Status', 
+                'Payment Status',
+                'Amount Paid (NGN)',
+                'Payment Reference',
+                'Gender',
                 'JAMB Number',
                 'JAMB Score',
                 'Phone', 
@@ -685,14 +758,17 @@ class DashboardController extends Controller
                 $programName = $app->admittedDepartment ? $app->admittedDepartment->name : 'N/A';
                 
                 fputcsv($file, [
-                    $app->id,
+                    'ADM-' . str_pad($app->id, 5, '0', STR_PAD_LEFT),
                     $app->applicant_name,
                     $app->applicant_email,
-                    strtoupper($app->status),
-                    $data['sex'] ?? 'N/A',
+                    ucfirst($app->status),
+                    strtoupper($app->payment_status ?: 'PENDING'),
+                    number_format((float) ($app->amount_paid ?: 0), 2),
+                    $app->payment_reference ?: 'N/A',
+                    $data['gender'] ?? $data['sex'] ?? 'N/A',
                     $data['jamb_number'] ?? 'N/A',
                     $data['jamb_score'] ?? 'N/A',
-                    $data['phone'] ?? $data['phone_number'] ?? 'N/A',
+                    $data['phone_number'] ?? $data['phone'] ?? 'N/A',
                     $data['state_of_origin'] ?? 'N/A',
                     $data['lga'] ?? 'N/A',
                     $programName,
@@ -821,9 +897,13 @@ class DashboardController extends Controller
         \App\Models\AdmissionApplication::create([
             'tenant_id' => $tenant->id,
             'admission_form_id' => $admissionForm ? $admissionForm->id : 1,
+            'applicant_id' => $applicant->id,
             'applicant_name' => $applicant->full_name,
             'applicant_email' => $applicant->email,
             'status' => 'pending',
+            'payment_status' => 'paid',
+            'amount_paid' => 14700.00,
+            'payment_reference' => $applicant->payment_reference,
             'data' => [
                 'jamb_number' => $applicant->jamb_number,
                 'phone_number' => $applicant->phone_number,

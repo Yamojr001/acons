@@ -13,10 +13,14 @@ class AdmissionApplication extends Model
     protected $fillable = [
         'tenant_id', 
         'admission_form_id', 
+        'applicant_id',
         'applicant_name', 
         'applicant_email', 
         'data', 
         'status',
+        'payment_status',
+        'amount_paid',
+        'payment_reference',
         'admitted_department_id',
         'admitted_section',
         'clearance_schedule',
@@ -26,7 +30,13 @@ class AdmissionApplication extends Model
 
     protected $casts = [
         'data' => 'json',
+        'amount_paid' => 'decimal:2',
     ];
+
+    public function applicant()
+    {
+        return $this->belongsTo(Applicant::class);
+    }
 
     public function form()
     {

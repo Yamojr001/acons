@@ -167,6 +167,13 @@ class DashboardController extends Controller
             'status' => 'cleared'
         ]);
 
+        $applicantModel = \App\Models\Applicant::where('id', $application->applicant_id)
+            ->orWhere('email', $application->applicant_email)
+            ->first();
+        if ($applicantModel) {
+            $applicantModel->update(['admission_status' => 'cleared']);
+        }
+
         try {
             Mail::to($application->applicant_email)->send(
                 new ClearanceApprovedMail(
