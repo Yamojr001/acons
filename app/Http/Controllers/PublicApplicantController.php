@@ -564,7 +564,7 @@ class PublicApplicantController extends Controller
         // Default or configured exam details
         $examDate = $applicantWithProgram->exam_date 
             ? $applicantWithProgram->exam_date->format('l, F j, Y — g:i A') 
-            : 'Saturday, November 15, ' . date('Y') . ' — 8:30 AM';
+            : 'Wednesday, October 14, ' . date('Y') . ' — 8:30 AM';
 
         $examVenue = $applicantWithProgram->exam_venue 
             ?: 'ACONS Advanced CBT Centre, Main Campus, Takur Site, Dutse, Jigawa State';

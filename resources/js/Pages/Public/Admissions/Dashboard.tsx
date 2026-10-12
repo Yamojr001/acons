@@ -191,7 +191,7 @@ export default function Dashboard({
   // Fallback defaults for examination details
   const fallbackExamDate = applicant.exam_date 
     ? new Date(applicant.exam_date).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : 'Saturday, November 15, 2025 — 8:30 AM'
+    : 'Wednesday, October 14, 2026 — 8:30 AM'
 
   const activeExam = {
     exam_date: examDetails?.exam_date || fallbackExamDate,
