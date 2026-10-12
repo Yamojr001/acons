@@ -49,11 +49,15 @@ auth.json
 *.sqlite3
 storage/*.key
 
-# Laravel Storage & Caches
+# Laravel Storage, Caches & Uploaded Pictures
 /storage/app/public/*
+/storage/app/public/**
 !/storage/app/public/.gitignore
+!/storage/app/public/**/.gitkeep
 /storage/app/private/*
+/storage/app/private/**
 !/storage/app/private/.gitignore
+!/storage/app/private/**/.gitkeep
 /storage/framework/cache/data/*
 !/storage/framework/cache/data/.gitignore
 /storage/framework/sessions/*
@@ -65,8 +69,35 @@ storage/*.key
 /storage/logs/*
 !/storage/logs/.gitignore
 /public/storage
+/public/storage/*
+/public/storage/**
+/public/uploads
+/public/uploads/*
+/public/uploads/**
 /public/hot
 /public/mix-manifest.json
+
+# User & Applicant Uploaded Pictures, Passports & Avatars
+pictures/
+photos/
+passports/
+avatars/
+storage/app/public/passports/*
+storage/app/public/avatars/*
+storage/app/public/uploads/*
+storage/app/public/tenants/*
+storage/app/public/**/*.jpg
+storage/app/public/**/*.jpeg
+storage/app/public/**/*.png
+storage/app/public/**/*.webp
+storage/app/public/**/*.gif
+public/uploads/**/*.jpg
+public/uploads/**/*.jpeg
+public/uploads/**/*.png
+public/uploads/**/*.webp
+
+# Preserve core static branding assets
+!public/assets/images/**
 
 # Laravel IDE Helper
 _ide_helper.php
