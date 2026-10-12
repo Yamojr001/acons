@@ -76,6 +76,9 @@ class PublicApplicantController extends Controller
             'first_sitting_no' => 'required|string|max:40',
             'first_sitting_grades' => 'required|array',
 
+            // Program Choice
+            'applied_program_id' => 'nullable|exists:programs,id',
+
             // O'Levels Sitting 2 (Optional)
             'second_sitting_type' => 'nullable|string|max:40',
             'second_sitting_year' => 'nullable|string|max:10',
@@ -136,6 +139,7 @@ class PublicApplicantController extends Controller
             'sponsor_name_address' => $request->sponsor_name_address,
 
             // States
+            'applied_program_id' => $request->applied_program_id,
             'payment_status' => 'pending',
             'admission_status' => 'pending'
         ]);
@@ -402,6 +406,12 @@ class PublicApplicantController extends Controller
             'payment_status'       => $applicant->payment_status ?: 'pending',
             'payment_reference'    => $applicant->payment_reference,
             'amount_paid'          => (float) ($applicant->amount_paid ?: 0),
+            'passport_photo'       => $applicant->passport_photo,
+            'applied_program_id'   => $applicant->applied_program_id,
+            'applied_program_name' => $applicant->appliedProgram?->name ?? 'Basic Nursing',
+            'exam_date'            => $applicant->exam_date ? $applicant->exam_date->format('Y-m-d H:i:s') : null,
+            'exam_venue'           => $applicant->exam_venue,
+            'seat_number'          => $applicant->seat_number,
             'jamb_number'          => $applicant->jamb_number,
             'phone_number'         => $applicant->phone_number,
             'jamb_score'           => $applicant->jamb_score,
@@ -410,9 +420,11 @@ class PublicApplicantController extends Controller
             'gender'               => $applicant->sex,
             'date_of_birth'        => $applicant->dob ? $applicant->dob->format('Y-m-d') : null,
             'first_sitting_type'   => $applicant->first_sitting_type,
+            'first_sitting_year'   => $applicant->first_sitting_year,
             'first_sitting_no'     => $applicant->first_sitting_no,
             'first_sitting_grades' => $applicant->first_sitting_grades,
             'second_sitting_type'  => $applicant->second_sitting_type,
+            'second_sitting_year'  => $applicant->second_sitting_year,
             'second_sitting_no'    => $applicant->second_sitting_no,
             'second_sitting_grades'=> $applicant->second_sitting_grades,
         ];
@@ -537,23 +549,134 @@ class PublicApplicantController extends Controller
     }
 
     /**
-     * Applicant Dashboard tracking page.
+     * Applicant Dashboard tracking page with tabs, photocard, and screening edit.
      */
     public function dashboard(): Response
     {
         $applicant = Auth::guard('applicant')->user();
         $tenant = app('currentTenant');
         
-        $applicantWithProgram = Applicant::with('admittedProgram')->find($applicant->id);
-        $academicSession = \App\Models\AcademicSession::where('tenant_id', $tenant->id)->where('is_current', true)->first();
-        $admissionForm = \App\Models\AdmissionForm::where('tenant_id', $tenant->id)->where('is_active', true)->first();
-        
+        $applicantWithProgram = Applicant::with(['admittedProgram', 'appliedProgram'])->find($applicant->id);
+        $academicSession = \App\Models\AcademicSession::where('tenant_id', $tenant->id ?? 1)->where('is_current', true)->first();
+        $admissionForm = \App\Models\AdmissionForm::where('tenant_id', $tenant->id ?? 1)->where('is_active', true)->first();
+        $programs = \App\Models\Program::where('tenant_id', $tenant->id ?? 1)->get(['id', 'name', 'degree_type', 'duration_years']);
+
+        // Default or configured exam details
+        $examDate = $applicantWithProgram->exam_date 
+            ? $applicantWithProgram->exam_date->format('l, F j, Y — g:i A') 
+            : 'Saturday, November 15, ' . date('Y') . ' — 8:30 AM';
+
+        $examVenue = $applicantWithProgram->exam_venue 
+            ?: 'ACONS Advanced CBT Centre, Main Campus, Takur Site, Dutse, Jigawa State';
+
+        $seatNumber = $applicantWithProgram->seat_number 
+            ?: ('ACONS/CBT/' . date('Y') . '/' . str_pad($applicantWithProgram->id, 4, '0', STR_PAD_LEFT));
+
+        $examDetails = [
+            'exam_date'    => $examDate,
+            'exam_venue'   => $examVenue,
+            'seat_number'  => $seatNumber,
+            'batch'        => 'Batch A (Morning Session)',
+            'cbt_duration' => '90 Minutes (Computer-Based Test)',
+            'subjects'     => [
+                ['name' => 'English Language', 'questions' => 20],
+                ['name' => 'Biology & Human Anatomy', 'questions' => 20],
+                ['name' => 'Chemistry', 'questions' => 20],
+                ['name' => 'Physics', 'questions' => 20],
+                ['name' => 'Current Affairs & General Nursing Aptitude', 'questions' => 20],
+            ],
+            'instructions' => [
+                'Arrive at the CBT Examination Centre at least 45 minutes prior to the scheduled start time for biometric verification and facial accreditation.',
+                'Candidates must present a printed color copy of this Examination Photocard along with the original JAMB UTME result slip and Photo ID.',
+                'Electronic gadgets, mobile phones, smartwatches, recording devices, and programmable scientific calculators are strictly prohibited inside the CBT exam hall.',
+                'Impersonation or examination malpractice of any form will lead to immediate disqualification, cancellation of results, and prosecution by law enforcement.',
+                'Ensure your verified passport photograph is clearly printed on this card. Photocards without a photograph or with defaced images will not be admitted.',
+            ],
+        ];
+
         return Inertia::render('Public/Admissions/Dashboard', [
-            'tenant' => $tenant,
-            'applicant' => $applicantWithProgram,
+            'tenant'          => $tenant,
+            'applicant'       => $applicantWithProgram,
             'academicSession' => $academicSession,
-            'admissionForm' => $admissionForm
+            'admissionForm'   => $admissionForm,
+            'programs'        => $programs,
+            'examDetails'     => $examDetails,
         ]);
+    }
+
+    /**
+     * Upload / Update applicant passport photo.
+     */
+    public function uploadPhoto(Request $request)
+    {
+        $applicant = Auth::guard('applicant')->user();
+        if (!$applicant) {
+            return redirect()->route('admissions.login');
+        }
+
+        $request->validate([
+            'passport_photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+        ]);
+
+        if ($request->hasFile('passport_photo')) {
+            $file = $request->file('passport_photo');
+            $filename = 'applicant_' . $applicant->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('passports', $filename, 'public');
+
+            $applicant->update([
+                'passport_photo' => '/storage/' . $path,
+            ]);
+
+            $this->syncAdmissionApplication($applicant);
+
+            return back()->with('success', 'Passport photograph uploaded and verified successfully! Your Exam Card is now unlocked for download and printing.');
+        }
+
+        return back()->withErrors(['passport_photo' => 'Unable to process the uploaded photo. Please ensure it is a valid JPG/PNG under 2MB.']);
+    }
+
+    /**
+     * Update applicant examination qualifications (O'Levels, Awaiting results, contact).
+     */
+    public function updateExam(Request $request)
+    {
+        $applicant = Auth::guard('applicant')->user();
+        if (!$applicant) {
+            return redirect()->route('admissions.login');
+        }
+
+        if (in_array($applicant->admission_status, ['admitted', 'cleared'])) {
+            return back()->with('error', 'Your admission screening has already been finalized and can no longer be modified.');
+        }
+
+        $validated = $request->validate([
+            // O'Levels Sitting 1
+            'first_sitting_type'   => 'required|string|max:40',
+            'first_sitting_year'   => 'required|string|max:10',
+            'first_sitting_no'     => 'nullable|string|max:60',
+            'first_sitting_grades' => 'required|array|min:1',
+
+            // O'Levels Sitting 2 (Optional)
+            'second_sitting_type'  => 'nullable|string|max:40',
+            'second_sitting_year'  => 'nullable|string|max:10',
+            'second_sitting_no'    => 'nullable|string|max:60',
+            'second_sitting_grades'=> 'nullable|array',
+
+            // Program choice
+            'applied_program_id'   => 'nullable|exists:programs,id',
+
+            // Contact updates
+            'phone_number'         => 'nullable|string|max:30',
+            'email'                => 'nullable|email|max:255',
+            'contact_address'      => 'nullable|string',
+            'next_of_kin_name'     => 'nullable|string|max:255',
+            'next_of_kin_address'  => 'nullable|string',
+        ]);
+
+        $applicant->update($validated);
+        $this->syncAdmissionApplication($applicant);
+
+        return back()->with('success', 'Your examination qualifications and application details have been updated successfully.');
     }
 
     /**

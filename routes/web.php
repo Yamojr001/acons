@@ -50,8 +50,10 @@ Route::middleware(['identify.tenant'])->group(function () {
     Route::post('/admissions/login',              [PublicApplicantController::class, 'login'])->name('admissions.login.submit');
 
     Route::middleware(['auth:applicant'])->group(function () {
-        Route::get('/admissions/status',  [PublicApplicantController::class, 'dashboard'])->name('admissions.dashboard');
-        Route::post('/admissions/logout', [PublicApplicantController::class, 'logout'])->name('admissions.logout');
+        Route::get('/admissions/status',        [PublicApplicantController::class, 'dashboard'])->name('admissions.dashboard');
+        Route::post('/admissions/logout',       [PublicApplicantController::class, 'logout'])->name('admissions.logout');
+        Route::post('/admissions/photo/upload', [PublicApplicantController::class, 'uploadPhoto'])->name('admissions.photo.upload');
+        Route::post('/admissions/exam/update',  [PublicApplicantController::class, 'updateExam'])->name('admissions.exam.update');
     });
 });
 

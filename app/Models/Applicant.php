@@ -68,6 +68,11 @@ class Applicant extends Authenticatable
         'amount_paid',
         'admission_status',
         'admitted_program_id',
+        'applied_program_id',
+        'passport_photo',
+        'exam_date',
+        'exam_venue',
+        'seat_number',
         'remarks'
     ];
 
@@ -78,6 +83,7 @@ class Applicant extends Authenticatable
 
     protected $casts = [
         'dob' => 'date',
+        'exam_date' => 'datetime',
         'first_sitting_grades' => 'array',
         'second_sitting_grades' => 'array',
         'amount_paid' => 'decimal:2',
@@ -91,5 +97,10 @@ class Applicant extends Authenticatable
     public function admittedProgram(): BelongsTo
     {
         return $this->belongsTo(Program::class, 'admitted_program_id');
+    }
+
+    public function appliedProgram(): BelongsTo
+    {
+        return $this->belongsTo(Program::class, 'applied_program_id');
     }
 }
