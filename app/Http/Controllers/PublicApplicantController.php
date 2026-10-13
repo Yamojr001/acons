@@ -680,6 +680,95 @@ class PublicApplicantController extends Controller
     }
 
     /**
+     * Download official CBT Examination Photocard as PDF.
+     */
+    public function downloadExamCardPdf()
+    {
+        $applicant = Auth::guard('applicant')->user();
+        if (!$applicant) {
+            return redirect()->route('admissions.login');
+        }
+
+        if (empty($applicant->passport_photo)) {
+            return redirect()->route('admissions.dashboard')
+                ->with('error', 'You must upload your passport photograph before downloading your CBT Examination Photocard.');
+        }
+
+        $tenant = app('currentTenant');
+        $applicantWithProgram = Applicant::with(['admittedProgram', 'appliedProgram'])->find($applicant->id);
+        $academicSession = \App\Models\AcademicSession::where('tenant_id', $tenant->id ?? 1)->where('is_current', true)->first();
+
+        // Default or configured exam details
+        $examDate = $applicantWithProgram->exam_date 
+            ? $applicantWithProgram->exam_date->format('l, F j, Y — g:i A') 
+            : 'Wednesday, October 14, ' . date('Y') . ' — 8:30 AM';
+
+        $examVenue = $applicantWithProgram->exam_venue 
+            ?: 'ACONS Advanced CBT Centre, Main Campus, Takur Site, Dutse, Jigawa State';
+
+        $seatNumber = $applicantWithProgram->seat_number 
+            ?: ('ACONS/CBT/' . date('Y') . '/' . str_pad($applicantWithProgram->id, 4, '0', STR_PAD_LEFT));
+
+        $examDetails = [
+            'exam_date'    => $examDate,
+            'exam_venue'   => $examVenue,
+            'seat_number'  => $seatNumber,
+            'batch'        => 'Batch A (Morning Session)',
+            'cbt_duration' => '90 Minutes (Computer-Based Test)',
+            'subjects'     => [
+                ['name' => 'English Language', 'questions' => 20],
+                ['name' => 'Biology & Human Anatomy', 'questions' => 20],
+                ['name' => 'Chemistry', 'questions' => 20],
+                ['name' => 'Physics', 'questions' => 20],
+                ['name' => 'Current Affairs & General Nursing Aptitude', 'questions' => 20],
+            ],
+            'instructions' => [
+                'Arrive at the CBT Examination Centre at least 45 minutes prior to the scheduled start time for biometric accreditation.',
+                'Candidates must present a printed color copy of this Examination Photocard along with their original JAMB UTME result slip and Photo ID.',
+                'Electronic gadgets, mobile phones, smartwatches, and programmable scientific calculators are strictly prohibited in the hall.',
+                'Impersonation or examination malpractice will lead to instant disqualification and referral to law enforcement.',
+                'Ensure your verified passport photograph is clearly visible on this card. Photocards without photos will not be admitted.',
+            ],
+        ];
+
+        // Prepare Base64 logo and passport for DomPDF
+        $logoBase64 = null;
+        $logoPath = public_path('assets/images/acons_logo.png');
+        if (file_exists($logoPath)) {
+            $logoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+        }
+
+        $passportBase64 = null;
+        if (!empty($applicantWithProgram->passport_photo)) {
+            $photoRelative = ltrim(str_replace('/storage/', '', $applicantWithProgram->passport_photo), '/');
+            $photoDiskPath = storage_path('app/public/' . $photoRelative);
+            if (!file_exists($photoDiskPath)) {
+                $photoDiskPath = public_path('storage/' . $photoRelative);
+            }
+            if (!file_exists($photoDiskPath)) {
+                $photoDiskPath = public_path($photoRelative);
+            }
+            if (file_exists($photoDiskPath)) {
+                $mime = mime_content_type($photoDiskPath) ?: 'image/jpeg';
+                $passportBase64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($photoDiskPath));
+            }
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.exam_card_pdf', [
+            'tenant'          => $tenant,
+            'applicant'       => $applicantWithProgram,
+            'academicSession' => $academicSession,
+            'examDetails'     => $examDetails,
+            'logoBase64'      => $logoBase64,
+            'passportBase64'  => $passportBase64,
+        ])->setPaper('a4', 'portrait');
+
+        $filename = 'ACONS_CBT_Exam_Card_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $applicant->jamb_number) . '.pdf';
+
+        return $pdf->download($filename);
+    }
+
+    /**
      * Log out applicant guard session.
      */
     public function logout(Request $request)

@@ -295,11 +295,11 @@ export default function Dashboard({
         </h2>
       </div>
 
-      {/* Candidate Info Grid + Passport Photo */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+      {/* Candidate Details & Biometric Passport Photo (Photo on top right opposite name) */}
+      <div className="flex flex-row items-start justify-between gap-6">
         
-        {/* Left 3 columns: Candidate Details */}
-        <div className="md:col-span-3 space-y-4">
+        {/* Left: Candidate Details Table */}
+        <div className="flex-1 space-y-4">
           <table className="w-full text-xs">
             <tbody className="divide-y divide-surface-100">
               <tr>
@@ -334,14 +334,21 @@ export default function Dashboard({
           </table>
         </div>
 
-        {/* Right 1 column: Passport Photo */}
-        <div className="md:col-span-1 flex flex-col items-center text-center space-y-2">
-          <div className="w-32 h-40 rounded-xl overflow-hidden border-2 border-red-900 bg-surface-100 shadow-sm relative">
-            <img 
-              src={applicant.passport_photo} 
-              alt={applicant.full_name} 
-              className="w-full h-full object-cover"
-            />
+        {/* Top Right: Passport Photo opposite Candidate Name */}
+        <div className="w-32 sm:w-36 shrink-0 flex flex-col items-center text-center space-y-2">
+          <div className="w-28 h-36 sm:w-32 sm:h-40 rounded-xl overflow-hidden border-2 border-red-900 bg-surface-100 shadow-sm relative">
+            {applicant.passport_photo ? (
+              <img 
+                src={applicant.passport_photo} 
+                alt={applicant.full_name} 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center text-surface-400 p-2 text-center">
+                <Camera size={24} className="mb-1 text-surface-400" />
+                <span className="text-[10px] font-bold">NO PHOTO</span>
+              </div>
+            )}
           </div>
           <span className="text-[9px] font-bold uppercase tracking-wider text-red-900 block">
             Verified Biometric Photo
@@ -668,56 +675,82 @@ export default function Dashboard({
               )}
 
               {/* Candidate Profile Summary Card */}
-              <div className="bg-white rounded-3xl p-6 sm:p-8 border border-surface-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="flex items-start sm:items-center gap-4">
+              <div className="bg-white rounded-3xl p-6 sm:p-8 border border-surface-200 shadow-sm space-y-6">
+                
+                {/* Heading Bar */}
+                <div className="flex items-center justify-between border-b border-surface-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-surface-100 text-surface-600 border border-surface-200">
+                      Candidate Profile
+                    </span>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${statusMeta.badgeClass}`}>
+                      {statusMeta.label}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono text-surface-500 font-bold">
+                    REG: {applicant.jamb_number}
+                  </span>
+                </div>
+
+                {/* Candidate Name & Info (Left) with Picture on Top Right (Opposite Name) */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
                   
-                  {/* Avatar / Passport */}
-                  <div className="relative shrink-0">
+                  {/* Left: Name and Candidate Meta */}
+                  <div className="space-y-3 flex-1">
+                    <div>
+                      <h2 className="text-xl sm:text-2xl font-black text-surface-900 font-display leading-tight">
+                        {applicant.full_name}
+                      </h2>
+                      <p className="text-xs font-semibold text-blue-900 mt-1">
+                        Applied Program: <strong className="font-bold text-surface-800">{appliedProgramName}</strong>
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs text-surface-500">
+                      <div className="p-2.5 rounded-xl bg-surface-50 border border-surface-100">
+                        <span className="text-[10px] text-surface-400 block font-medium">JAMB Reg No</span>
+                        <span className="font-mono font-bold text-surface-800">{applicant.jamb_number}</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-surface-50 border border-surface-100">
+                        <span className="text-[10px] text-surface-400 block font-medium">UTME Score</span>
+                        <span className="font-bold text-surface-800">{applicant.jamb_score || 'N/A'}</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-surface-50 border border-surface-100">
+                        <span className="text-[10px] text-surface-400 block font-medium">State / LGA</span>
+                        <span className="font-semibold text-surface-800 truncate block">{applicant.state_of_origin} / {applicant.lga}</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-surface-50 border border-surface-100">
+                        <span className="text-[10px] text-surface-400 block font-medium">Phone Number</span>
+                        <span className="font-semibold text-surface-800">{applicant.phone_number}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Top Right: Biometric Picture opposite Name */}
+                  <div className="shrink-0 flex flex-col items-center sm:items-end">
                     {applicant.passport_photo ? (
-                      <img 
-                        src={applicant.passport_photo} 
-                        alt={applicant.full_name} 
-                        className="w-16 h-20 sm:w-20 sm:h-24 rounded-2xl object-cover border-2 border-surface-200 shadow-sm"
-                      />
+                      <div className="flex flex-col items-center">
+                        <img 
+                          src={applicant.passport_photo} 
+                          alt={applicant.full_name} 
+                          className="w-20 h-24 sm:w-24 sm:h-28 rounded-2xl object-cover border-2 border-surface-300 shadow-sm"
+                        />
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 mt-1.5 block">
+                          Verified Photo
+                        </span>
+                      </div>
                     ) : (
-                      <div className="w-16 h-20 sm:w-20 sm:h-24 rounded-2xl bg-surface-100 border-2 border-dashed border-surface-300 flex flex-col items-center justify-center text-surface-400 p-2 text-center">
+                      <div className="w-20 h-24 sm:w-24 sm:h-28 rounded-2xl bg-surface-100 border-2 border-dashed border-surface-300 flex flex-col items-center justify-center text-surface-400 p-2 text-center">
                         <Camera size={20} className="mb-1 text-surface-400" />
                         <span className="text-[10px] font-semibold leading-tight">No Photo</span>
                       </div>
                     )}
                   </div>
 
-                  {/* Candidate Details */}
-                  <div className="space-y-1.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-surface-100 text-surface-600 border border-surface-200">
-                        Candidate Profile
-                      </span>
-                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${statusMeta.badgeClass}`}>
-                        {statusMeta.label}
-                      </span>
-                    </div>
-
-                    <h2 className="text-xl sm:text-2xl font-black text-surface-900 font-display leading-tight">
-                      {applicant.full_name}
-                    </h2>
-
-                    <p className="text-xs font-semibold text-blue-900">
-                      Applied Program: <strong className="font-bold text-surface-800">{appliedProgramName}</strong>
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-surface-500 font-medium pt-0.5">
-                      <span className="font-mono text-surface-700">JAMB: {applicant.jamb_number}</span>
-                      <span>Score: {applicant.jamb_score}</span>
-                      <span>Phone: {applicant.phone_number}</span>
-                      <span>State: {applicant.state_of_origin}</span>
-                    </div>
-                  </div>
-
                 </div>
 
                 {/* Quick Action Buttons */}
-                <div className="shrink-0 flex flex-wrap md:flex-col gap-2">
+                <div className="pt-2 border-t border-surface-100 flex flex-wrap items-center gap-2.5">
                   <button
                     onClick={() => {
                       if (hasPassport) {
@@ -732,7 +765,15 @@ export default function Dashboard({
                     <span>{hasPassport ? 'Print Exam Card' : 'View Exam Card'}</span>
                   </button>
 
-                  {!hasPassport && (
+                  {hasPassport ? (
+                    <a
+                      href={route('admissions.exam.download')}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-700 text-white font-bold text-xs hover:bg-emerald-800 transition-colors shadow-sm"
+                    >
+                      <Download size={14} />
+                      <span>Download Exam Card PDF</span>
+                    </a>
+                  ) : (
                     <button
                       onClick={() => setActiveTab('passport')}
                       className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200 font-bold text-xs hover:bg-amber-100 transition-colors"
@@ -750,6 +791,7 @@ export default function Dashboard({
                     <span>Application Slip</span>
                   </button>
                 </div>
+
               </div>
 
               {/* Passport Required Callout (if missing) */}
@@ -981,6 +1023,13 @@ export default function Dashboard({
                     </div>
 
                     <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <a
+                        href={route('admissions.exam.download')}
+                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 text-white font-bold text-xs hover:bg-emerald-800 shadow-sm transition-colors flex-1 sm:flex-none"
+                      >
+                        <Download size={14} />
+                        <span>Download PDF</span>
+                      </a>
                       <button
                         onClick={() => setExamCardModal(true)}
                         className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-900 text-white font-bold text-xs hover:bg-blue-950 shadow-sm transition-colors flex-1 sm:flex-none"
@@ -1581,13 +1630,22 @@ export default function Dashboard({
                       </p>
                     </div>
                     {hasPassport ? (
-                      <button
-                        onClick={() => setExamCardModal(true)}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-surface-300 text-surface-800 font-bold text-xs hover:bg-surface-50 shadow-sm transition-colors"
-                      >
-                        <Printer size={14} />
-                        <span>Print CBT Photocard</span>
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setExamCardModal(true)}
+                          className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white border border-surface-300 text-surface-800 font-bold text-xs hover:bg-surface-50 shadow-sm transition-colors"
+                        >
+                          <Printer size={14} />
+                          <span>Print Slip</span>
+                        </button>
+                        <a
+                          href={route('admissions.exam.download')}
+                          className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-700 text-white font-bold text-xs hover:bg-emerald-800 shadow-sm transition-colors"
+                        >
+                          <Download size={14} />
+                          <span>Download PDF</span>
+                        </a>
+                      </div>
                     ) : (
                       <button
                         onClick={() => setActiveTab('passport')}
@@ -1685,9 +1743,18 @@ export default function Dashboard({
                     <span className="text-[10px] text-surface-400 block mt-0.5">PMB 105, Jigawa State, Nigeria</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-xs font-bold text-surface-400 block">APPLICATION ID</span>
-                  <span className="text-base font-black text-red-900 tracking-wide font-mono block">ACONS/2025/{applicant.id}</span>
+                <div className="text-right flex items-center gap-4 shrink-0">
+                  {applicant.passport_photo && (
+                    <img 
+                      src={applicant.passport_photo} 
+                      alt={applicant.full_name} 
+                      className="w-16 h-20 rounded-lg object-cover border-2 border-red-900 shadow-sm"
+                    />
+                  )}
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-surface-400 block">APPLICATION ID</span>
+                    <span className="text-base font-black text-red-900 tracking-wide font-mono block">ACONS/2025/{applicant.id}</span>
+                  </div>
                 </div>
               </div>
 
@@ -1987,21 +2054,27 @@ export default function Dashboard({
           <div className="bg-white rounded-3xl w-full max-w-4xl p-6 sm:p-10 border border-surface-200 shadow-2xl space-y-6 print:border-none print:shadow-none print:p-0 print:w-full print:max-w-none relative">
             
             {/* Print Action Bar */}
-            <div className="flex justify-between items-center bg-surface-50 border border-surface-200 p-4 rounded-2xl print:hidden">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 bg-surface-50 border border-surface-200 p-4 rounded-2xl print:hidden">
               <span className="text-xs font-bold text-surface-700 flex items-center gap-1.5">
                 <Printer size={14} className="text-blue-900" />
                 Official ACONS CBT Examination Photocard Preview
               </span>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href={route('admissions.exam.download')}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-700 text-white rounded-xl text-xs font-bold hover:bg-emerald-800 shadow-md transition-colors"
+                >
+                  <Download size={14} /> Download PDF
+                </a>
                 <button 
                   onClick={() => window.print()}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-900 text-white rounded-xl text-xs font-bold hover:bg-blue-950 shadow-md"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-900 text-white rounded-xl text-xs font-bold hover:bg-blue-950 shadow-md transition-colors"
                 >
                   <Printer size={14} /> Send to Printer
                 </button>
                 <button 
                   onClick={() => setExamCardModal(false)}
-                  className="px-4 py-2 border border-surface-200 text-surface-600 rounded-xl text-xs font-bold hover:bg-surface-100"
+                  className="px-4 py-2 border border-surface-200 text-surface-600 rounded-xl text-xs font-bold hover:bg-surface-100 transition-colors"
                 >
                   Close Preview
                 </button>
