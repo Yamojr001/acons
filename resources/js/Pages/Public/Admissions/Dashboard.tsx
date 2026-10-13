@@ -258,9 +258,208 @@ export default function Dashboard({
 
   const statusMeta = getStatusMeta(applicant.admission_status)
 
+  // ── Reusable Printable Examination Photocard Sheet ───────────────────────
+  const renderExamCardSheet = () => (
+    <div className="bg-white rounded-3xl p-8 sm:p-10 border border-surface-300 shadow-md max-w-4xl mx-auto space-y-6 text-left font-sans text-surface-900 print:p-0 print:m-0 print:border-none print:shadow-none print:max-w-none print:w-full print:rounded-none">
+      
+      {/* Header */}
+      <div className="flex items-center justify-between border-b-4 border-red-900 pb-4">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-sm border border-surface-200 shrink-0">
+            <img src="/assets/images/acons_logo.png" alt="ACONS Logo" className="w-full h-full object-contain p-1" />
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl font-black text-red-900 tracking-tight font-display leading-tight uppercase">
+              AMEENATU COLLEGE OF NURSING SCIENCES
+            </h1>
+            <p className="text-xs font-bold text-surface-700 tracking-wider uppercase mt-0.5">
+              Office of the Registrar & Admissions Directorate
+            </p>
+            <p className="text-[11px] text-surface-500">
+              Takur Site, PMB 105, Dutse, Jigawa State, Nigeria
+            </p>
+          </div>
+        </div>
+
+        <div className="text-right shrink-0">
+          <span className="text-[10px] font-bold text-surface-400 block uppercase">SESSION</span>
+          <span className="text-xs font-black text-surface-800 uppercase block">{academicSession?.name || '2025/2026'}</span>
+          <span className="text-[10px] font-mono font-bold text-red-900 block mt-1">SLIP NO: ACONS/{applicant.id}</span>
+        </div>
+      </div>
+
+      {/* Banner Title */}
+      <div className="bg-surface-100 border border-surface-200 py-2.5 text-center rounded-xl">
+        <h2 className="text-xs sm:text-sm font-black text-red-900 tracking-wider uppercase font-display">
+          ENTRANCE SCREENING & COMPUTER-BASED TEST (CBT) PHOTOCARD
+        </h2>
+      </div>
+
+      {/* Candidate Info Grid + Passport Photo */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+        
+        {/* Left 3 columns: Candidate Details */}
+        <div className="md:col-span-3 space-y-4">
+          <table className="w-full text-xs">
+            <tbody className="divide-y divide-surface-100">
+              <tr>
+                <td className="py-2 font-semibold text-surface-500 w-1/3">Full Name:</td>
+                <td className="py-2 font-bold text-surface-900 uppercase">{applicant.full_name}</td>
+              </tr>
+              <tr>
+                <td className="py-2 font-semibold text-surface-500">JAMB Registration No:</td>
+                <td className="py-2 font-mono font-black text-red-900">{applicant.jamb_number}</td>
+              </tr>
+              <tr>
+                <td className="py-2 font-semibold text-surface-500">CBT Roll / Seat Number:</td>
+                <td className="py-2 font-mono font-bold text-blue-900">{activeExam.seat_number}</td>
+              </tr>
+              <tr>
+                <td className="py-2 font-semibold text-surface-500">Applied Program:</td>
+                <td className="py-2 font-bold text-surface-900">{appliedProgramName}</td>
+              </tr>
+              <tr>
+                <td className="py-2 font-semibold text-surface-500">Gender / Sex:</td>
+                <td className="py-2 font-bold text-surface-900 uppercase">{applicant.sex}</td>
+              </tr>
+              <tr>
+                <td className="py-2 font-semibold text-surface-500">State of Origin / LGA:</td>
+                <td className="py-2 font-bold text-surface-900">{applicant.state_of_origin} / {applicant.lga}</td>
+              </tr>
+              <tr>
+                <td className="py-2 font-semibold text-surface-500">Telephone / Phone:</td>
+                <td className="py-2 font-bold text-surface-900">{applicant.phone_number}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Right 1 column: Passport Photo */}
+        <div className="md:col-span-1 flex flex-col items-center text-center space-y-2">
+          <div className="w-32 h-40 rounded-xl overflow-hidden border-2 border-red-900 bg-surface-100 shadow-sm relative">
+            <img 
+              src={applicant.passport_photo} 
+              alt={applicant.full_name} 
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <span className="text-[9px] font-bold uppercase tracking-wider text-red-900 block">
+            Verified Biometric Photo
+          </span>
+        </div>
+
+      </div>
+
+      {/* Schedule & Venue Box */}
+      <div className="border border-surface-200 rounded-2xl p-4 bg-surface-50 space-y-3">
+        <div className="flex items-center justify-between border-b border-surface-200 pb-2">
+          <span className="text-xs font-black text-red-900 uppercase tracking-wider">
+            Examination Schedule & Hall Allocation
+          </span>
+          <span className="text-[10px] font-bold uppercase text-surface-500">
+            {activeExam.batch}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div>
+            <span className="text-surface-500 font-medium block">Date & Time:</span>
+            <span className="font-bold text-surface-900 block">{activeExam.exam_date}</span>
+          </div>
+          <div>
+            <span className="text-surface-500 font-medium block">Mode & Duration:</span>
+            <span className="font-bold text-surface-900 block">{activeExam.cbt_duration}</span>
+          </div>
+          <div className="sm:col-span-2">
+            <span className="text-surface-500 font-medium block">Venue:</span>
+            <span className="font-bold text-surface-900 block">{activeExam.exam_venue}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Registered Examination Papers Table */}
+      <div className="space-y-2">
+        <span className="text-xs font-black text-red-900 uppercase tracking-wider block">
+          Registered CBT Subject Papers (100 Questions Total)
+        </span>
+        <table className="w-full text-xs border border-surface-200 rounded-xl overflow-hidden">
+          <thead className="bg-surface-100 text-surface-700 font-bold border-b border-surface-200">
+            <tr>
+              <th className="py-2 px-3 text-left w-12">#</th>
+              <th className="py-2 px-3 text-left">Subject Paper</th>
+              <th className="py-2 px-3 text-center w-28">Questions</th>
+              <th className="py-2 px-3 text-right w-28">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-surface-100">
+            {activeExam.subjects.map((sub, idx) => (
+              <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-surface-50'}>
+                <td className="py-1.5 px-3 text-surface-400 font-mono">{idx + 1}</td>
+                <td className="py-1.5 px-3 font-bold text-surface-800">{sub.name}</td>
+                <td className="py-1.5 px-3 text-center text-surface-600">{sub.questions} Qs</td>
+                <td className="py-1.5 px-3 text-right font-semibold text-emerald-700">Accredited</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Instructions */}
+      <div className="space-y-2 text-xs">
+        <span className="font-black text-red-900 uppercase tracking-wider block">
+          Rules & Instructions for Candidates
+        </span>
+        <ol className="list-decimal pl-5 space-y-1 text-surface-600 leading-relaxed text-[11px]">
+          {activeExam.instructions.map((inst, idx) => (
+            <li key={idx}>{inst}</li>
+          ))}
+        </ol>
+      </div>
+
+      {/* Sign-off Blocks */}
+      <div className="grid grid-cols-2 gap-8 border-t border-surface-200 pt-6 text-xs">
+        <div className="space-y-4">
+          <div className="border-b border-surface-300 h-8 w-48" />
+          <div>
+            <span className="font-bold text-surface-800 block">Candidate Signature & Date</span>
+            <span className="text-[10px] text-surface-400">Must be signed in ink in the exam hall</span>
+          </div>
+        </div>
+
+        <div className="space-y-4 text-right">
+          <div className="border-b border-surface-300 h-8 w-48 ml-auto" />
+          <div>
+            <span className="font-bold text-surface-800 block">Chief Invigilator / Verifier Stamp</span>
+            <span className="text-[10px] text-surface-400">Official Exam Center Accreditation</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Barcode & Hash */}
+      <div className="border-t border-dashed border-surface-200 pt-3 flex items-center justify-between text-[10px] text-surface-400 font-mono">
+        <span>VERIFICATION: ACONS-CBT-{applicant.jamb_number}-{applicant.id}</span>
+        <span>DATE PRINTED: {new Date().toLocaleDateString()}</span>
+      </div>
+
+    </div>
+  )
+
   return (
     <>
       <Head title="Applicant Admissions & Screening Portal — ACONS" />
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 10mm;
+          }
+          body {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            background: white !important;
+          }
+        }
+      `}</style>
 
       {/* ── Top Institutional Navigation Bar ─────────────────────────────── */}
       <header className="sticky top-0 z-40 bg-white border-b border-surface-200 shadow-sm print:hidden">
@@ -402,7 +601,9 @@ export default function Dashboard({
       </header>
 
       {/* ── Main Dashboard Workspace ─────────────────────────────────────── */}
-      <main className="min-h-screen bg-surface-50 pb-20 pt-6 px-4 sm:px-6 print:hidden">
+      <main className={`min-h-screen bg-surface-50 pb-20 pt-6 px-4 sm:px-6 ${
+        printSlipMode || letterMode || examCardModal ? 'print:hidden' : ''
+      }`}>
         <div className="max-w-6xl mx-auto space-y-6">
 
           {/* Flash Feedback Banner */}
@@ -518,11 +719,17 @@ export default function Dashboard({
                 {/* Quick Action Buttons */}
                 <div className="shrink-0 flex flex-wrap md:flex-col gap-2">
                   <button
-                    onClick={() => setActiveTab('exam_card')}
+                    onClick={() => {
+                      if (hasPassport) {
+                        setExamCardModal(true)
+                      } else {
+                        setActiveTab('exam_card')
+                      }
+                    }}
                     className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-900 text-white font-bold text-xs hover:bg-blue-950 transition-colors shadow-sm"
                   >
                     <Printer size={14} />
-                    <span>View Exam Card</span>
+                    <span>{hasPassport ? 'Print Exam Card' : 'View Exam Card'}</span>
                   </button>
 
                   {!hasPassport && (
@@ -762,7 +969,7 @@ export default function Dashboard({
                 <div className="space-y-6">
                   
                   {/* Action Toolbar */}
-                  <div className="bg-white rounded-2xl p-4 border border-surface-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="bg-white rounded-2xl p-4 border border-surface-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200">
                         <CheckCircle2 size={18} />
@@ -775,7 +982,7 @@ export default function Dashboard({
 
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                       <button
-                        onClick={() => window.print()}
+                        onClick={() => setExamCardModal(true)}
                         className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-900 text-white font-bold text-xs hover:bg-blue-950 shadow-sm transition-colors flex-1 sm:flex-none"
                       >
                         <Printer size={14} />
@@ -784,189 +991,8 @@ export default function Dashboard({
                     </div>
                   </div>
 
-                  {/* Printable Photocard Sheet Component */}
-                  <div className="bg-white rounded-3xl p-8 sm:p-12 border border-surface-300 shadow-md max-w-4xl mx-auto space-y-8 text-left font-sans text-surface-900">
-                    
-                    {/* Header */}
-                    <div className="flex items-center justify-between border-b-4 border-red-900 pb-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-sm border border-surface-200 shrink-0">
-                          <img src="/assets/images/acons_logo.png" alt="ACONS Logo" className="w-full h-full object-contain p-1" />
-                        </div>
-                        <div>
-                          <h1 className="text-lg sm:text-xl font-black text-red-900 tracking-tight font-display leading-tight uppercase">
-                            AMEENATU COLLEGE OF NURSING SCIENCES
-                          </h1>
-                          <p className="text-xs font-bold text-surface-700 tracking-wider uppercase mt-0.5">
-                            Office of the Registrar & Admissions Directorate
-                          </p>
-                          <p className="text-[11px] text-surface-500">
-                            Takur Site, PMB 105, Dutse, Jigawa State, Nigeria
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <span className="text-[10px] font-bold text-surface-400 block uppercase">SESSION</span>
-                        <span className="text-xs font-black text-surface-800 uppercase block">{academicSession?.name || '2025/2026'}</span>
-                        <span className="text-[10px] font-mono font-bold text-red-900 block mt-1">SLIP NO: ACONS/{applicant.id}</span>
-                      </div>
-                    </div>
-
-                    {/* Banner Title */}
-                    <div className="bg-surface-100 border border-surface-200 py-2.5 text-center rounded-xl">
-                      <h2 className="text-xs sm:text-sm font-black text-red-900 tracking-wider uppercase font-display">
-                        ENTRANCE SCREENING & COMPUTER-BASED TEST (CBT) PHOTOCARD
-                      </h2>
-                    </div>
-
-                    {/* Candidate Info Grid + Passport Photo */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                      
-                      {/* Left 3 columns: Candidate Details */}
-                      <div className="md:col-span-3 space-y-4">
-                        <table className="w-full text-xs">
-                          <tbody className="divide-y divide-surface-100">
-                            <tr>
-                              <td className="py-2 font-semibold text-surface-500 w-1/3">Full Name:</td>
-                              <td className="py-2 font-bold text-surface-900 uppercase">{applicant.full_name}</td>
-                            </tr>
-                            <tr>
-                              <td className="py-2 font-semibold text-surface-500">JAMB Registration No:</td>
-                              <td className="py-2 font-mono font-black text-red-900">{applicant.jamb_number}</td>
-                            </tr>
-                            <tr>
-                              <td className="py-2 font-semibold text-surface-500">CBT Roll / Seat Number:</td>
-                              <td className="py-2 font-mono font-bold text-blue-900">{activeExam.seat_number}</td>
-                            </tr>
-                            <tr>
-                              <td className="py-2 font-semibold text-surface-500">Applied Program:</td>
-                              <td className="py-2 font-bold text-surface-900">{appliedProgramName}</td>
-                            </tr>
-                            <tr>
-                              <td className="py-2 font-semibold text-surface-500">Gender / Sex:</td>
-                              <td className="py-2 font-bold text-surface-900 uppercase">{applicant.sex}</td>
-                            </tr>
-                            <tr>
-                              <td className="py-2 font-semibold text-surface-500">State of Origin / LGA:</td>
-                              <td className="py-2 font-bold text-surface-900">{applicant.state_of_origin} / {applicant.lga}</td>
-                            </tr>
-                            <tr>
-                              <td className="py-2 font-semibold text-surface-500">Telephone / Phone:</td>
-                              <td className="py-2 font-bold text-surface-900">{applicant.phone_number}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Right 1 column: Passport Photo */}
-                      <div className="md:col-span-1 flex flex-col items-center text-center space-y-2">
-                        <div className="w-32 h-40 rounded-xl overflow-hidden border-2 border-red-900 bg-surface-100 shadow-sm relative">
-                          <img 
-                            src={applicant.passport_photo} 
-                            alt={applicant.full_name} 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-red-900 block">
-                          Verified Biometric Photo
-                        </span>
-                      </div>
-
-                    </div>
-
-                    {/* Schedule & Venue Box */}
-                    <div className="border border-surface-200 rounded-2xl p-4 bg-surface-50 space-y-3">
-                      <div className="flex items-center justify-between border-b border-surface-200 pb-2">
-                        <span className="text-xs font-black text-red-900 uppercase tracking-wider">
-                          Examination Schedule & Hall Allocation
-                        </span>
-                        <span className="text-[10px] font-bold uppercase text-surface-500">
-                          {activeExam.batch}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                        <div>
-                          <span className="text-surface-500 font-medium block">Date & Time:</span>
-                          <span className="font-bold text-surface-900 block">{activeExam.exam_date}</span>
-                        </div>
-                        <div>
-                          <span className="text-surface-500 font-medium block">Mode & Duration:</span>
-                          <span className="font-bold text-surface-900 block">{activeExam.cbt_duration}</span>
-                        </div>
-                        <div className="sm:col-span-2">
-                          <span className="text-surface-500 font-medium block">Venue:</span>
-                          <span className="font-bold text-surface-900 block">{activeExam.exam_venue}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Registered Examination Papers Table */}
-                    <div className="space-y-2">
-                      <span className="text-xs font-black text-red-900 uppercase tracking-wider block">
-                        Registered CBT Subject Papers (100 Questions Total)
-                      </span>
-                      <table className="w-full text-xs border border-surface-200 rounded-xl overflow-hidden">
-                        <thead className="bg-surface-100 text-surface-700 font-bold border-b border-surface-200">
-                          <tr>
-                            <th className="py-2 px-3 text-left w-12">#</th>
-                            <th className="py-2 px-3 text-left">Subject Paper</th>
-                            <th className="py-2 px-3 text-center w-28">Questions</th>
-                            <th className="py-2 px-3 text-right w-28">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-surface-100">
-                          {activeExam.subjects.map((sub, idx) => (
-                            <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-surface-50'}>
-                              <td className="py-1.5 px-3 text-surface-400 font-mono">{idx + 1}</td>
-                              <td className="py-1.5 px-3 font-bold text-surface-800">{sub.name}</td>
-                              <td className="py-1.5 px-3 text-center text-surface-600">{sub.questions} Qs</td>
-                              <td className="py-1.5 px-3 text-right font-semibold text-emerald-700">Accredited</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Instructions */}
-                    <div className="space-y-2 text-xs">
-                      <span className="font-black text-red-900 uppercase tracking-wider block">
-                        Rules & Instructions for Candidates
-                      </span>
-                      <ol className="list-decimal pl-5 space-y-1 text-surface-600 leading-relaxed text-[11px]">
-                        {activeExam.instructions.map((inst, idx) => (
-                          <li key={idx}>{inst}</li>
-                        ))}
-                      </ol>
-                    </div>
-
-                    {/* Sign-off Blocks */}
-                    <div className="grid grid-cols-2 gap-8 border-t border-surface-200 pt-8 text-xs">
-                      <div className="space-y-6">
-                        <div className="border-b border-surface-300 h-10 w-48" />
-                        <div>
-                          <span className="font-bold text-surface-800 block">Candidate Signature & Date</span>
-                          <span className="text-[10px] text-surface-400">Must be signed in ink in the exam hall</span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-6 text-right">
-                        <div className="border-b border-surface-300 h-10 w-48 ml-auto" />
-                        <div>
-                          <span className="font-bold text-surface-800 block">Chief Invigilator / Verifier Stamp</span>
-                          <span className="text-[10px] text-surface-400">Official Exam Center Accreditation</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Barcode & Hash */}
-                    <div className="border-t border-dashed border-surface-200 pt-4 flex items-center justify-between text-[10px] text-surface-400 font-mono">
-                      <span>VERIFICATION: ACONS-CBT-{applicant.jamb_number}-{applicant.id}</span>
-                      <span>DATE PRINTED: {new Date().toLocaleDateString()}</span>
-                    </div>
-
-                  </div>
+                  {/* Render Photocard Sheet */}
+                  {renderExamCardSheet()}
                 </div>
               )}
 
@@ -1556,7 +1582,7 @@ export default function Dashboard({
                     </div>
                     {hasPassport ? (
                       <button
-                        onClick={() => setActiveTab('exam_card')}
+                        onClick={() => setExamCardModal(true)}
                         className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-surface-300 text-surface-800 font-bold text-xs hover:bg-surface-50 shadow-sm transition-colors"
                       >
                         <Printer size={14} />
@@ -1948,6 +1974,42 @@ export default function Dashboard({
 
               </div>
             </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MODAL 3: OFFICIAL CBT EXAMINATION PHOTOCARD PREVIEW & PRINT
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {examCardModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 overflow-y-auto p-4 flex items-start justify-center pt-10 print:p-0 print:bg-white print:static">
+          <div className="bg-white rounded-3xl w-full max-w-4xl p-6 sm:p-10 border border-surface-200 shadow-2xl space-y-6 print:border-none print:shadow-none print:p-0 print:w-full print:max-w-none relative">
+            
+            {/* Print Action Bar */}
+            <div className="flex justify-between items-center bg-surface-50 border border-surface-200 p-4 rounded-2xl print:hidden">
+              <span className="text-xs font-bold text-surface-700 flex items-center gap-1.5">
+                <Printer size={14} className="text-blue-900" />
+                Official ACONS CBT Examination Photocard Preview
+              </span>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => window.print()}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-900 text-white rounded-xl text-xs font-bold hover:bg-blue-950 shadow-md"
+                >
+                  <Printer size={14} /> Send to Printer
+                </button>
+                <button 
+                  onClick={() => setExamCardModal(false)}
+                  className="px-4 py-2 border border-surface-200 text-surface-600 rounded-xl text-xs font-bold hover:bg-surface-100"
+                >
+                  Close Preview
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Photocard Sheet */}
+            {renderExamCardSheet()}
 
           </div>
         </div>
