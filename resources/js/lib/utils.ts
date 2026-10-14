@@ -62,6 +62,14 @@ export function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
 }
 
+export function getPhotoUrl(photo?: string | null): string | null {
+  if (!photo) return null
+  if (photo.startsWith('http://') || photo.startsWith('https://') || photo.startsWith('/')) {
+    return photo
+  }
+  return `/storage/${photo}`
+}
+
 // Framer Motion variants
 export const staggerContainer = {
   hidden: { opacity: 0 },
