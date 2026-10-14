@@ -61,14 +61,19 @@ class DashboardController extends Controller
             });
         }
 
+        $perPageInput = $request->input('per_page', 15);
+        $perPage = ($perPageInput === 'all' || (is_numeric($perPageInput) && (int)$perPageInput >= 9999)) 
+            ? 9999 
+            : (is_numeric($perPageInput) ? max((int)$perPageInput, 5) : 15);
+
         $applications = $query->orderBy('updated_at', 'desc')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         return Inertia::render('HOD/Clearance/Index', [
             'applications' => $applications,
             'department' => $dept,
-            'filters' => $request->only(['search', 'section'])
+            'filters' => $request->only(['search', 'section', 'per_page'])
         ]);
     }
 

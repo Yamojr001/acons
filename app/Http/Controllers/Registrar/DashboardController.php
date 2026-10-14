@@ -191,7 +191,12 @@ class DashboardController extends Controller
             return $dept . ' (' . $y . ')';
         })->map->count();
 
-        $applications = (clone $query)->with(['form', 'admittedDepartment', 'appliedProgram'])->latest()->paginate(20)->withQueryString();
+        $perPageInput = $request->input('per_page', 20);
+        $perPage = ($perPageInput === 'all' || (is_numeric($perPageInput) && (int)$perPageInput >= 9999)) 
+            ? 9999 
+            : (is_numeric($perPageInput) ? max((int)$perPageInput, 5) : 20);
+
+        $applications = (clone $query)->with(['form', 'admittedDepartment', 'appliedProgram'])->latest()->paginate($perPage)->withQueryString();
         
         $availableYears = \App\Models\Applicant::where('tenant_id', $tenantId)
             ->pluck('created_at')
@@ -211,7 +216,7 @@ class DashboardController extends Controller
             'applications' => $applications,
             'stats' => $stats,
             'deptYearStats' => $deptYearStats,
-            'filters' => request()->only(['year', 'payment_status', 'status', 'search']),
+            'filters' => request()->only(['year', 'payment_status', 'status', 'search', 'per_page']),
             'availableYears' => $availableYears,
             'departments' => Department::get(['id', 'name', 'code']),
             'defaultClearanceSchedule' => $defaultClearanceSchedule

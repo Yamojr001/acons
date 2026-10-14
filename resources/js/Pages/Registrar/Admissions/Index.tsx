@@ -8,14 +8,19 @@ import {
 } from 'lucide-react'
 import AppLayout from '@/Layouts/AppLayout'
 import { Card, Button, Badge, Avatar } from '@/Components/UI'
-import { formatDate, getPhotoUrl } from '@/lib/utils'
+import { cn, formatDate, getPhotoUrl } from '@/lib/utils'
 import type { PageProps } from '@/types'
 
 interface Props extends PageProps {
   applications: {
     data: any[]
-    links: any[]
+    links: Array<{ url: string | null; label: string; active: boolean }>
     total: number
+    from?: number | null
+    to?: number | null
+    current_page?: number
+    last_page?: number
+    per_page?: number
   }
   stats: {
     total: number
@@ -31,6 +36,7 @@ interface Props extends PageProps {
     payment_status?: string
     status?: string
     search?: string
+    per_page?: string
   }
   availableYears: string[]
   departments: Array<{ id: number; name: string; code: string }>
@@ -193,9 +199,10 @@ export default function AdmissionIndex({
       ...filters,
       [key]: value || undefined,
     };
-    if (value === '' || value === 'all') {
+    if (value === '' || (value === 'all' && key !== 'per_page')) {
       delete newFilters[key];
     }
+    delete newFilters['page'];
     router.get(
       route(destRoute),
       newFilters,
@@ -396,6 +403,20 @@ export default function AdmissionIndex({
                 ))}
               </select>
            </div>
+
+           {/* Per Page / View All Selector */}
+           <div className="w-full md:w-auto">
+              <select 
+                className="w-full md:w-auto pl-3 pr-8 py-2 bg-white border border-surface-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium text-surface-700"
+                value={filters?.per_page || '20'}
+                onChange={(e) => handleFilterChange('per_page', e.target.value)}
+              >
+                <option value="20">20 per page</option>
+                <option value="50">50 per page</option>
+                <option value="100">100 per page</option>
+                <option value="all">View All ({applications.total})</option>
+              </select>
+           </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -498,6 +519,68 @@ export default function AdmissionIndex({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Table Pagination & Row Summary Footer */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-surface-100 bg-surface-50/30">
+          <div className="flex items-center gap-3 text-sm text-surface-500">
+            <span>
+              {filters?.per_page === 'all' || applications.total <= applications.data.length ? (
+                <>Showing all <strong className="text-surface-800 font-bold">{applications.total}</strong> applicants</>
+              ) : (
+                <>Showing <strong className="text-surface-800 font-bold">{applications.from ?? 1}</strong> to <strong className="text-surface-800 font-bold">{applications.to ?? applications.data.length}</strong> of <strong className="text-surface-800 font-bold">{applications.total}</strong> applicants</>
+              )}
+            </span>
+            <div className="hidden sm:flex items-center gap-1.5 pl-3 border-l border-surface-200 text-xs">
+              <span className="text-surface-400 font-medium">Rows:</span>
+              {(['20', '50', '100', 'all'] as const).map((size) => {
+                const isActive = (filters?.per_page === size) || (!filters?.per_page && size === '20');
+                return (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => handleFilterChange('per_page', size)}
+                    className={cn(
+                      'px-2 py-0.5 rounded font-medium transition-colors text-xs',
+                      isActive
+                        ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200 shadow-2xs'
+                        : 'text-surface-600 hover:bg-surface-100'
+                    )}
+                  >
+                    {size === 'all' ? 'All' : size}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {applications.links && applications.links.length > 3 && (
+            <div className="flex items-center gap-1 flex-wrap justify-center">
+              {applications.links.map((link, i) => (
+                link.url ? (
+                  <Link
+                    key={i}
+                    href={link.url}
+                    preserveScroll
+                    preserveState
+                    className={cn(
+                      'px-3 py-1 text-xs rounded-lg transition-colors font-medium',
+                      link.active
+                        ? 'bg-brand-600 text-white font-bold'
+                        : 'hover:bg-surface-100 text-surface-600 border border-transparent hover:border-surface-200'
+                    )}
+                    dangerouslySetInnerHTML={{ __html: link.label }}
+                  />
+                ) : (
+                  <span
+                    key={i}
+                    className="px-3 py-1 text-xs text-surface-300 font-medium select-none"
+                    dangerouslySetInnerHTML={{ __html: link.label }}
+                  />
+                )
+              ))}
+            </div>
+          )}
         </div>
       </Card>
 

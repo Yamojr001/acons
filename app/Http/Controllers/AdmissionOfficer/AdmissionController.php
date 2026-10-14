@@ -92,7 +92,12 @@ class AdmissionController extends Controller
             });
         }
 
-        $applications = $query->with('admittedDepartment')->orderBy('updated_at', 'desc')->paginate(15);
+        $perPageInput = $request->input('per_page', 15);
+        $perPage = ($perPageInput === 'all' || (is_numeric($perPageInput) && (int)$perPageInput >= 9999)) 
+            ? 9999 
+            : (is_numeric($perPageInput) ? max((int)$perPageInput, 5) : 15);
+
+        $applications = $query->with('admittedDepartment')->orderBy('updated_at', 'desc')->paginate($perPage)->withQueryString();
 
         // Fetch available years for filter
         $availableYears = AdmissionForm::whereNotNull('admission_year')
@@ -103,7 +108,8 @@ class AdmissionController extends Controller
             'applications' => $applications,
             'filters' => [
                 'search' => $search,
-                'year' => $year
+                'year' => $year,
+                'per_page' => $perPageInput
             ],
             'availableYears' => $availableYears
         ]);

@@ -1,19 +1,24 @@
 import { useState, useEffect } from 'react'
-import { Head, useForm, router } from '@inertiajs/react'
+import { Head, Link, useForm, router } from '@inertiajs/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   FileText, CheckCircle, XCircle, Eye, Clock, ShieldCheck, X, Search, Filter, Phone, Mail
 } from 'lucide-react'
 import AppLayout from '@/Layouts/AppLayout'
 import { Card, Button, Badge, Avatar } from '@/Components/UI'
-import { formatDate, getPhotoUrl } from '@/lib/utils'
+import { cn, formatDate, getPhotoUrl } from '@/lib/utils'
 import type { PageProps } from '@/types'
 
 interface Props extends PageProps {
   applications: {
     data: any[]
-    links: any[]
+    links: Array<{ url: string | null; label: string; active: boolean }>
     total: number
+    from?: number | null
+    to?: number | null
+    current_page?: number
+    last_page?: number
+    per_page?: number
   }
   department: {
     id: number
@@ -22,6 +27,7 @@ interface Props extends PageProps {
   filters: {
     search?: string
     section?: string
+    per_page?: string
   }
 }
 
@@ -47,7 +53,7 @@ export default function ClearanceIndex({ applications, department, filters }: Pr
     const delayDebounceFn = setTimeout(() => {
       router.get(
         '/hod/clearance', 
-        { search, section }, 
+        { search, section, per_page: filters?.per_page }, 
         { preserveState: true, replace: true }
       )
     }, 250)
@@ -57,7 +63,11 @@ export default function ClearanceIndex({ applications, department, filters }: Pr
 
   const handleSectionChange = (val: string) => {
     setSection(val)
-    router.get('/hod/clearance', { search, section: val }, { preserveState: true })
+    router.get('/hod/clearance', { search, section: val, per_page: filters?.per_page }, { preserveState: true })
+  }
+
+  const handlePerPageChange = (val: string) => {
+    router.get('/hod/clearance', { search, section, per_page: val }, { preserveState: true })
   }
 
   const handleApprove = (appId: number) => {
@@ -120,6 +130,19 @@ export default function ClearanceIndex({ applications, department, filters }: Pr
                 <option value="all">All Sections</option>
                 <option value="ND">ND (National Diploma)</option>
                 <option value="HND">HND (Higher National Diploma)</option>
+              </select>
+           </div>
+           <div className="flex items-center gap-2 shrink-0">
+              <select 
+                value={filters?.per_page || '15'}
+                onChange={(e) => handlePerPageChange(e.target.value)}
+                className="px-3 py-1.5 bg-white border border-surface-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium text-surface-700"
+              >
+                <option value="15">15 per page</option>
+                <option value="30">30 per page</option>
+                <option value="50">50 per page</option>
+                <option value="100">100 per page</option>
+                <option value="all">View All ({applications.total})</option>
               </select>
            </div>
         </div>
@@ -196,6 +219,68 @@ export default function ClearanceIndex({ applications, department, filters }: Pr
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Table Pagination & Row Summary Footer */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-surface-100 bg-surface-50/30">
+          <div className="flex items-center gap-3 text-sm text-surface-500">
+            <span>
+              {filters?.per_page === 'all' || applications.total <= applications.data.length ? (
+                <>Showing all <strong className="text-surface-800 font-bold">{applications.total}</strong> candidates</>
+              ) : (
+                <>Showing <strong className="text-surface-800 font-bold">{applications.from ?? 1}</strong> to <strong className="text-surface-800 font-bold">{applications.to ?? applications.data.length}</strong> of <strong className="text-surface-800 font-bold">{applications.total}</strong> candidates</>
+              )}
+            </span>
+            <div className="hidden sm:flex items-center gap-1.5 pl-3 border-l border-surface-200 text-xs">
+              <span className="text-surface-400 font-medium">Rows:</span>
+              {(['15', '30', '50', 'all'] as const).map((size) => {
+                const isActive = (filters?.per_page === size) || (!filters?.per_page && size === '15');
+                return (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => handlePerPageChange(size)}
+                    className={cn(
+                      'px-2 py-0.5 rounded font-medium transition-colors text-xs',
+                      isActive
+                        ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200 shadow-2xs'
+                        : 'text-surface-600 hover:bg-surface-100'
+                    )}
+                  >
+                    {size === 'all' ? 'All' : size}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {applications.links && applications.links.length > 3 && (
+            <div className="flex items-center gap-1 flex-wrap justify-center">
+              {applications.links.map((link, i) => (
+                link.url ? (
+                  <Link
+                    key={i}
+                    href={link.url}
+                    preserveScroll
+                    preserveState
+                    className={cn(
+                      'px-3 py-1 text-xs rounded-lg transition-colors font-medium',
+                      link.active
+                        ? 'bg-brand-600 text-white font-bold'
+                        : 'hover:bg-surface-100 text-surface-600 border border-transparent hover:border-surface-200'
+                    )}
+                    dangerouslySetInnerHTML={{ __html: link.label }}
+                  />
+                ) : (
+                  <span
+                    key={i}
+                    className="px-3 py-1 text-xs text-surface-300 font-medium select-none"
+                    dangerouslySetInnerHTML={{ __html: link.label }}
+                  />
+                )
+              ))}
+            </div>
+          )}
         </div>
       </Card>
 
