@@ -570,31 +570,13 @@ class SchoolSeeder extends Seeder
             'parent_phone' => '08036894451',
             'sponsor_name_address' => 'Hon. Ibrahim Hashim Kanya Kofar Fada House No: 05',
 
+            'admission_form_id' => $admissionForm->id,
             'payment_status' => 'paid',
             'payment_reference' => 'ACON_ADM_REMITA8934',
             'amount_paid' => 14700.00,
             'admission_status' => 'pending',
-            'admitted_program_id' => null
-        ]);
-
-        \App\Models\AdmissionApplication::create([
-            'tenant_id' => $tenant->id,
-            'admission_form_id' => $admissionForm->id,
-            'applicant_name' => $applicant->full_name,
-            'applicant_email' => $applicant->email,
             'status' => 'pending',
-            'data' => [
-                'jamb_number' => $applicant->jamb_number,
-                'phone_number' => $applicant->phone_number,
-                'jamb_score' => $applicant->jamb_score,
-                'state_of_origin' => $applicant->state_of_origin,
-                'lga' => $applicant->lga,
-                'gender' => $applicant->sex,
-                'date_of_birth' => '2007-01-21',
-                'first_sitting_type' => $applicant->first_sitting_type,
-                'first_sitting_no' => $applicant->first_sitting_no,
-                'first_sitting_grades' => $applicant->first_sitting_grades
-            ]
+            'admitted_program_id' => null
         ]);
 
         $pendingApplicantsData = [
@@ -760,29 +742,12 @@ class SchoolSeeder extends Seeder
                 'parent_address' => 'No 12 Airport Road Kano',
                 'parent_phone' => $data['phone_number'],
                 'sponsor_name_address' => 'Alhaji Yusuf Aliyu',
+                'admission_form_id' => $admissionForm->id,
                 'payment_status' => 'paid',
                 'payment_reference' => 'ACON_ADM_' . Str::random(8),
                 'amount_paid' => 14700.00,
-                'admission_status' => 'pending'
-            ]);
-
-            \App\Models\AdmissionApplication::create([
-                'tenant_id' => $tenant->id,
-                'admission_form_id' => $admissionForm->id,
-                'applicant_name' => $appModel->full_name,
-                'applicant_email' => $appModel->email,
+                'admission_status' => 'pending',
                 'status' => 'pending',
-                'data' => [
-                    'jamb_number' => $appModel->jamb_number,
-                    'phone_number' => $appModel->phone_number,
-                    'jamb_score' => $appModel->jamb_score,
-                    'state_of_origin' => $appModel->state_of_origin,
-                    'lga' => $appModel->lga,
-                    'gender' => $appModel->sex,
-                    'first_sitting_type' => $appModel->first_sitting_type,
-                    'first_sitting_no' => $appModel->first_sitting_no,
-                    'first_sitting_grades' => $appModel->first_sitting_grades
-                ]
             ]);
         }
 

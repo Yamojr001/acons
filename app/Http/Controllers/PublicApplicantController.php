@@ -139,12 +139,12 @@ class PublicApplicantController extends Controller
             'sponsor_name_address' => $request->sponsor_name_address,
 
             // States
+            'admission_form_id' => \App\Models\AdmissionForm::where('tenant_id', $tenant->id)->where('is_active', true)->value('id'),
             'applied_program_id' => $request->applied_program_id,
             'payment_status' => 'pending',
-            'admission_status' => 'pending'
+            'admission_status' => 'pending',
+            'status' => 'pending',
         ]);
-
-        $this->syncAdmissionApplication($applicant);
 
         return redirect()->route('admissions.pay', ['applicant' => $applicant->id]);
     }
@@ -325,8 +325,6 @@ class PublicApplicantController extends Controller
                 'payment_reference' => $txnRef,
             ]);
 
-            $this->createAdmissionApplication($applicant);
-
             // Send transactional SMS notification via Sendar
             if (!empty($applicant->phone_number)) {
                 try {
@@ -382,87 +380,6 @@ class PublicApplicantController extends Controller
     }
 
     /**
-     * Create or update the AdmissionApplication record with payment tracking.
-     */
-    private function syncAdmissionApplication(Applicant $applicant): void
-    {
-        $tenant       = app('currentTenant');
-        $tenantId     = $tenant ? $tenant->id : ($applicant->tenant_id ?: 1);
-        $admissionForm = \App\Models\AdmissionForm::where('tenant_id', $tenantId)->where('is_active', true)->first();
-        $formId = $admissionForm ? $admissionForm->id : 1;
-
-        $existing = \App\Models\AdmissionApplication::where('applicant_id', $applicant->id)
-            ->orWhere(function ($q) use ($applicant) {
-                if (!empty($applicant->email)) {
-                    $q->where('applicant_email', $applicant->email);
-                }
-                if (!empty($applicant->jamb_number)) {
-                    $q->orWhere('data->jamb_number', $applicant->jamb_number);
-                }
-            })
-            ->first();
-
-        $data = [
-            'payment_status'       => $applicant->payment_status ?: 'pending',
-            'payment_reference'    => $applicant->payment_reference,
-            'amount_paid'          => (float) ($applicant->amount_paid ?: 0),
-            'passport_photo'       => $applicant->passport_photo,
-            'applied_program_id'   => $applicant->applied_program_id,
-            'applied_program_name' => $applicant->appliedProgram?->name ?? 'Basic Nursing',
-            'exam_date'            => $applicant->exam_date ? $applicant->exam_date->format('Y-m-d H:i:s') : null,
-            'exam_venue'           => $applicant->exam_venue,
-            'seat_number'          => $applicant->seat_number,
-            'jamb_number'          => $applicant->jamb_number,
-            'phone_number'         => $applicant->phone_number,
-            'jamb_score'           => $applicant->jamb_score,
-            'state_of_origin'      => $applicant->state_of_origin,
-            'lga'                  => $applicant->lga,
-            'gender'               => $applicant->sex,
-            'date_of_birth'        => $applicant->dob ? $applicant->dob->format('Y-m-d') : null,
-            'first_sitting_type'   => $applicant->first_sitting_type,
-            'first_sitting_year'   => $applicant->first_sitting_year,
-            'first_sitting_no'     => $applicant->first_sitting_no,
-            'first_sitting_grades' => $applicant->first_sitting_grades,
-            'second_sitting_type'  => $applicant->second_sitting_type,
-            'second_sitting_year'  => $applicant->second_sitting_year,
-            'second_sitting_no'    => $applicant->second_sitting_no,
-            'second_sitting_grades'=> $applicant->second_sitting_grades,
-        ];
-
-        if ($existing) {
-            $mergedData = array_merge($existing->data ?: [], $data);
-            $existing->update([
-                'applicant_id'      => $applicant->id,
-                'applicant_name'    => $applicant->full_name,
-                'applicant_email'   => $applicant->email ?: ($applicant->jamb_number . '@acons.edu.ng'),
-                'payment_status'    => $applicant->payment_status ?: 'pending',
-                'amount_paid'       => (float) ($applicant->amount_paid ?: 0),
-                'payment_reference' => $applicant->payment_reference,
-                'data'              => $mergedData,
-            ]);
-        } else {
-            \App\Models\AdmissionApplication::create([
-                'tenant_id'         => $tenantId,
-                'admission_form_id' => $formId,
-                'applicant_id'      => $applicant->id,
-                'applicant_name'    => $applicant->full_name,
-                'applicant_email'   => $applicant->email ?: ($applicant->jamb_number . '@acons.edu.ng'),
-                'status'            => 'pending',
-                'payment_status'    => $applicant->payment_status ?: 'pending',
-                'amount_paid'       => (float) ($applicant->amount_paid ?: 0),
-                'payment_reference' => $applicant->payment_reference,
-                'data'              => $data,
-                'created_at'        => $applicant->created_at ?: now(),
-            ]);
-        }
-    }
-
-    private function createAdmissionApplication(Applicant $applicant): void
-    {
-        $this->syncAdmissionApplication($applicant);
-    }
-
-    /**
      * Legacy authorize fallback (kept for any direct POST scenarios).
      */
     public function authorizePayment(Request $request, Applicant $applicant)
@@ -476,8 +393,6 @@ class PublicApplicantController extends Controller
             'amount_paid'       => 14700.00,
             'payment_reference' => 'ACON_ADM_' . strtoupper(Str::random(12)),
         ]);
-
-        $this->createAdmissionApplication($applicant);
 
         // Send transactional SMS notification via Sendar
         if (!empty($applicant->phone_number)) {
@@ -627,8 +542,6 @@ class PublicApplicantController extends Controller
                 'passport_photo' => '/storage/' . $path,
             ]);
 
-            $this->syncAdmissionApplication($applicant);
-
             return back()->with('success', 'Passport photograph uploaded and verified successfully! Your Exam Card is now unlocked for download and printing.');
         }
 
@@ -674,7 +587,6 @@ class PublicApplicantController extends Controller
         ]);
 
         $applicant->update($validated);
-        $this->syncAdmissionApplication($applicant);
 
         return back()->with('success', 'Your examination qualifications and application details have been updated successfully.');
     }

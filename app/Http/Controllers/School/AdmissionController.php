@@ -4,7 +4,7 @@ namespace App\Http\Controllers\School;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdmissionForm;
-use App\Models\AdmissionApplication;
+use App\Models\Applicant;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -60,15 +60,18 @@ class AdmissionController extends Controller
     public function applications(): Response
     {
         $tenant = app('currentTenant');
-        $applications = AdmissionApplication::where('tenant_id', $tenant->id)
+        $applications = Applicant::where('tenant_id', $tenant->id)
             ->with('form')->latest()->paginate(20);
         return Inertia::render('SchoolAdmin/Admissions/Applications', ['applications' => $applications]);
     }
 
-    public function updateApplicationStatus(Request $request, AdmissionApplication $application)
+    public function updateApplicationStatus(Request $request, Applicant $application)
     {
-        $request->validate(['status' => 'required|in:pending,under_review,accepted,rejected']);
-        $application->update(['status' => $request->status]);
+        $request->validate(['status' => 'required|in:pending,under_review,accepted,rejected,admitted,cleared,clearance_rejected']);
+        $application->update([
+            'status' => $request->status,
+            'admission_status' => $request->status,
+        ]);
         return back()->with('success', 'Application status updated.');
     }
 }

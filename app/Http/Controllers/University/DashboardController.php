@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\University;
 
 use App\Http\Controllers\Controller;
-use App\Models\{AdmissionApplication, AdmissionForm, Announcement, Department, Course, Fee, Grade, Payment, Student, Lecturer, Semester, CourseRegistration};
+use App\Models\{Applicant, AdmissionForm, Announcement, Department, Course, Fee, Grade, Payment, Student, Lecturer, Semester, CourseRegistration};
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Support\Facades\Auth;

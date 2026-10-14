@@ -27,8 +27,13 @@ class AdmissionForm extends Model
         'registration_start_date' => 'date',
     ];
 
+    public function applicants()
+    {
+        return $this->hasMany(Applicant::class, 'admission_form_id');
+    }
+
     public function applications()
     {
-        return $this->hasMany(AdmissionApplication::class);
+        return $this->applicants();
     }
 }

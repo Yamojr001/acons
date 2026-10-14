@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Registrar;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Student, Lecturer, Department, AcademicSession, Semester, AdmissionForm, AdmissionApplication, Course, CourseRegistration, Grade};
+use App\Models\{Student, Lecturer, Department, AcademicSession, Semester, AdmissionForm, Applicant, Course, CourseRegistration, Grade};
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Mail;
@@ -134,7 +134,7 @@ class DashboardController extends Controller
         $status = $request->input('status');
         $search = $request->input('search');
         
-        $query = \App\Models\AdmissionApplication::where('tenant_id', $tenantId);
+        $query = \App\Models\Applicant::where('tenant_id', $tenantId);
         
         if ($year) {
             $query->whereYear('created_at', $year);
@@ -163,14 +163,14 @@ class DashboardController extends Controller
                     $q->where('id', $searchId);
                 }
                 
-                $q->orWhere('applicant_name', 'like', "%{$search}%")
-                  ->orWhere('applicant_email', 'like', "%{$search}%")
-                  ->orWhere('data->jamb_number', 'like', "%{$search}%")
-                  ->orWhere('data->phone_number', 'like', "%{$search}%");
+                $q->orWhere('full_name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('jamb_number', 'like', "%{$search}%")
+                  ->orWhere('phone_number', 'like', "%{$search}%");
             });
         }
         
-        $baseQuery = \App\Models\AdmissionApplication::where('tenant_id', $tenantId);
+        $baseQuery = \App\Models\Applicant::where('tenant_id', $tenantId);
         if ($year) {
             $baseQuery->whereYear('created_at', $year);
         }
@@ -184,16 +184,16 @@ class DashboardController extends Controller
             'pending' => (clone $baseQuery)->whereIn('status', ['pending', 'under_review'])->count(),
         ];
 
-        $allApps = (clone $query)->with('form')->get();
+        $allApps = (clone $query)->with(['form', 'admittedDepartment', 'appliedProgram'])->get();
         $deptYearStats = $allApps->groupBy(function($app) {
             $y = $app->created_at ? $app->created_at->format('Y') : date('Y');
-            $dept = $app->data['department'] ?? $app->data['program'] ?? ($app->form ? $app->form->title : 'General');
+            $dept = $app->appliedProgram?->name ?? ($app->admittedDepartment?->name ?? ($app->form ? $app->form->title : 'General'));
             return $dept . ' (' . $y . ')';
         })->map->count();
 
-        $applications = (clone $query)->with(['form'])->latest()->paginate(20)->withQueryString();
+        $applications = (clone $query)->with(['form', 'admittedDepartment', 'appliedProgram'])->latest()->paginate(20)->withQueryString();
         
-        $availableYears = \App\Models\AdmissionApplication::where('tenant_id', $tenantId)
+        $availableYears = \App\Models\Applicant::where('tenant_id', $tenantId)
             ->pluck('created_at')
             ->map(fn($date) => $date ? $date->format('Y') : date('Y'))
             ->unique()
@@ -400,7 +400,7 @@ class DashboardController extends Controller
         return redirect()->back()->with('success', 'Academic session updated successfully.');
     }
 
-    public function postAdmit(Request $request, AdmissionApplication $application)
+    public function postAdmit(Request $request, \App\Models\Applicant $application)
     {
         if (auth()->user()->hasRole('registrar')) {
             abort(403, 'Unauthorized action. Registrars cannot offer admission or reject applications.');
@@ -412,35 +412,23 @@ class DashboardController extends Controller
             'clearance_schedule' => 'required|string',
         ]);
 
+        $program = \App\Models\Program::where('department_id', $request->department_id)->first();
+
         $application->update([
             'status' => 'admitted',
+            'admission_status' => 'admitted',
             'admitted_department_id' => $request->department_id,
+            'admitted_program_id' => $program?->id,
             'admitted_section' => $request->section,
             'clearance_schedule' => $request->clearance_schedule,
         ]);
 
-        // Sync the public applicant profile state
-        $jambNumber = $application->data['jamb_number'] ?? $application->data['jamb_registration_number'] ?? null;
-        $applicant = \App\Models\Applicant::where('email', $application->applicant_email)
-            ->when($jambNumber, function ($q) use ($jambNumber) {
-                return $q->orWhere('jamb_number', $jambNumber);
-            })
-            ->first();
-
-        if ($applicant) {
-            $program = \App\Models\Program::where('department_id', $request->department_id)->first();
-            $applicant->update([
-                'admission_status' => 'admitted',
-                'admitted_program_id' => $program?->id,
-            ]);
-        }
-
         $dept = Department::find($request->department_id);
 
         try {
-            Mail::to($application->applicant_email)->send(
+            Mail::to($application->email)->send(
                 new AdmissionOfferedMail(
-                    $application->applicant_name,
+                    $application->full_name,
                     $dept->name,
                     $request->section,
                     $request->clearance_schedule
@@ -451,12 +439,12 @@ class DashboardController extends Controller
         }
 
         // Send transactional SMS notification via Sendar
-        $phone = $application->data['phone_number'] ?? $application->data['phone'] ?? ($applicant?->phone_number ?? null);
+        $phone = $application->phone_number;
         if (!empty($phone)) {
             try {
                 app(\App\Services\SmsService::class)->send(
                     $phone,
-                    "Congratulations {$application->applicant_name}! You have been offered provisional admission into {$dept->name} ({$request->section}) at ACONS. Clearance starts {$request->clearance_schedule}."
+                    "Congratulations {$application->full_name}! You have been offered provisional admission into {$dept->name} ({$request->section}) at ACONS. Clearance starts {$request->clearance_schedule}."
                 );
             } catch (\Throwable) {}
         }
@@ -464,7 +452,7 @@ class DashboardController extends Controller
         return redirect()->back()->with('success', 'Admission offered successfully and clearance details emailed & SMS sent.');
     }
 
-    public function postReject(Request $request, AdmissionApplication $application)
+    public function postReject(Request $request, \App\Models\Applicant $application)
     {
         if (auth()->user()->hasRole('registrar')) {
             abort(403, 'Unauthorized action. Registrars cannot offer admission or reject applications.');
@@ -476,28 +464,15 @@ class DashboardController extends Controller
 
         $application->update([
             'status' => 'rejected',
+            'admission_status' => 'rejected',
             'rejection_reason' => $request->reason,
+            'remarks' => $request->reason,
         ]);
 
-        // Sync the public applicant profile state
-        $jambNumber = $application->data['jamb_number'] ?? $application->data['jamb_registration_number'] ?? null;
-        $applicant = \App\Models\Applicant::where('email', $application->applicant_email)
-            ->when($jambNumber, function ($q) use ($jambNumber) {
-                return $q->orWhere('jamb_number', $jambNumber);
-            })
-            ->first();
-
-        if ($applicant) {
-            $applicant->update([
-                'admission_status' => 'rejected',
-                'remarks' => $request->reason,
-            ]);
-        }
-
         try {
-            Mail::to($application->applicant_email)->send(
+            Mail::to($application->email)->send(
                 new AdmissionRejectedMail(
-                    $application->applicant_name,
+                    $application->full_name,
                     $request->reason
                 )
             );
@@ -684,7 +659,7 @@ class DashboardController extends Controller
         $status = $request->input('status');
         $search = $request->input('search');
         
-        $query = \App\Models\AdmissionApplication::where('tenant_id', $tenantId);
+        $query = \App\Models\Applicant::where('tenant_id', $tenantId);
         
         if ($year) {
             $query->whereYear('created_at', $year);
@@ -713,14 +688,14 @@ class DashboardController extends Controller
                     $q->where('id', $searchId);
                 }
                 
-                $q->orWhere('applicant_name', 'like', "%{$search}%")
-                  ->orWhere('applicant_email', 'like', "%{$search}%")
-                  ->orWhere('data->jamb_number', 'like', "%{$search}%")
-                  ->orWhere('data->phone_number', 'like', "%{$search}%");
+                $q->orWhere('full_name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('jamb_number', 'like', "%{$search}%")
+                  ->orWhere('phone_number', 'like', "%{$search}%");
             });
         }
         
-        $applications = $query->with(['form', 'admittedDepartment'])->latest()->get();
+        $applications = $query->with(['form', 'admittedDepartment', 'appliedProgram'])->latest()->get();
         
         $headers = [
             'Content-Type' => 'text/csv',
@@ -754,23 +729,22 @@ class DashboardController extends Controller
             ]);
             
             foreach ($applications as $app) {
-                $data = $app->data ?: [];
-                $programName = $app->admittedDepartment ? $app->admittedDepartment->name : 'N/A';
+                $programName = $app->admittedDepartment ? $app->admittedDepartment->name : ($app->appliedProgram?->name ?? 'N/A');
                 
                 fputcsv($file, [
                     'ADM-' . str_pad($app->id, 5, '0', STR_PAD_LEFT),
-                    $app->applicant_name,
-                    $app->applicant_email,
+                    $app->full_name,
+                    $app->email,
                     ucfirst($app->status),
                     strtoupper($app->payment_status ?: 'PENDING'),
                     number_format((float) ($app->amount_paid ?: 0), 2),
                     $app->payment_reference ?: 'N/A',
-                    $data['gender'] ?? $data['sex'] ?? 'N/A',
-                    $data['jamb_number'] ?? 'N/A',
-                    $data['jamb_score'] ?? 'N/A',
-                    $data['phone_number'] ?? $data['phone'] ?? 'N/A',
-                    $data['state_of_origin'] ?? 'N/A',
-                    $data['lga'] ?? 'N/A',
+                    $app->sex ?: 'N/A',
+                    $app->jamb_number ?: 'N/A',
+                    $app->jamb_score ?: 'N/A',
+                    $app->phone_number ?: 'N/A',
+                    $app->state_of_origin ?: 'N/A',
+                    $app->lga ?: 'N/A',
                     $programName,
                     $app->clearance_schedule ?: 'N/A',
                     $app->created_at ? $app->created_at->format('Y-m-d H:i:s') : 'N/A'
@@ -886,39 +860,12 @@ class DashboardController extends Controller
             'sponsor_name_address' => $request->sponsor_name_address,
 
             // States
+            'admission_form_id' => \App\Models\AdmissionForm::where('tenant_id', $tenant->id)->where('is_active', true)->value('id'),
             'payment_status' => 'paid',
             'payment_reference' => 'DIRECT_ADM_' . strtoupper(\Illuminate\Support\Str::random(12)),
             'amount_paid' => 14700.00,
-            'admission_status' => 'pending'
-        ]);
-
-        $admissionForm = \App\Models\AdmissionForm::where('tenant_id', $tenant->id)->where('is_active', true)->first();
-
-        \App\Models\AdmissionApplication::create([
-            'tenant_id' => $tenant->id,
-            'admission_form_id' => $admissionForm ? $admissionForm->id : 1,
-            'applicant_id' => $applicant->id,
-            'applicant_name' => $applicant->full_name,
-            'applicant_email' => $applicant->email,
+            'admission_status' => 'pending',
             'status' => 'pending',
-            'payment_status' => 'paid',
-            'amount_paid' => 14700.00,
-            'payment_reference' => $applicant->payment_reference,
-            'data' => [
-                'jamb_number' => $applicant->jamb_number,
-                'phone_number' => $applicant->phone_number,
-                'jamb_score' => $applicant->jamb_score,
-                'state_of_origin' => $applicant->state_of_origin,
-                'lga' => $applicant->lga,
-                'gender' => $applicant->sex,
-                'date_of_birth' => $applicant->dob ? $applicant->dob->format('Y-m-d') : null,
-                'first_sitting_type' => $applicant->first_sitting_type,
-                'first_sitting_no' => $applicant->first_sitting_no,
-                'first_sitting_grades' => $applicant->first_sitting_grades,
-                'second_sitting_type' => $applicant->second_sitting_type,
-                'second_sitting_no' => $applicant->second_sitting_no,
-                'second_sitting_grades' => $applicant->second_sitting_grades,
-            ]
         ]);
 
         return redirect()->back()->with('success', 'Direct admission candidate registered successfully as a pending applicant!');

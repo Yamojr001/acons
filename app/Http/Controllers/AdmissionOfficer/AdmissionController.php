@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\AdmissionOfficer;
 
 use App\Http\Controllers\Controller;
-use App\Models\{AdmissionApplication, AdmissionForm, AcademicSession, Announcement, BroadcastRecipient};
+use App\Models\{Applicant, AdmissionForm, AcademicSession, Announcement, BroadcastRecipient};
 use App\Jobs\SendBroadcastSmsJob;
 use App\Services\SmsService;
 use Illuminate\Http\Request;
@@ -76,12 +76,13 @@ class AdmissionController extends Controller
         $search = $request->input('search');
         $year = $request->input('year');
 
-        $query = AdmissionApplication::whereIn('status', ['admitted', 'cleared']);
+        $query = Applicant::whereIn('status', ['admitted', 'cleared']);
 
         if ($search) {
             $query->where(function($q) use ($search) {
-                $q->where('applicant_name', 'like', "%{$search}%")
-                  ->orWhere('applicant_email', 'like', "%{$search}%");
+                $q->where('full_name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('jamb_number', 'like', "%{$search}%");
             });
         }
 
@@ -143,14 +144,14 @@ class AdmissionController extends Controller
         $tenant = app('currentTenant');
 
         // 1. Fetch target applicants
-        $query = AdmissionApplication::where('tenant_id', $tenant->id);
+        $query = Applicant::where('tenant_id', $tenant->id);
 
         if ($request->target === 'pending') {
-            $query->where('status', 'pending');
+            $query->whereIn('status', ['pending', 'under_review']);
         } elseif ($request->target === 'admitted') {
             $query->whereIn('status', ['admitted', 'cleared']);
         } elseif ($request->target === 'rejected') {
-            $query->where('status', 'rejected');
+            $query->whereIn('status', ['rejected', 'clearance_rejected']);
         } // 'all' fetches everyone
 
         $applicants = $query->get();
@@ -180,16 +181,16 @@ class AdmissionController extends Controller
         $smsService = app(SmsService::class);
 
         foreach ($applicants as $applicant) {
-            $phone = $applicant->data['phone_number'] ?? $applicant->data['phone'] ?? null;
-            $email = $applicant->applicant_email;
+            $phone = $applicant->phone_number;
+            $email = $applicant->email;
             $formattedPhone = $phone ? $smsService->formatPhoneNumber($phone) : null;
 
             $recipient = BroadcastRecipient::create([
                 'tenant_id'        => $tenant->id,
                 'announcement_id'  => $announcement->id,
-                'recipient_type'   => AdmissionApplication::class,
+                'recipient_type'   => Applicant::class,
                 'recipient_id'     => $applicant->id,
-                'recipient_name'   => $applicant->applicant_name,
+                'recipient_name'   => $applicant->full_name,
                 'recipient_email'  => $email,
                 'recipient_phone'  => $phone,
                 'formatted_phone'  => $formattedPhone,
@@ -206,18 +207,18 @@ class AdmissionController extends Controller
         $queuedEmails = 0;
         if ($sendEmail) {
             foreach ($applicants as $applicant) {
-                if (!empty($applicant->applicant_email)) {
+                if (!empty($applicant->email)) {
                     try {
-                        Mail::to($applicant->applicant_email)->queue(
+                        Mail::to($applicant->email)->queue(
                             new ApplicantAnnouncementMail(
-                                $applicant->applicant_name,
+                                $applicant->full_name,
                                 $request->subject,
                                 $request->message
                             )
                         );
                         $queuedEmails++;
                     } catch (\Throwable $e) {
-                        Log::error("Failed to queue email announcement to {$applicant->applicant_email}: " . $e->getMessage());
+                        Log::error("Failed to queue email announcement to {$applicant->email}: " . $e->getMessage());
                     }
                 }
             }

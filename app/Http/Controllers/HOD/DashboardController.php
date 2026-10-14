@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\HOD;
 
 use App\Http\Controllers\Controller;
-use App\Models\{AdmissionApplication, Department, User, Student, Role};
+use App\Models\{Applicant, Department, User, Student, Role};
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Hash;
@@ -27,9 +27,9 @@ class DashboardController extends Controller
         $dept = Department::find($deptId);
 
         $stats = [
-            'pending_clearance' => AdmissionApplication::where('admitted_department_id', $deptId)->where('status', 'admitted')->count(),
-            'cleared' => AdmissionApplication::where('admitted_department_id', $deptId)->where('status', 'cleared')->count(),
-            'rejected' => AdmissionApplication::where('admitted_department_id', $deptId)->where('status', 'clearance_rejected')->count(),
+            'pending_clearance' => Applicant::where('admitted_department_id', $deptId)->where('status', 'admitted')->count(),
+            'cleared' => Applicant::where('admitted_department_id', $deptId)->where('status', 'cleared')->count(),
+            'rejected' => Applicant::where('admitted_department_id', $deptId)->where('status', 'clearance_rejected')->count(),
         ];
 
         return Inertia::render('University/AdminDashboard', [
@@ -44,7 +44,7 @@ class DashboardController extends Controller
         $deptId = $this->getHodDepartmentId();
         $dept = Department::find($deptId);
 
-        $query = AdmissionApplication::where('admitted_department_id', $deptId)
+        $query = Applicant::where('admitted_department_id', $deptId)
             ->whereIn('status', ['admitted', 'cleared', 'clearance_rejected']);
 
         if ($request->filled('section') && $request->section !== 'all') {
@@ -54,12 +54,10 @@ class DashboardController extends Controller
         if ($request->filled('search')) {
             $search = '%' . $request->search . '%';
             $query->where(function ($q) use ($search) {
-                $q->where('applicant_name', 'like', $search)
-                  ->orWhere('applicant_email', 'like', $search)
-                  ->orWhere('data->phone', 'like', $search)
-                  ->orWhere('data->phone_number', 'like', $search)
-                  ->orWhere('data->jamb_registration_number', 'like', $search)
-                  ->orWhere('data->jamb_number', 'like', $search);
+                $q->where('full_name', 'like', $search)
+                  ->orWhere('email', 'like', $search)
+                  ->orWhere('phone_number', 'like', $search)
+                  ->orWhere('jamb_number', 'like', $search);
             });
         }
 
@@ -74,7 +72,7 @@ class DashboardController extends Controller
         ]);
     }
 
-    public function clearanceApprove(Request $request, AdmissionApplication $application)
+    public function clearanceApprove(Request $request, Applicant $application)
     {
         $deptId = $this->getHodDepartmentId();
         if ($application->admitted_department_id !== $deptId) {
@@ -87,17 +85,15 @@ class DashboardController extends Controller
 
         $tenant = app('currentTenant');
         
-        // Retrieve phone and email from the application data JSON or fields
-        $jambEmail = $application->applicant_email;
-        // Phone can be in data or we can fallback
-        $phone = $application->data['phone'] ?? $application->data['phone_number'] ?? '08000000000';
+        $jambEmail = $application->email ?: ($application->jamb_number . '@acons.edu.ng');
+        $phone = $application->phone_number ?: '08000000000';
 
         // Check if user already exists
         $user = User::where('email', $jambEmail)->where('tenant_id', $tenant->id)->first();
         if (!$user) {
             $user = User::create([
                 'tenant_id' => $tenant->id,
-                'name' => $application->applicant_name,
+                'name' => $application->full_name,
                 'email' => $jambEmail,
                 'password' => Hash::make($phone), // password is phone number
                 'phone' => $phone,
@@ -110,17 +106,13 @@ class DashboardController extends Controller
         // Check if student profile exists
         $student = Student::where('user_id', $user->id)->first();
         if (!$student) {
-            // Retrieve program associated with this applicant
-            $jambNumber = $application->data['jamb_registration_number'] ?? $application->data['jamb_number'] ?? null;
-            $applicant = \App\Models\Applicant::where('email', $application->applicant_email)
-                ->when($jambNumber, function ($q) use ($jambNumber) {
-                    return $q->orWhere('jamb_number', $jambNumber);
-                })
-                ->first();
-
             $program = null;
-            if ($applicant && $applicant->admitted_program_id) {
-                $program = \App\Models\Program::find($applicant->admitted_program_id);
+            if ($application->admitted_program_id) {
+                $program = \App\Models\Program::find($application->admitted_program_id);
+            }
+
+            if (!$program && $application->applied_program_id) {
+                $program = \App\Models\Program::find($application->applied_program_id);
             }
 
             if (!$program) {
@@ -137,7 +129,7 @@ class DashboardController extends Controller
 
             $matriculationNumber = 'ACONS/' . date('y') . '/' . str_pad($user->id, 4, '0', STR_PAD_LEFT);
 
-            $gender = strtolower($application->data['gender'] ?? $application->data['sex'] ?? 'other');
+            $gender = strtolower($application->sex ?: 'other');
             if (!in_array($gender, ['male', 'female', 'other'])) {
                 $gender = 'other';
             }
@@ -151,12 +143,12 @@ class DashboardController extends Controller
                 'phone_number' => $phone,
                 'status' => 'active',
                 'current_level' => $initialLevel,
-                'jamb_registration_number' => $application->data['jamb_registration_number'] ?? $application->data['jamb_number'] ?? null,
-                'date_of_birth' => $application->data['date_of_birth'] ?? $application->data['dob'] ?? '2000-01-01',
+                'jamb_registration_number' => $application->jamb_number,
+                'date_of_birth' => $application->dob ? $application->dob->format('Y-m-d') : '2000-01-01',
                 'gender' => $gender,
-                'nationality' => $application->data['nationality'] ?? 'Nigerian',
-                'state_of_origin' => $application->data['state_of_origin'] ?? null,
-                'lga' => $application->data['lga'] ?? null,
+                'nationality' => $application->nationality ?? 'Nigerian',
+                'state_of_origin' => $application->state_of_origin,
+                'lga' => $application->lga,
                 'academic_status' => 'Good Standing',
                 'years_in_current_level' => 0,
             ]);
@@ -164,24 +156,20 @@ class DashboardController extends Controller
 
         // Set status to cleared
         $application->update([
-            'status' => 'cleared'
+            'status' => 'cleared',
+            'admission_status' => 'cleared',
         ]);
 
-        $applicantModel = \App\Models\Applicant::where('id', $application->applicant_id)
-            ->orWhere('email', $application->applicant_email)
-            ->first();
-        if ($applicantModel) {
-            $applicantModel->update(['admission_status' => 'cleared']);
-        }
-
         try {
-            Mail::to($application->applicant_email)->send(
-                new ClearanceApprovedMail(
-                    $application->applicant_name,
-                    $jambEmail,
-                    $phone
-                )
-            );
+            if (!empty($application->email)) {
+                Mail::to($application->email)->send(
+                    new ClearanceApprovedMail(
+                        $application->full_name,
+                        $jambEmail,
+                        $phone
+                    )
+                );
+            }
         } catch (\Exception $e) {
             // Ignore email errors to avoid blocking the workflow
         }
@@ -189,7 +177,7 @@ class DashboardController extends Controller
         return redirect()->back()->with('success', 'Physical clearance approved! Student credentials generated and emailed.');
     }
 
-    public function clearanceReject(Request $request, AdmissionApplication $application)
+    public function clearanceReject(Request $request, Applicant $application)
     {
         $deptId = $this->getHodDepartmentId();
         if ($application->admitted_department_id !== $deptId) {
@@ -202,16 +190,19 @@ class DashboardController extends Controller
 
         $application->update([
             'status' => 'clearance_rejected',
+            'admission_status' => 'clearance_rejected',
             'clearance_rejection_reason' => $request->reason,
         ]);
 
         try {
-            Mail::to($application->applicant_email)->send(
-                new ClearanceRejectedMail(
-                    $application->applicant_name,
-                    $request->reason
-                )
-            );
+            if (!empty($application->email)) {
+                Mail::to($application->email)->send(
+                    new ClearanceRejectedMail(
+                        $application->full_name,
+                        $request->reason
+                    )
+                );
+            }
         } catch (\Exception $e) {
             // Ignore email errors to avoid blocking
         }

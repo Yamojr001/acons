@@ -73,12 +73,12 @@ class SendBroadcastSmsJob implements ShouldQueue
             $recipientMapByPhone = [];
 
             foreach ($chunk as $recipient) {
-                // If recipient_id is linked to AdmissionApplication, refresh phone if needed
+                // If recipient_id is linked to Applicant, refresh phone if needed
                 $phone = $recipient->recipient_phone;
                 if (empty($phone) && $recipient->recipient_type && $recipient->recipient_id) {
                     $app = $recipient->recipient;
-                    if ($app && isset($app->data)) {
-                        $phone = $app->data['phone_number'] ?? $app->data['phone'] ?? null;
+                    if ($app) {
+                        $phone = $app->phone_number ?? ($app->data['phone_number'] ?? $app->data['phone'] ?? null);
                         if ($phone) {
                             $recipient->recipient_phone = $phone;
                         }

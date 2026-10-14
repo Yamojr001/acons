@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Applicant;
-use App\Models\AdmissionApplication;
 use App\Models\AdmissionForm;
 use App\Models\Payment;
 use App\Models\StudentInvoice;
@@ -63,7 +62,7 @@ class ZainpayReconciliationService
         if ($applicant) {
             if ($applicant->payment_status === 'paid') {
                 // Ensure AdmissionApplication exists even if applicant was already marked paid
-                $this->ensureAdmissionApplicationExists($applicant);
+                $this->ensureApplicantFormLinked($applicant);
                 return null;
             }
 
@@ -74,7 +73,7 @@ class ZainpayReconciliationService
                 'payment_reference' => $txnRef ?: ($gatewayRef ?: $applicant->payment_reference),
             ]);
 
-            $this->ensureAdmissionApplicationExists($applicant);
+            $this->ensureApplicantFormLinked($applicant);
 
             // Send transactional SMS notification via Sendar
             if (!empty($applicant->phone_number)) {
@@ -451,7 +450,7 @@ class ZainpayReconciliationService
         }
 
         if ($applicant->payment_status === 'paid' && !$force) {
-            $this->ensureAdmissionApplicationExists($applicant);
+            $this->ensureApplicantFormLinked($applicant);
             return [
                 'success' => true,
                 'message' => "Applicant #{$applicant->id} ({$applicant->full_name}) is already marked as PAID.",
@@ -466,7 +465,7 @@ class ZainpayReconciliationService
                 'amount_paid'       => 14700.00,
                 'payment_reference' => $ref,
             ]);
-            $this->ensureAdmissionApplicationExists($applicant);
+            $this->ensureApplicantFormLinked($applicant);
 
             return [
                 'success' => true,
@@ -513,7 +512,7 @@ class ZainpayReconciliationService
                 'amount_paid'       => 14700.00,
                 'payment_reference' => $txnRef,
             ]);
-            $this->ensureAdmissionApplicationExists($applicant);
+            $this->ensureApplicantFormLinked($applicant);
 
             return [
                 'success' => true,
@@ -646,43 +645,15 @@ class ZainpayReconciliationService
     }
 
     /**
-     * Ensure an AdmissionApplication record is linked to an approved applicant.
+     * Ensure an Applicant is linked to an active admission form window.
      */
-    protected function ensureAdmissionApplicationExists(Applicant $applicant): void
+    protected function ensureApplicantFormLinked(Applicant $applicant): void
     {
-        $tenantId = $applicant->tenant_id ?: 1;
-
-        $exists = AdmissionApplication::where('tenant_id', $tenantId)
-            ->where(function ($q) use ($applicant) {
-                $q->where('applicant_email', $applicant->email)
-                  ->orWhere('data->jamb_number', $applicant->jamb_number);
-            })->exists();
-
-        if (!$exists) {
-            $admissionForm = AdmissionForm::where('tenant_id', $tenantId)->where('is_active', true)->first();
-
-            AdmissionApplication::create([
-                'tenant_id'         => $tenantId,
-                'admission_form_id' => $admissionForm ? $admissionForm->id : 1,
-                'applicant_name'    => $applicant->full_name,
-                'applicant_email'   => $applicant->email ?: ($applicant->jamb_number . '@acons.edu.ng'),
-                'status'            => 'pending',
-                'data'              => [
-                    'jamb_number'          => $applicant->jamb_number,
-                    'phone_number'         => $applicant->phone_number,
-                    'jamb_score'           => $applicant->jamb_score,
-                    'state_of_origin'      => $applicant->state_of_origin,
-                    'lga'                  => $applicant->lga,
-                    'gender'               => $applicant->sex,
-                    'date_of_birth'        => $applicant->dob ? $applicant->dob->format('Y-m-d') : null,
-                    'first_sitting_type'   => $applicant->first_sitting_type,
-                    'first_sitting_no'     => $applicant->first_sitting_no,
-                    'first_sitting_grades' => $applicant->first_sitting_grades,
-                    'second_sitting_type'  => $applicant->second_sitting_type,
-                    'second_sitting_no'    => $applicant->second_sitting_no,
-                    'second_sitting_grades'=> $applicant->second_sitting_grades,
-                ],
-            ]);
+        if (empty($applicant->admission_form_id)) {
+            $defaultFormId = AdmissionForm::where('tenant_id', $applicant->tenant_id ?: 1)->where('is_active', true)->value('id');
+            if ($defaultFormId) {
+                $applicant->update(['admission_form_id' => $defaultFormId]);
+            }
         }
     }
 }
