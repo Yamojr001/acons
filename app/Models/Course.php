@@ -27,4 +27,9 @@ class Course extends Model
     public function department(): BelongsTo   { return $this->belongsTo(Department::class); }
     public function lecturer(): BelongsTo     { return $this->belongsTo(Lecturer::class); }
     public function registrations(): HasMany { return $this->hasMany(CourseRegistration::class); }
+
+    public function getTitleAttribute(): ?string
+    {
+        return $this->name;
+    }
 }

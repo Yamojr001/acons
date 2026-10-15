@@ -1,38 +1,46 @@
-import { useState } from 'react'
-import { Head } from '@inertiajs/react'
-import { motion } from 'framer-motion'
+import { useState, useRef } from 'react'
+import { Head, useForm } from '@inertiajs/react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Trophy, BookOpen, Printer, ChevronRight, 
-  Search, Filter, Award, Star, GraduationCap
+  Printer, Award, Camera, Upload, AlertCircle, 
+  CheckCircle, Shield, FileText, ChevronRight
 } from 'lucide-react'
 import AppLayout from '@/Layouts/AppLayout'
-import { Card, Badge, Button, EmptyState, Avatar } from '@/Components/UI'
+import { Card, Badge, Button, EmptyState } from '@/Components/UI'
 import type { PageProps } from '@/types'
+
+interface CourseGrade {
+  course_code: string
+  course_name: string
+  units: number
+  ca_score?: number | null
+  exam_score?: number | null
+  score: number
+  grade: string
+  points: number
+}
 
 interface ResultGroup {
   session_name: string
   academic_session_name: string
   semester_name: string
   semester_load: number
-  grades: Array<{
-    course_code: string
-    course_name: string
-    units: number
-    score: number
-    grade: string
-    points: number
-  }>
+  grades: CourseGrade[]
   semester_gpa: number
 }
 
 interface Props extends PageProps {
   groupedResults: Record<string, ResultGroup>
+  pendingReleaseCount?: number
+  needs_passport?: boolean
+  has_passport?: boolean
   studentDetails: {
     name: string
     matric_number: string
     level: string
     department: string
-    avatar_url: string
+    avatar_url: string | null
+    gender?: string
     cgpa: number
     total_load: number
     academic_status: string
@@ -40,14 +48,55 @@ interface Props extends PageProps {
   }
 }
 
-export default function StudentResults({ groupedResults, studentDetails, auth }: Props) {
+export default function StudentResults({
+  groupedResults = {},
+  pendingReleaseCount = 0,
+  needs_passport = false,
+  has_passport = true,
+  studentDetails,
+  auth
+}: Props) {
   const tenant = auth?.tenant
   const groups = Object.values(groupedResults)
   
   // By default select the most recent session/semester
   const [selectedSession, setSelectedSession] = useState<string>(groups[0]?.session_name || '')
+  const currentGroup = groups.find(g => g.session_name === selectedSession) || groups[0]
 
-  const currentGroup = groups.find(g => g.session_name === selectedSession)
+  // Passport Upload Form
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const passportForm = useForm({
+    passport: null as File | null,
+  })
+
+  const handlePassportSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('File size exceeds 2MB limit. Please choose a smaller photo.')
+        return
+      }
+      passportForm.setData('passport', file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handlePassportSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!passportForm.data.passport) {
+      alert('Please select a passport photograph to upload.')
+      return
+    }
+    passportForm.post('/student/results/passport', {
+      forceFormData: true,
+      preserveScroll: true,
+    })
+  }
 
   const handlePrint = () => {
     window.print()
@@ -55,165 +104,335 @@ export default function StudentResults({ groupedResults, studentDetails, auth }:
 
   return (
     <AppLayout title="Academic Transcript">
-      <Head title="Academic Results" />
+      <Head title="Academic Results & Transcript" />
 
       {/* Hide controls when printing */}
-      <div className="print:hidden flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div className="print:hidden flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-display font-bold text-surface-900">Academic Transcript</h1>
-          <p className="text-sm text-surface-500 mt-1">View your official semester-by-semester performance history.</p>
+          <h1 className="text-2xl sm:text-3xl font-display font-bold text-surface-900 tracking-tight">
+            Academic Examination Transcript
+          </h1>
+          <p className="text-sm text-surface-500 mt-0.5">
+            Official semester performance record and downloadable result slip.
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          {groups.length > 0 && (
-            <select 
-              value={selectedSession}
-              onChange={(e) => setSelectedSession(e.target.value)}
-              className="px-4 py-2 bg-white border border-surface-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-brand-500/20 outline-none"
-            >
-              {groups.map(g => (
-                <option key={g.session_name} value={g.session_name}>
-                  {g.session_name}
-                </option>
-              ))}
-            </select>
-          )}
-          <Button variant="brand" onClick={handlePrint} iconLeft={<Printer size={16} />}>
-            Print Result
-          </Button>
-        </div>
+
+        {has_passport && !needs_passport && (
+          <div className="flex items-center gap-2.5">
+            {groups.length > 0 && (
+              <select 
+                value={selectedSession}
+                onChange={(e) => setSelectedSession(e.target.value)}
+                className="px-3.5 py-2 bg-white border border-surface-200 rounded-lg text-sm font-semibold text-surface-800 focus:ring-2 focus:ring-brand-500/20 outline-none"
+              >
+                {groups.map(g => (
+                  <option key={g.session_name} value={g.session_name}>
+                    {g.session_name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <Button variant="brand" onClick={handlePrint} iconLeft={<Printer size={15} />}>
+              Print Result Slip
+            </Button>
+          </div>
+        )}
       </div>
 
-      {groups.length === 0 ? (
-        <Card className="py-20 text-center print:hidden">
-          <EmptyState
-            title="No Results Yet"
-            description="Your academic records will appear here as soon as they are approved by the Senate."
-            icon={<Award size={48} className="text-surface-200" />}
-          />
+      {/* Mandatory Passport Photograph Lockout Screen */}
+      {(needs_passport || !has_passport) && (
+        <Card className="max-w-xl mx-auto p-6 md:p-8 border border-surface-200 shadow-sm my-6 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto mb-4">
+            <Camera size={28} />
+          </div>
+
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-amber-100/70 text-amber-800 text-xs font-bold uppercase tracking-wider mb-2">
+            <Shield size={12} /> Student Verification Required
+          </div>
+
+          <h2 className="text-xl font-display font-bold text-surface-900 tracking-tight">
+            Upload Official Passport Photograph
+          </h2>
+          <p className="text-xs text-surface-600 max-w-md mx-auto mt-1.5 leading-relaxed">
+            In accordance with college examination regulations, you must upload your official passport photograph before accessing your academic results and generating your transcript.
+          </p>
+
+          <form onSubmit={handlePassportSubmit} className="mt-6 space-y-5 text-left">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/jpeg,image/png,image/jpg"
+              onChange={handlePassportSelect}
+              className="hidden"
+            />
+
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-surface-200 hover:border-brand-500 rounded-xl p-6 text-center cursor-pointer transition-all bg-surface-50/50 hover:bg-surface-50"
+            >
+              {previewUrl ? (
+                <div className="flex flex-col items-center">
+                  <img
+                    src={previewUrl}
+                    alt="Passport Preview"
+                    className="w-28 h-32 object-cover rounded-lg border-2 border-brand-500 shadow-sm"
+                  />
+                  <p className="text-xs font-semibold text-brand-600 mt-2">Click to choose another photo</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center py-2">
+                  <div className="w-12 h-12 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mb-2">
+                    <Upload size={20} />
+                  </div>
+                  <p className="text-sm font-semibold text-surface-800">
+                    Click to browse passport photograph
+                  </p>
+                  <p className="text-xs text-surface-400 mt-0.5">
+                    JPG or PNG format, max 2MB (plain background recommended)
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {passportForm.errors.passport && (
+              <p className="text-xs text-danger-600 font-medium">{passportForm.errors.passport}</p>
+            )}
+
+            <div className="bg-surface-50 border border-surface-200 rounded-lg p-3 text-xs text-surface-600 space-y-1">
+              <p className="font-semibold text-surface-800">Photo Requirements:</p>
+              <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-surface-500">
+                <li>Clear, front-facing colour portrait with neutral expression</li>
+                <li>Both ears and facial features clearly visible</li>
+                <li>White or off-white background</li>
+              </ul>
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full bg-brand-600 hover:bg-brand-700 py-2.5 text-xs font-semibold shadow-sm"
+              disabled={passportForm.processing || !passportForm.data.passport}
+            >
+              {passportForm.processing ? 'Uploading & Verifying...' : 'Upload Passport & Unlock Results'}
+            </Button>
+          </form>
         </Card>
-      ) : (
-        /* Print Container */
-        <div className="bg-white p-8 md:p-12 print:p-0 print:border-none print:shadow-none w-full max-w-4xl mx-auto mb-10 shadow-sm border border-surface-150 font-sans text-black relative">
-          {/* Watermark Logo */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden z-0 print:opacity-[0.03] opacity-5">
-             <img src={tenant?.logo_path || '/logo.png'} className="w-[500px] h-[500px] object-contain" alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
+      )}
+
+      {/* Pending Provost Release Banner if any grades are awaiting release */}
+      {has_passport && !needs_passport && pendingReleaseCount > 0 && (
+        <div className="print:hidden mb-6 p-4 bg-amber-50/80 border border-amber-200 rounded-xl flex items-start gap-3 text-amber-950 text-xs">
+          <Award size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold uppercase tracking-wider text-[11px] text-amber-800">Results Pending Official Release</p>
+            <p className="mt-0.5 font-medium leading-relaxed text-amber-900">
+              You have <strong>{pendingReleaseCount}</strong> course score(s) undergoing final administrative review.
+              Grades remain blocked from official publication until authorized by the Provost for your department and section.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State when no results published yet */}
+      {has_passport && !needs_passport && groups.length === 0 && (
+        <Card className="py-20 text-center print:hidden">
+          {pendingReleaseCount > 0 ? (
+            <div className="max-w-md mx-auto px-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto mb-3">
+                <Award size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-surface-900">Results Withheld Pending Provost Release</h3>
+              <p className="text-xs text-surface-500 mt-1">
+                Your examination records ({pendingReleaseCount} course{pendingReleaseCount > 1 ? 's' : ''}) have been recorded by the Exam Office and are awaiting official release by the Provost for your department.
+              </p>
+            </div>
+          ) : (
+            <EmptyState
+              title="No Results Published Yet"
+              description="Your academic records will appear here as soon as they are approved and released by the Provost."
+              icon={<Award size={48} className="text-surface-200" />}
+            />
+          )}
+        </Card>
+      )}
+
+      {/* Official Academic Transcript / Result Slip (Printable) */}
+      {has_passport && !needs_passport && groups.length > 0 && (
+        <div className="bg-white p-6 sm:p-10 print:p-0 print:border-none print:shadow-none w-full max-w-4xl mx-auto mb-10 shadow-sm border border-surface-200 font-sans text-black relative">
+          {/* Official Watermark College Logo */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden z-0 print:opacity-[0.04] opacity-[0.03]">
+             <img
+               src="/assets/images/acons_logo.png"
+               className="w-[450px] h-[450px] object-contain"
+               alt=""
+               onError={(e) => {
+                 const target = e.currentTarget
+                 if (!target.src.endsWith('/logo.png')) target.src = '/logo.png'
+               }}
+             />
           </div>
 
           <div className="relative z-10">
-            {/* Header */}
-            <div className="flex items-start justify-between border-b-4 border-gray-200 pb-2 mb-4">
-              <div className="flex items-start gap-4 w-full">
-                <img src={tenant?.logo_path || '/logo.png'} alt="Logo" className="w-[100px] h-[100px] object-contain flex-shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />
-                <div className="flex-1 text-center pt-2 relative">
-                  <h1 className="text-[18px] md:text-[22px] font-black text-[#1a237e] tracking-tight leading-tight">{(tenant?.name || 'Ameenatu College of Nursing Sciences (ACONS)').toUpperCase()}</h1>
-                  {tenant?.address && <h2 className="text-[15px] md:text-[17px] font-bold text-[#5c6bc0] leading-tight mt-1">{tenant.address}</h2>}
-                  <h3 className="text-[14px] md:text-[15px] font-bold text-[#3949ab] italic leading-tight mt-0.5">Academic Transcript / Result Slip</h3>
-                  
-                  <div className="md:absolute right-0 top-8 text-right text-xs font-bold text-[#1976d2] space-y-1 mt-2 md:mt-0 flex flex-col items-center md:items-end">
-                    {tenant?.email && (
-                      <div className="flex items-center gap-1.5">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                        <span>{tenant.email}</span>
-                      </div>
-                    )}
-                    {tenant?.phone && (
-                      <div className="flex items-center gap-1.5">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                        <span>{tenant.phone}</span>
-                      </div>
-                    )}
-                  </div>
+            {/* Institution Header with College Logo */}
+            <div className="flex items-center justify-between border-b-2 border-gray-800 pb-3 mb-4">
+              <div className="flex items-center gap-4 w-full">
+                <img
+                  src="/assets/images/acons_logo.png"
+                  alt="ACONS Logo"
+                  className="w-20 h-20 md:w-24 md:h-24 object-contain flex-shrink-0"
+                  onError={(e) => {
+                    const target = e.currentTarget
+                    if (!target.src.endsWith('/logo.png')) target.src = '/logo.png'
+                  }}
+                />
+                <div className="flex-1 text-center pt-1">
+                  <h1 className="text-lg md:text-xl font-extrabold text-[#1a237e] tracking-tight uppercase leading-tight">
+                    {tenant?.name || 'Ameenatu College of Nursing Sciences (ACONS)'}
+                  </h1>
+                  {tenant?.address && (
+                    <h2 className="text-xs md:text-sm font-semibold text-gray-700 leading-tight mt-0.5">
+                      {tenant.address}
+                    </h2>
+                  )}
+                  <h3 className="text-xs md:text-sm font-bold text-[#3949ab] italic leading-tight mt-1">
+                    Official Academic Transcript / Semester Result Slip
+                  </h3>
                 </div>
+                {/* Balance placeholder for symmetrical layout */}
+                <div className="w-20 md:w-24 hidden sm:block flex-shrink-0" />
               </div>
             </div>
 
-            <div className="text-center font-bold text-sm md:text-md mb-1">
-              {currentGroup?.academic_session_name || currentGroup?.session_name || 'Academic Session'}
+            {/* Session & Semester Title */}
+            <div className="text-center font-bold text-sm mb-0.5 uppercase tracking-wide text-gray-900">
+              {currentGroup?.academic_session_name || 'Academic Session'}
             </div>
-            <div className="text-center font-semibold text-xs md:text-sm mb-6 text-gray-600">
+            <div className="text-center font-semibold text-xs mb-5 text-gray-600">
               {currentGroup?.semester_name || 'Semester'}
             </div>
 
-            {/* Student Info */}
-            <div className="flex justify-between items-start mb-6 border-b-4 border-gray-100 pb-6">
-              <div className="space-y-1.5 text-sm md:text-base">
-                <h3 className="font-extrabold text-lg mb-2">Student's Information</h3>
-                <div className="flex"><span className="w-32 md:w-40 inline-block">Registration No.:</span> <span className="font-bold">{studentDetails.matric_number}</span></div>
-                <div className="flex"><span className="w-32 md:w-40 inline-block">Name:</span> <span className="font-bold uppercase">{studentDetails.name}</span></div>
-                <div className="flex"><span className="w-32 md:w-40 inline-block">Gender:</span> <span className="font-bold">{(studentDetails as any).gender || 'Male'}</span></div>
+            {/* Student Information Section with Passport Photo */}
+            <div className="flex justify-between items-start mb-5 border-b border-gray-200 pb-5">
+              <div className="space-y-1.5 text-xs md:text-sm">
+                <h3 className="font-bold text-sm uppercase tracking-wider text-gray-900 mb-2 border-b border-gray-300 pb-0.5 inline-block">
+                  Student Information
+                </h3>
+                <div className="flex"><span className="w-36 font-semibold text-gray-600">Registration No.:</span> <span className="font-mono font-bold text-gray-900">{studentDetails.matric_number}</span></div>
+                <div className="flex"><span className="w-36 font-semibold text-gray-600">Full Name:</span> <span className="font-bold uppercase text-gray-900">{studentDetails.name}</span></div>
+                <div className="flex"><span className="w-36 font-semibold text-gray-600">Department:</span> <span className="font-bold text-gray-900">{studentDetails.department}</span></div>
+                <div className="flex"><span className="w-36 font-semibold text-gray-600">Level:</span> <span className="font-bold text-gray-900">{studentDetails.level}</span></div>
+                <div className="flex"><span className="w-36 font-semibold text-gray-600">Gender:</span> <span className="font-bold uppercase text-gray-900">{studentDetails.gender || 'N/A'}</span></div>
               </div>
-              <div>
-                <img src={studentDetails.avatar_url || '/default-avatar.png'} alt="Student" className="w-24 h-28 md:w-32 md:h-36 object-cover bg-red-600 border-none" />
+
+              {/* Student Passport Photograph */}
+              <div className="text-center flex-shrink-0">
+                <div className="w-24 h-28 md:w-28 md:h-32 border-2 border-gray-400 rounded p-0.5 bg-white shadow-xs overflow-hidden">
+                  <img
+                    src={studentDetails.avatar_url || '/assets/images/acons_logo.png'}
+                    alt="Student Passport"
+                    className="w-full h-full object-cover rounded"
+                    onError={(e) => {
+                      const target = e.currentTarget
+                      target.src = '/assets/images/acons_logo.png'
+                    }}
+                  />
+                </div>
+                <p className="text-[9px] uppercase font-semibold text-gray-500 mt-1">Official Passport</p>
               </div>
             </div>
 
-            {/* Academic Info */}
-            <div className="mb-6 border-b-4 border-gray-100 pb-6 text-sm md:text-base">
-              <h3 className="font-extrabold text-lg mb-2">Academic's Information</h3>
-              <div className="flex"><span className="w-32 md:w-40 inline-block">Academic Session:</span> <span className="font-bold">{currentGroup?.academic_session_name || 'N/A'}</span></div>
-              <div className="flex"><span className="w-32 md:w-40 inline-block">Semester:</span> <span className="font-bold">{currentGroup?.semester_name || 'N/A'}</span></div>
-              <div className="flex"><span className="w-32 md:w-40 inline-block">Current Level:</span> <span className="font-bold">{studentDetails.level}</span></div>
-              <div className="flex"><span className="w-32 md:w-40 inline-block">Programme:</span> <span className="font-bold">{studentDetails.department}</span></div>
-            </div>
-
-            {/* Courses */}
+            {/* Courses Table */}
             {currentGroup && (
               <div>
-                <h3 className="font-extrabold text-lg mb-2">Courses</h3>
-                <table className="w-full text-left text-sm md:text-base mb-6">
-                  <thead>
-                    <tr className="font-bold">
-                      <th className="py-2 w-16">S/No.</th>
-                      <th className="py-2 w-24">Code</th>
-                      <th className="py-2">Course Title</th>
-                      <th className="py-2 text-center w-20">Score</th>
-                      <th className="py-2 text-left w-24">Remark</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentGroup.grades.map((g, i) => (
-                      <tr key={i} className="font-semibold">
-                        <td className="py-1.5">{i + 1}.</td>
-                        <td className="py-1.5">{g.course_code}</td>
-                        <td className="py-1.5">{g.course_name}</td>
-                        <td className="py-1.5 text-center">{g.score}</td>
-                        <td className="py-1.5 text-left uppercase">{g.grade === 'F' || g.grade === 'ABS' ? 'FAIL' : 'PASS'}</td>
+                <h3 className="font-bold text-sm uppercase tracking-wider text-gray-900 mb-2">
+                  Academic Performance
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs md:text-sm mb-5 border-collapse">
+                    <thead>
+                      <tr className="border-y-2 border-gray-800 text-gray-900 font-bold bg-gray-50">
+                        <th className="py-2 px-2 w-10 text-center">S/N</th>
+                        <th className="py-2 px-2 w-24">Course Code</th>
+                        <th className="py-2 px-2">Course Title</th>
+                        <th className="py-2 px-2 text-center w-14">Units</th>
+                        <th className="py-2 px-2 text-center w-14">CA (30)</th>
+                        <th className="py-2 px-2 text-center w-16">Exam (70)</th>
+                        <th className="py-2 px-2 text-center w-16">Total (100)</th>
+                        <th className="py-2 px-2 text-center w-14">Grade</th>
+                        <th className="py-2 px-2 text-left w-20">Remark</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {currentGroup.grades.map((g, i) => (
+                        <tr key={i} className="hover:bg-gray-50/50">
+                          <td className="py-2 px-2 text-center text-gray-600">{i + 1}</td>
+                          <td className="py-2 px-2 font-mono font-bold text-gray-900">{g.course_code}</td>
+                          <td className="py-2 px-2 font-medium text-gray-800">{g.course_name}</td>
+                          <td className="py-2 px-2 text-center font-mono">{g.units}</td>
+                          <td className="py-2 px-2 text-center font-mono text-gray-700">{g.ca_score !== null && g.ca_score !== undefined ? g.ca_score : '—'}</td>
+                          <td className="py-2 px-2 text-center font-mono text-gray-700">{g.exam_score !== null && g.exam_score !== undefined ? g.exam_score : '—'}</td>
+                          <td className="py-2 px-2 text-center font-mono font-bold text-gray-900">{g.score}</td>
+                          <td className="py-2 px-2 text-center font-bold">
+                            <span className={g.grade === 'F' ? 'text-danger-600' : 'text-gray-900'}>
+                              {g.grade}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2 text-left uppercase font-semibold text-[11px]">
+                            {g.grade === 'F' || g.grade === 'ABS' ? (
+                              <span className="text-danger-600">FAIL</span>
+                            ) : (
+                              <span className="text-emerald-700">PASS</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-                <div className="border-t-2 border-dashed border-gray-800 pt-4 mb-16 font-bold text-sm md:text-base">
-                  <div className="flex justify-between max-w-2xl">
+                {/* Summary Band */}
+                <div className="border-t-2 border-gray-800 pt-3 mb-10 text-xs md:text-sm font-semibold">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-gray-50 p-3 rounded border border-gray-200">
                     <div>
-                      <p className="mb-1">Total Score : {currentGroup.grades.reduce((sum, g) => sum + g.score, 0)}</p>
-                      <p>CANDIDATE STATUS : <span className="uppercase">{studentDetails.academic_status === 'normal' ? 'PASSED' : studentDetails.academic_status === 'reseat' ? 'RESIT' : studentDetails.academic_status === 'repeat' ? 'REPEAT' : studentDetails.academic_status === 'withdrawn' ? 'WITHDRAWN' : 'PASSED'}</span></p>
+                      <p className="text-[10px] uppercase text-gray-500 font-bold">Total Courses</p>
+                      <p className="font-bold text-gray-900 text-sm">{currentGroup.grades.length}</p>
                     </div>
                     <div>
-                      <p>Course Spread : {currentGroup.grades.length}</p>
+                      <p className="text-[10px] uppercase text-gray-500 font-bold">Credit Load</p>
+                      <p className="font-bold text-gray-900 text-sm">{currentGroup.semester_load} Units</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-gray-500 font-bold">Cumulative GPA</p>
+                      <p className="font-bold text-gray-900 text-sm">{studentDetails.cgpa.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-gray-500 font-bold">Standing Status</p>
+                      <p className="font-bold uppercase text-sm text-emerald-800">
+                        {studentDetails.academic_status === 'normal' ? 'PASSED' : studentDetails.academic_status === 'reseat' ? 'RESIT' : studentDetails.academic_status === 'repeat' ? 'REPEAT' : studentDetails.academic_status === 'withdrawn' ? 'WITHDRAWN' : 'PASSED'}
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 {/* Signatures */}
-                <div className="flex justify-between items-end mb-8 text-sm md:text-base font-bold">
-                  <div className="text-center w-56 md:w-64">
-                    <div className="border-t border-dashed border-gray-800 pt-1">
-                      Exams Officer, Signature & Date
+                <div className="flex justify-between items-end mb-8 text-xs font-bold pt-6">
+                  <div className="text-center w-48 md:w-56">
+                    <div className="border-t border-dashed border-gray-800 pt-1.5">
+                      Exams Officer Signature & Date
                     </div>
                   </div>
-                  <div className="text-center w-56 md:w-64">
-                    <div className="border-t border-dashed border-gray-800 pt-1">
-                      Director SON, Signature & Date
+                  <div className="text-center w-48 md:w-56">
+                    <div className="border-t border-dashed border-gray-800 pt-1.5">
+                      Provost / Director SON Signature & Date
                     </div>
                   </div>
                 </div>
 
                 {/* Footer */}
-                <div className="text-xs font-bold border-t-2 border-gray-800 pt-2 pb-2">
-                  <p className="mb-2">Printed on : {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })} - {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).toLowerCase()}</p>
-                  <p className="text-[9px] md:text-[10px] text-center w-full block uppercase font-normal tracking-widest border-t-2 border-gray-400 pt-2 mt-2">
-                    THIS IS AN ONLINE SLIP. IT IS FOR REFERENCE ONLY.
+                <div className="text-[10px] font-medium border-t border-gray-300 pt-2 text-gray-500 flex flex-col sm:flex-row justify-between items-center gap-1">
+                  <p>Printed on: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} at {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
+                  <p className="uppercase tracking-widest text-gray-400">
+                    Official Online Result Slip · Ameenatu College of Nursing Sciences
                   </p>
                 </div>
               </div>

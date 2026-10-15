@@ -72,7 +72,9 @@ const navConfig: Record<string, Array<{ label: string; href: string; icon: React
     { label: 'Grades Approval', href: '/hod/results',          icon: <CheckCircle size={17} /> },
   ],
   exam_officer: [
-    { label: 'Dashboard',     href: '/exam-office/dashboard',  icon: <LayoutDashboard size={17} /> },
+    { label: 'Dashboard',      href: '/exam-office/dashboard',      icon: <LayoutDashboard size={17} /> },
+    { label: 'Import Results', href: '/exam-office/results/import', icon: <FileText size={17} /> },
+    { label: 'Master Results', href: '/exam-office/results',        icon: <Trophy size={17} /> },
   ],
   lecturer: [
     { label: 'Dashboard',     href: '/lecturer/dashboard',     icon: <LayoutDashboard size={17} /> },

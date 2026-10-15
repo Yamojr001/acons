@@ -1,0 +1,919 @@
+<?php
+
+namespace App\Http\Controllers\ExamOfficer;
+
+use App\Http\Controllers\Controller;
+use App\Models\{
+    AcademicSession,
+    Course,
+    CourseRegistration,
+    Department,
+    Grade,
+    Program,
+    Semester,
+    Student,
+    Tenant,
+    User
+};
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\{Auth, Cache, DB, Hash, Log};
+use Inertia\Inertia;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+
+class ResultImportController extends Controller
+{
+    /**
+     * Known standard course mappings for Set 1 ND/HND Nursing.
+     */
+    protected array $knownMap = [
+        'HUMAN PHYSIOLOGY II' => ['name' => 'Human Physiology II', 'code' => 'NUS 122', 'units' => 2],
+        'INTERPERSONAL COMMUNICATION' => ['name' => 'Interpersonal Communication & IPC', 'code' => 'IPC 121', 'units' => 2],
+        'INTERPRENEURSHIP' => ['name' => 'Entrepreneurship Education', 'code' => 'EED 126', 'units' => 2],
+        'OSCE' => ['name' => 'Objective Structured Clinical Examination (OSCE)', 'code' => 'OSCE 121', 'units' => 3],
+        'FOUNDATION OF NURSING' => ['name' => 'Foundations of Nursing II', 'code' => 'NUS 121', 'units' => 3],
+        'NUS 122' => ['name' => 'Human Physiology II', 'code' => 'NUS 122', 'units' => 2],
+        'IPC 121' => ['name' => 'Interpersonal Communication & IPC', 'code' => 'IPC 121', 'units' => 2],
+        'EED 126' => ['name' => 'Entrepreneurship Education', 'code' => 'EED 126', 'units' => 2],
+        'OSCE 121' => ['name' => 'Objective Structured Clinical Examination (OSCE)', 'code' => 'OSCE 121', 'units' => 3],
+        'NUS 121' => ['name' => 'Foundations of Nursing II', 'code' => 'NUS 121', 'units' => 3],
+        'SOCIO' => ['name' => 'Sociology', 'code' => 'SOCIO', 'units' => 2],
+        'ENG' => ['name' => 'English Language', 'code' => 'ENG', 'units' => 2],
+        'N/INFO' => ['name' => 'Nursing Informatics', 'code' => 'N/INFO', 'units' => 2],
+        'F/NSG' => ['name' => 'Foundations of Nursing', 'code' => 'F/NSG', 'units' => 3],
+        'CITIZEN' => ['name' => 'Citizenship Education', 'code' => 'CITIZEN', 'units' => 2],
+        'ANAT' => ['name' => 'Anatomy & Physiology', 'code' => 'ANAT', 'units' => 3],
+        'CHEM' => ['name' => 'Chemistry', 'code' => 'CHEM', 'units' => 2],
+        'EMERG' => ['name' => 'Emergency Nursing & First Aid', 'code' => 'EMERG', 'units' => 2],
+        'MICRO' => ['name' => 'Microbiology', 'code' => 'MICRO', 'units' => 2],
+        'PHYSC' => ['name' => 'Physics', 'code' => 'PHYSC', 'units' => 2],
+        'INSTR' => ['name' => 'Medical Instrumentation', 'code' => 'INSTR', 'units' => 2],
+    ];
+
+    /**
+     * Display the import results form.
+     */
+    public function index()
+    {
+        $tenantId = app()->has('currentTenant') ? app('currentTenant')->id : (Tenant::first()?->id ?? 1);
+
+        $sessions = AcademicSession::orderBy('id', 'desc')->get();
+        $semesters = Semester::with('academicSession')->orderBy('id', 'desc')->get();
+        $programs = Program::all();
+        $departments = Department::all();
+        $courses = Course::orderBy('name')->get(['id', 'name', 'code', 'credit_units', 'level', 'semester_type']);
+
+        $currentSession = AcademicSession::where('is_current', true)->first() ?? $sessions->first();
+        $currentSemester = Semester::where('is_current', true)->first() ?? $semesters->first();
+
+        // Recent stats
+        $totalStudents = Student::count();
+        $totalGrades = Grade::count();
+        $recentGradesCount = Grade::where('created_at', '>=', now()->subDays(7))->count();
+        $totalCourses = Course::count();
+
+        return Inertia::render('ExamOfficer/ImportResults', [
+            'sessions' => $sessions,
+            'semesters' => $semesters,
+            'programs' => $programs,
+            'departments' => $departments,
+            'courses' => $courses,
+            'currentSessionId' => $currentSession?->id,
+            'currentSemesterId' => $currentSemester?->id,
+            'stats' => [
+                'total_students' => $totalStudents,
+                'total_grades' => $totalGrades,
+                'recent_grades' => $recentGradesCount,
+                'total_courses' => $totalCourses,
+            ],
+        ]);
+    }
+
+    /**
+     * Lightweight preview endpoint to detect courses and suggest credit units before import.
+     */
+    public function preview(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:30720',
+        ]);
+
+        try {
+            $file = $request->file('file');
+            $spreadsheet = IOFactory::load($file->getRealPath());
+            $sheet = $spreadsheet->getActiveSheet();
+            $highestRow = $sheet->getHighestRow();
+            $highestColIndex = Coordinate::columnIndexFromString($sheet->getHighestColumn());
+
+            // 1. Detect title from rows 1-8
+            $detectedCourseTitle = '';
+            for ($r = 1; $r <= min(8, $highestRow); $r++) {
+                for ($c = 1; $c <= $highestColIndex; $c++) {
+                    $val = trim((string)$sheet->getCellByColumnAndRow($c, $r)->getValue());
+                    if (preg_match('/score\s*sheet\s*(.*)/i', $val, $m)) {
+                        $detectedCourseTitle = trim($m[1]);
+                        break 2;
+                    }
+                }
+            }
+
+            if (empty($detectedCourseTitle)) {
+                $baseName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+                $detectedCourseTitle = trim(preg_replace('/^(score\s*sheet\s*[-_]?)/i', '', $baseName));
+            }
+
+            // 2. Detect Header Row
+            $headerRow = null;
+            for ($r = 1; $r <= min(25, $highestRow); $r++) {
+                for ($c = 1; $c <= $highestColIndex; $c++) {
+                    $val = trim((string)$sheet->getCellByColumnAndRow($c, $r)->getValue());
+                    if (preg_match('/reg(istration)?\s*(no|num|number)?|matric/i', $val)) {
+                        $headerRow = $r;
+                        break 2;
+                    }
+                }
+            }
+
+            $regCol = null;
+            $caCol = null;
+            $objCol = null;
+            $essayCol = null;
+            $examCol = null;
+            $totalCol = null;
+            $broadsheetCourseCols = [];
+
+            for ($c = 1; $c <= $highestColIndex; $c++) {
+                $rawVal = trim((string)$sheet->getCellByColumnAndRow($c, $headerRow)->getValue());
+                if (empty($rawVal)) continue;
+                $upperVal = strtoupper($rawVal);
+
+                if (preg_match('/reg(istration)?\s*(no|num|number)?|matric/i', $rawVal)) $regCol = $c;
+                elseif ($upperVal === 'CA' || preg_match('/^C\.?A\.?$/', $upperVal) || preg_match('/continuous\s*assess/i', $rawVal)) $caCol = $c;
+                elseif ($upperVal === 'OBJ' || preg_match('/objective/i', $rawVal)) $objCol = $c;
+                elseif ($upperVal === 'ESSAY' || preg_match('/theory/i', $rawVal)) $essayCol = $c;
+                elseif (preg_match('/^(exam|examination)$/i', $rawVal)) $examCol = $c;
+                elseif (preg_match('/^(total|total\s*score|final\s*score|sum)$/i', $rawVal)) $totalCol = $c;
+                elseif (preg_match('/^(s\/?n|no\.?|codes?|name|candidate|sex|gender|remarks?|gpa|cgpa|pos|position|comment)$/i', $rawVal)) continue;
+                else $broadsheetCourseCols[$c] = $rawVal;
+            }
+
+            $isSingle = ($caCol !== null || $totalCol !== null || $examCol !== null || $objCol !== null || $essayCol !== null);
+
+            $courses = [];
+            if ($isSingle) {
+                $upperTitle = strtoupper($detectedCourseTitle);
+                $suggested = $this->knownMap[$upperTitle] ?? null;
+
+                $code = $suggested['code'] ?? '';
+                $name = $suggested['name'] ?? ucwords(strtolower($detectedCourseTitle));
+                $units = $suggested['units'] ?? 2;
+
+                $existing = Course::where('name', $name)->orWhere('code', $code)->first();
+                if ($existing) {
+                    $code = $existing->code;
+                    $name = $existing->name;
+                    $units = $existing->credit_units ?: $units;
+                }
+
+                $courses[] = [
+                    'code' => $code ?: 'CRS',
+                    'name' => $name,
+                    'credit_units' => (float)$units,
+                    'existing_id' => $existing?->id,
+                ];
+            } else {
+                foreach ($broadsheetCourseCols as $c => $rawCode) {
+                    $code = strtoupper(trim($rawCode));
+                    $suggested = $this->knownMap[$code] ?? null;
+
+                    $name = $suggested['name'] ?? ucwords(strtolower(str_replace(['_', '-'], ' ', $code)));
+                    $units = $suggested['units'] ?? 2;
+
+                    $existing = Course::where('code', $code)->orWhere('name', $name)->first();
+                    if ($existing) {
+                        $name = $existing->name;
+                        $units = $existing->credit_units ?: $units;
+                    }
+
+                    $courses[] = [
+                        'code' => $code,
+                        'name' => $name,
+                        'credit_units' => (float)$units,
+                        'existing_id' => $existing?->id,
+                    ];
+                }
+            }
+
+            // Count student rows
+            $studentCount = 0;
+            if ($regCol && $headerRow) {
+                for ($r = $headerRow + 1; $r <= $highestRow; $r++) {
+                    $val = trim((string)$sheet->getCellByColumnAndRow($regCol, $r)->getValue());
+                    if (!empty($val) && preg_match('/[a-z0-9]/i', $val) && !preg_match('/^(signed|management|statistics|no\.\s*of|total)/i', $val) && !preg_match('/^[0-9]+$/', $val)) {
+                        $studentCount++;
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'mode' => $isSingle ? 'single' : 'multi',
+                'detected_title' => $detectedCourseTitle,
+                'courses' => $courses,
+                'student_count' => $studentCount,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Process uploaded Excel file (per-course score sheet or multi-course broadsheet).
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:30720',
+            'upload_type' => 'required|in:full,ca,exam',
+            'course_id' => 'nullable|exists:courses,id',
+            'course_name' => 'nullable|string|max:255',
+            'course_code' => 'nullable|string|max:50',
+            'credit_units' => 'nullable|numeric|min:1|max:12',
+            'course_units' => 'nullable|array',
+            'academic_session_id' => 'nullable|exists:academic_sessions,id',
+            'semester_id' => 'nullable|exists:semesters,id',
+            'program_id' => 'nullable|exists:programs,id',
+            'department_id' => 'nullable|exists:departments,id',
+            'current_level' => 'nullable|string',
+        ]);
+
+        $tenantId = app()->has('currentTenant') ? app('currentTenant')->id : (Tenant::first()?->id ?? 1);
+
+        // Resolve Session & Semester
+        $session = $request->academic_session_id
+            ? AcademicSession::find($request->academic_session_id)
+            : (AcademicSession::where('is_current', true)->first() ?? AcademicSession::first());
+
+        $semester = $request->semester_id
+            ? Semester::find($request->semester_id)
+            : (Semester::where('is_current', true)->first() ?? Semester::first());
+
+        if (!$semester) {
+            return back()->with('error', 'No active semester found. Please configure a semester first.');
+        }
+
+        $program = $request->program_id
+            ? Program::find($request->program_id)
+            : Program::first();
+
+        $department = $request->department_id
+            ? Department::find($request->department_id)
+            : Department::first();
+
+        $level = $request->current_level ?: 'ND1';
+        $uploadType = $request->upload_type; // 'full', 'ca', or 'exam'
+
+        // Per-course credit units mapping from request
+        $courseUnitsMap = $request->input('course_units', []);
+
+        $file = $request->file('file');
+
+        try {
+            $spreadsheet = IOFactory::load($file->getRealPath());
+            $sheet = $spreadsheet->getActiveSheet();
+            $highestRow = $sheet->getHighestRow();
+            $highestColIndex = Coordinate::columnIndexFromString($sheet->getHighestColumn());
+
+            // 1. Detect Course Title from metadata rows (Rows 1-8)
+            $detectedCourseTitle = '';
+            for ($r = 1; $r <= min(8, $highestRow); $r++) {
+                for ($c = 1; $c <= $highestColIndex; $c++) {
+                    $val = trim((string)$sheet->getCellByColumnAndRow($c, $r)->getValue());
+                    if (preg_match('/score\s*sheet\s*(.*)/i', $val, $m)) {
+                        $detectedCourseTitle = trim($m[1]);
+                        break 2;
+                    }
+                }
+            }
+
+            if (empty($detectedCourseTitle)) {
+                $baseName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+                $detectedCourseTitle = trim(preg_replace('/^(score\s*sheet\s*[-_]?)/i', '', $baseName));
+            }
+
+            // 2. Detect Header Row
+            $headerRow = null;
+            for ($r = 1; $r <= min(25, $highestRow); $r++) {
+                for ($c = 1; $c <= $highestColIndex; $c++) {
+                    $val = trim((string)$sheet->getCellByColumnAndRow($c, $r)->getValue());
+                    if (preg_match('/reg(istration)?\s*(no|num|number)?|matric/i', $val)) {
+                        $headerRow = $r;
+                        break 2;
+                    }
+                }
+            }
+
+            if (!$headerRow) {
+                for ($r = 1; $r <= min(25, $highestRow); $r++) {
+                    for ($c = 1; $c <= $highestColIndex; $c++) {
+                        $val = trim((string)$sheet->getCellByColumnAndRow($c, $r)->getValue());
+                        if (preg_match('/candidate(\'s)?\s*name|name\s*of\s*candidate/i', $val)) {
+                            $headerRow = $r;
+                            break 2;
+                        }
+                    }
+                }
+            }
+
+            if (!$headerRow) {
+                return back()->with('error', 'Could not locate the header row. Please ensure the Excel sheet contains a "Registration Number" header column.');
+            }
+
+            // 3. Inspect Header Columns
+            $regCol = null;
+            $nameCol = null;
+            $caCol = null;
+            $objCol = null;
+            $essayCol = null;
+            $examCol = null;
+            $totalCol = null;
+            $sexCol = null;
+            $remarkCol = null;
+            $broadsheetCourseCols = [];
+
+            for ($c = 1; $c <= $highestColIndex; $c++) {
+                $rawVal = trim((string)$sheet->getCellByColumnAndRow($c, $headerRow)->getValue());
+                if (empty($rawVal)) continue;
+
+                $upperVal = strtoupper($rawVal);
+
+                if (preg_match('/reg(istration)?\s*(no|num|number)?|matric/i', $rawVal)) {
+                    $regCol = $c;
+                } elseif (preg_match('/(candidate(\'s)?\s*)?name/i', $rawVal)) {
+                    $nameCol = $c;
+                } elseif (preg_match('/^(sex|gender)$/i', $rawVal)) {
+                    $sexCol = $c;
+                } elseif (preg_match('/^remarks?$/i', $rawVal)) {
+                    $remarkCol = $c;
+                } elseif ($upperVal === 'CA' || preg_match('/^C\.?A\.?$/', $upperVal) || preg_match('/continuous\s*assess/i', $rawVal)) {
+                    $caCol = $c;
+                } elseif ($upperVal === 'OBJ' || preg_match('/objective/i', $rawVal)) {
+                    $objCol = $c;
+                } elseif ($upperVal === 'ESSAY' || preg_match('/theory/i', $rawVal)) {
+                    $essayCol = $c;
+                } elseif (preg_match('/^(exam|examination)$/i', $rawVal)) {
+                    $examCol = $c;
+                } elseif (preg_match('/^(total|total\s*score|final\s*score|sum)$/i', $rawVal)) {
+                    $totalCol = $c;
+                } elseif (preg_match('/^(s\/?n|no\.?|codes?|gpa|cgpa|pos|position|comment)$/i', $rawVal)) {
+                    continue;
+                } else {
+                    $broadsheetCourseCols[$c] = $rawVal;
+                }
+            }
+
+            if (!$regCol) {
+                return back()->with('error', 'Registration number column could not be detected in row ' . $headerRow . '.');
+            }
+
+            $isSingleCourseSheet = ($caCol !== null || $totalCol !== null || $examCol !== null || $objCol !== null || $essayCol !== null || $request->filled('course_id'));
+            $semesterType = stripos($semester->name, 'second') !== false ? 'second' : 'first';
+
+            // =========================================================================
+            // A. SINGLE COURSE SHEET IMPORT (Course-by-Course Mode)
+            // =========================================================================
+            if ($isSingleCourseSheet) {
+                $targetCourse = null;
+
+                if ($request->filled('course_id')) {
+                    $targetCourse = Course::find($request->course_id);
+                }
+
+                if (!$targetCourse) {
+                    $courseTitle = $request->course_name ?: ($detectedCourseTitle ?: 'Course ' . date('Y'));
+                    $courseCode = $request->course_code;
+
+                    $upperTitle = strtoupper($courseTitle);
+                    if (isset($this->knownMap[$upperTitle])) {
+                        if (empty($courseCode)) $courseCode = $this->knownMap[$upperTitle]['code'];
+                        if (empty($request->course_name)) $courseTitle = $this->knownMap[$upperTitle]['name'];
+                    }
+
+                    if (empty($courseCode)) {
+                        $words = preg_split('/\s+/', $courseTitle);
+                        $prefix = '';
+                        foreach (array_slice($words, 0, 3) as $w) {
+                            $prefix .= strtoupper(substr($w, 0, 1));
+                        }
+                        $courseCode = (strlen($prefix) >= 2 ? $prefix : 'CRS') . ' ' . ($semesterType === 'second' ? '121' : '111');
+                    }
+
+                    $targetCourse = Course::where('code', $courseCode)
+                        ->orWhere('name', $courseTitle)
+                        ->first();
+
+                    if (!$targetCourse) {
+                        $targetCourse = Course::create([
+                            'tenant_id' => $tenantId,
+                            'department_id' => $department?->id,
+                            'name' => $courseTitle,
+                            'code' => $courseCode,
+                            'credit_units' => $request->credit_units ?: 2,
+                            'level' => $level,
+                            'semester_type' => $semesterType,
+                            'type' => 'core',
+                        ]);
+                    }
+                }
+
+                // Check for user-selected credit units (from explicit field or course_units array)
+                $chosenUnits = null;
+                if ($request->filled('credit_units')) {
+                    $chosenUnits = (float)$request->credit_units;
+                } elseif (isset($courseUnitsMap[$targetCourse->code])) {
+                    $chosenUnits = (float)$courseUnitsMap[$targetCourse->code];
+                } elseif (isset($courseUnitsMap[$targetCourse->id])) {
+                    $chosenUnits = (float)$courseUnitsMap[$targetCourse->id];
+                } elseif (isset($this->knownMap[strtoupper($targetCourse->name)]['units'])) {
+                    $chosenUnits = (float)$this->knownMap[strtoupper($targetCourse->name)]['units'];
+                }
+
+                if ($chosenUnits !== null && $chosenUnits > 0) {
+                    $targetCourse->credit_units = $chosenUnits;
+                    $targetCourse->save();
+                }
+
+                $newStudentsCount = 0;
+                $existingStudentsCount = 0;
+                $gradesCount = 0;
+
+                DB::beginTransaction();
+
+                for ($r = $headerRow + 1; $r <= $highestRow; $r++) {
+                    $rawReg = (string)$sheet->getCellByColumnAndRow($regCol, $r)->getValue();
+                    $regNo = trim($rawReg);
+
+                    if (empty($regNo)) continue;
+                    if (preg_match('/^(signed|management|statistics|no\.\s*of|total|passed|withdrawn|resit|absent)/i', $regNo)) continue;
+                    if (preg_match('/^[0-9]+$/', $regNo)) continue;
+
+                    $name = $nameCol ? trim((string)$sheet->getCellByColumnAndRow($nameCol, $r)->getValue()) : '';
+                    if (preg_match('/^(statistics|no\.\s*of|total|signed|management)/i', $name)) continue;
+
+                    $gender = 'other';
+                    if ($sexCol) {
+                        $rawSex = trim((string)$sheet->getCellByColumnAndRow($sexCol, $r)->getValue());
+                        if (stripos($rawSex, 'm') === 0) $gender = 'male';
+                        elseif (stripos($rawSex, 'f') === 0) $gender = 'female';
+                    }
+
+                    // Auto-Provision or Match Student
+                    $student = Student::where('matriculation_number', $regNo)->first();
+                    $userEmail = strtolower($regNo) . '@acons.edu.ng';
+
+                    if (!$student) {
+                        $user = User::where('email', $userEmail)->first();
+                        if (!$user) {
+                            $user = User::create([
+                                'tenant_id' => $tenantId,
+                                'name' => !empty($name) ? $name : $regNo,
+                                'email' => $userEmail,
+                                'password' => Hash::make($regNo),
+                                'gender' => $gender,
+                                'is_active' => true,
+                                'force_password_change' => true,
+                            ]);
+                            $user->assignRole('student');
+                        }
+
+                        $student = Student::create([
+                            'tenant_id' => $tenantId,
+                            'user_id' => $user->id,
+                            'department_id' => $department?->id,
+                            'program_id' => $program?->id,
+                            'matriculation_number' => $regNo,
+                            'current_level' => $level,
+                            'date_of_birth' => '2000-01-01',
+                            'gender' => $gender,
+                            'status' => 'active',
+                            'academic_status' => 'normal',
+                            'years_in_current_level' => 1,
+                        ]);
+                        $newStudentsCount++;
+                    } else {
+                        if ($student->user && !empty($name) && (empty($student->user->name) || $student->user->name === $regNo)) {
+                            $student->user->update(['name' => $name]);
+                        }
+                        $existingStudentsCount++;
+                    }
+
+                    // Extract Scores: CA (/30), OBJ, ESSAY, Exam (/70), Total (/100)
+                    $caVal = null;
+                    if ($caCol) {
+                        $rawCa = $sheet->getCellByColumnAndRow($caCol, $r)->getValue();
+                        if ($rawCa !== null && trim((string)$rawCa) !== '' && is_numeric($rawCa)) {
+                            $caVal = min(30, max(0, (float)$rawCa));
+                        }
+                    }
+
+                    $objVal = null;
+                    if ($objCol) {
+                        $rawObj = $sheet->getCellByColumnAndRow($objCol, $r)->getValue();
+                        if ($rawObj !== null && trim((string)$rawObj) !== '' && is_numeric($rawObj)) {
+                            $objVal = (float)$rawObj;
+                        }
+                    }
+
+                    $essayVal = null;
+                    if ($essayCol) {
+                        $rawEssay = $sheet->getCellByColumnAndRow($essayCol, $r)->getValue();
+                        if ($rawEssay !== null && trim((string)$rawEssay) !== '' && is_numeric($rawEssay)) {
+                            $essayVal = (float)$rawEssay;
+                        }
+                    }
+
+                    $examVal = null;
+                    if ($objVal !== null || $essayVal !== null) {
+                        $examVal = min(70, max(0, ($objVal ?? 0) + ($essayVal ?? 0)));
+                    } elseif ($examCol) {
+                        $rawExam = $sheet->getCellByColumnAndRow($examCol, $r)->getValue();
+                        if ($rawExam !== null && trim((string)$rawExam) !== '' && is_numeric($rawExam)) {
+                            $examVal = min(70, max(0, (float)$rawExam));
+                        }
+                    }
+
+                    $totalVal = null;
+                    if ($totalCol) {
+                        $rawTotal = $sheet->getCellByColumnAndRow($totalCol, $r)->getValue();
+                        if (is_string($rawTotal) && str_starts_with($rawTotal, '=')) {
+                            $rawTotal = $sheet->getCellByColumnAndRow($totalCol, $r)->getCalculatedValue();
+                        }
+                        if ($rawTotal !== null && trim((string)$rawTotal) !== '' && is_numeric($rawTotal)) {
+                            $totalVal = min(100, max(0, (float)$rawTotal));
+                        }
+                    }
+
+                    if ($caVal === null && $examVal === null && $totalVal !== null) {
+                        $examVal = $totalVal;
+                    }
+
+                    $registration = CourseRegistration::firstOrCreate([
+                        'tenant_id' => $tenantId,
+                        'student_id' => $student->id,
+                        'course_id' => $targetCourse->id,
+                        'semester_id' => $semester->id,
+                    ], [
+                        'status' => 'approved',
+                        'is_carryover' => false,
+                    ]);
+
+                    $grade = Grade::firstOrNew([
+                        'tenant_id' => $tenantId,
+                        'course_registration_id' => $registration->id,
+                    ]);
+
+                    if ($uploadType === 'ca') {
+                        $grade->ca_score = $caVal;
+                        if ($grade->exam_score !== null && $caVal !== null) {
+                            $grade->total_score = round($caVal + $grade->exam_score, 2);
+                        }
+                    } elseif ($uploadType === 'exam') {
+                        $grade->exam_score = $examVal ?? $totalVal;
+                        if ($grade->ca_score !== null && $grade->exam_score !== null) {
+                            $grade->total_score = round($grade->ca_score + $grade->exam_score, 2);
+                        } else {
+                            $grade->total_score = $grade->exam_score;
+                        }
+                    } else { // 'full'
+                        if ($caVal !== null) $grade->ca_score = $caVal;
+                        if ($examVal !== null) $grade->exam_score = $examVal;
+                        $grade->total_score = $totalVal ?? round(($caVal ?? 0) + ($examVal ?? 0), 2);
+                    }
+
+                    if ($grade->total_score !== null) {
+                        $total = $grade->total_score;
+                        if ($total >= 70) $grade->grade_letter = 'A';
+                        elseif ($total >= 60) $grade->grade_letter = 'B';
+                        elseif ($total >= 50) $grade->grade_letter = 'C';
+                        elseif ($total >= 45) $grade->grade_letter = 'D';
+                        elseif ($total >= 40) $grade->grade_letter = 'E';
+                        else $grade->grade_letter = 'F';
+
+                        $grade->grade_points = match ($grade->grade_letter) {
+                            'A' => 4.00,
+                            'B' => 3.00,
+                            'C' => 2.00,
+                            'D' => 1.00,
+                            'E' => 0.50,
+                            default => 0.00,
+                        };
+                    }
+
+                    $grade->approval_status = 'hod_approved';
+                    $grade->save();
+                    $gradesCount++;
+
+                    Cache::forget('student_results_' . $student->id);
+                }
+
+                DB::commit();
+
+                $totalProcessed = $newStudentsCount + $existingStudentsCount;
+                return redirect()->route('exam_officer.results.index', [
+                    'semester_id' => $semester->id,
+                    'course_id' => $targetCourse->id,
+                ])->with('success', "Results for [{$targetCourse->code} - {$targetCourse->name}] ({$targetCourse->credit_units} Units) imported successfully! {$totalProcessed} students processed. Results are BLOCKED from student view until the Provost officially releases them.");
+            }
+
+            // =========================================================================
+            // B. MULTI-COURSE BROADSHEET IMPORT (Bulky Broadsheet Mode)
+            // =========================================================================
+            if (empty($broadsheetCourseCols)) {
+                return back()->with('error', 'No course score columns could be detected in the spreadsheet.');
+            }
+
+            $courseMap = [];
+            foreach ($broadsheetCourseCols as $c => $rawCode) {
+                $cleanCode = strtoupper(trim($rawCode));
+                $suggested = $this->knownMap[$cleanCode] ?? null;
+
+                $courseName = $suggested['name'] ?? ucwords(strtolower(str_replace(['_', '-'], ' ', $cleanCode)));
+                
+                // Allow credit unit override from user request per course
+                $units = 2;
+                if (isset($courseUnitsMap[$cleanCode]) && is_numeric($courseUnitsMap[$cleanCode])) {
+                    $units = (float)$courseUnitsMap[$cleanCode];
+                } elseif (isset($suggested['units'])) {
+                    $units = (float)$suggested['units'];
+                }
+
+                $course = Course::where('code', $cleanCode)
+                    ->orWhere('name', $cleanCode)
+                    ->first();
+
+                if (!$course) {
+                    $course = Course::create([
+                        'tenant_id' => $tenantId,
+                        'department_id' => $department?->id,
+                        'name' => $courseName,
+                        'code' => $cleanCode,
+                        'credit_units' => $units,
+                        'level' => $level,
+                        'semester_type' => $semesterType,
+                        'type' => 'core',
+                    ]);
+                } else {
+                    // Update credit units if user specified
+                    if (isset($courseUnitsMap[$cleanCode]) && is_numeric($courseUnitsMap[$cleanCode])) {
+                        $course->credit_units = (float)$courseUnitsMap[$cleanCode];
+                        $course->save();
+                    }
+                }
+                $courseMap[$c] = $course;
+            }
+
+            $newStudentsCount = 0;
+            $existingStudentsCount = 0;
+            $totalGradesRecorded = 0;
+
+            DB::beginTransaction();
+
+            for ($r = $headerRow + 1; $r <= $highestRow; $r++) {
+                $rawReg = (string)$sheet->getCellByColumnAndRow($regCol, $r)->getValue();
+                $regNo = trim($rawReg);
+
+                if (empty($regNo)) continue;
+                if (preg_match('/^(signed|management|statistics|no\.\s*of|total|passed|withdrawn|resit|absent)/i', $regNo)) continue;
+                if (preg_match('/^[0-9]+$/', $regNo)) continue;
+
+                $name = $nameCol ? trim((string)$sheet->getCellByColumnAndRow($nameCol, $r)->getValue()) : '';
+                if (preg_match('/^(statistics|no\.\s*of|total|signed|management)/i', $name)) continue;
+
+                $gender = 'other';
+                if ($sexCol) {
+                    $rawSex = trim((string)$sheet->getCellByColumnAndRow($sexCol, $r)->getValue());
+                    if (stripos($rawSex, 'm') === 0) $gender = 'male';
+                    elseif (stripos($rawSex, 'f') === 0) $gender = 'female';
+                }
+
+                $remark = $remarkCol ? strtoupper(trim((string)$sheet->getCellByColumnAndRow($remarkCol, $r)->getValue())) : null;
+
+                $student = Student::where('matriculation_number', $regNo)->first();
+                $userEmail = strtolower($regNo) . '@acons.edu.ng';
+
+                if (!$student) {
+                    $user = User::where('email', $userEmail)->first();
+                    if (!$user) {
+                        $user = User::create([
+                            'tenant_id' => $tenantId,
+                            'name' => !empty($name) ? $name : $regNo,
+                            'email' => $userEmail,
+                            'password' => Hash::make($regNo),
+                            'gender' => $gender,
+                            'is_active' => true,
+                            'force_password_change' => true,
+                        ]);
+                        $user->assignRole('student');
+                    }
+
+                    $student = Student::create([
+                        'tenant_id' => $tenantId,
+                        'user_id' => $user->id,
+                        'department_id' => $department?->id,
+                        'program_id' => $program?->id,
+                        'matriculation_number' => $regNo,
+                        'current_level' => $level,
+                        'date_of_birth' => '2000-01-01',
+                        'gender' => $gender,
+                        'status' => 'active',
+                        'academic_status' => 'normal',
+                        'years_in_current_level' => 1,
+                    ]);
+                    $newStudentsCount++;
+                } else {
+                    if ($student->user && !empty($name) && (empty($student->user->name) || $student->user->name === $regNo)) {
+                        $student->user->update(['name' => $name]);
+                    }
+                    $existingStudentsCount++;
+                }
+
+                if (!empty($remark)) {
+                    if (str_contains($remark, 'PASS')) {
+                        $student->academic_status = 'normal';
+                    } elseif (str_contains($remark, 'RESIT') || str_contains($remark, 'RESEAT')) {
+                        $student->academic_status = 'reseat';
+                    } elseif (str_contains($remark, 'WITHDRAW')) {
+                        $student->academic_status = 'withdrawn';
+                        $student->status = 'withdrawn';
+                    }
+                    $student->save();
+                }
+
+                foreach ($courseMap as $c => $course) {
+                    $rawScore = $sheet->getCellByColumnAndRow($c, $r)->getValue();
+                    if (is_string($rawScore) && str_starts_with($rawScore, '=')) {
+                        $rawScore = $sheet->getCellByColumnAndRow($c, $r)->getCalculatedValue();
+                    }
+
+                    $isAbsent = false;
+                    $score = null;
+
+                    if ($rawScore !== null && $rawScore !== '') {
+                        $strScore = trim((string)$rawScore);
+                        if (preg_match('/^(abs|absent|-)$/i', $strScore)) {
+                            $isAbsent = true;
+                            $score = 0;
+                        } elseif (is_numeric($strScore)) {
+                            $score = (float)$strScore;
+                        }
+                    }
+
+                    $registration = CourseRegistration::firstOrCreate([
+                        'tenant_id' => $tenantId,
+                        'student_id' => $student->id,
+                        'course_id' => $course->id,
+                        'semester_id' => $semester->id,
+                    ], [
+                        'status' => 'approved',
+                        'is_carryover' => false,
+                    ]);
+
+                    $grade = Grade::firstOrNew([
+                        'tenant_id' => $tenantId,
+                        'course_registration_id' => $registration->id,
+                    ]);
+
+                    if ($uploadType === 'ca') {
+                        $grade->ca_score = $score !== null ? min(30, max(0, $score)) : null;
+                        if ($grade->exam_score !== null && $grade->ca_score !== null) {
+                            $grade->total_score = round($grade->ca_score + $grade->exam_score, 2);
+                        }
+                    } else { // 'exam' or 'full'
+                        $grade->exam_score = $score !== null ? min(70, max(0, $score)) : null;
+                        if ($grade->ca_score !== null && $grade->exam_score !== null) {
+                            $grade->total_score = round($grade->ca_score + $grade->exam_score, 2);
+                        } else {
+                            $grade->total_score = $score;
+                        }
+                    }
+
+                    if ($isAbsent) $grade->is_absent = true;
+
+                    if ($grade->total_score !== null) {
+                        $total = $grade->total_score;
+                        if ($total >= 70) $grade->grade_letter = 'A';
+                        elseif ($total >= 60) $grade->grade_letter = 'B';
+                        elseif ($total >= 50) $grade->grade_letter = 'C';
+                        elseif ($total >= 45) $grade->grade_letter = 'D';
+                        elseif ($total >= 40) $grade->grade_letter = 'E';
+                        else $grade->grade_letter = 'F';
+
+                        $grade->grade_points = match ($grade->grade_letter) {
+                            'A' => 4.00,
+                            'B' => 3.00,
+                            'C' => 2.00,
+                            'D' => 1.00,
+                            'E' => 0.50,
+                            default => 0.00,
+                        };
+                    }
+
+                    $grade->approval_status = 'hod_approved';
+                    $grade->save();
+                    $totalGradesRecorded++;
+                }
+
+                Cache::forget('student_results_' . $student->id);
+            }
+
+            DB::commit();
+
+            $totalProcessed = $newStudentsCount + $existingStudentsCount;
+            return redirect()->route('exam_officer.results.index', [
+                'semester_id' => $semester->id,
+            ])->with('success', "Broadsheet results imported successfully! {$totalProcessed} students processed across " . count($courseMap) . " courses. Results are BLOCKED from student view until the Provost officially releases results for this department and semester.");
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error importing results: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return back()->with('error', 'Import failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Direct update for course credit units.
+     */
+    public function updateCourseUnits(Request $request, Course $course)
+    {
+        $request->validate([
+            'credit_units' => 'required|numeric|min:1|max:12',
+        ]);
+
+        $course->credit_units = (float)$request->credit_units;
+        $course->save();
+
+        return back()->with('success', "Updated [{$course->code} - {$course->name}] credit load to {$course->credit_units} Units.");
+    }
+
+    /**
+     * View and filter results for the exam officer broadsheet.
+     */
+    public function results(Request $request)
+    {
+        $sessions = AcademicSession::orderBy('id', 'desc')->get();
+        $semesters = Semester::with('academicSession')->orderBy('id', 'desc')->get();
+        $courses = Course::orderBy('name')->get();
+
+        $selectedSemesterId = $request->input('semester_id', Semester::where('is_current', true)->first()?->id ?? $semesters->first()?->id);
+        $selectedCourseId = $request->input('course_id');
+        $search = $request->input('search');
+
+        $query = Grade::with([
+            'registration.student.user',
+            'registration.student.department',
+            'registration.course',
+            'registration.semester.academicSession',
+        ]);
+
+        if ($selectedSemesterId) {
+            $query->whereHas('registration', function ($q) use ($selectedSemesterId) {
+                $q->where('semester_id', $selectedSemesterId);
+            });
+        }
+
+        if ($selectedCourseId) {
+            $query->whereHas('registration', function ($q) use ($selectedCourseId) {
+                $q->where('course_id', $selectedCourseId);
+            });
+        }
+
+        if ($search) {
+            $query->whereHas('registration.student', function ($q) use ($search) {
+                $q->where('matriculation_number', 'like', "%{$search}%")
+                  ->orWhereHas('user', function ($uq) use ($search) {
+                      $uq->where('name', 'like', "%{$search}%")
+                         ->orWhere('email', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $grades = $query->latest('id')->paginate(50)->withQueryString();
+
+        return Inertia::render('ExamOfficer/Results', [
+            'grades' => $grades,
+            'sessions' => $sessions,
+            'semesters' => $semesters,
+            'courses' => $courses,
+            'filters' => [
+                'semester_id' => $selectedSemesterId ? (int)$selectedSemesterId : null,
+                'course_id' => $selectedCourseId ? (int)$selectedCourseId : null,
+                'search' => $search,
+            ],
+        ]);
+    }
+}

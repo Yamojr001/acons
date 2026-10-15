@@ -4,7 +4,7 @@ import {
   BarChart3, Users, BookOpen, GraduationCap, 
   CreditCard, LayoutDashboard, ShieldCheck,
   TrendingUp, ArrowUpRight, ArrowDownRight,
-  Building2, Wallet, XCircle
+  Building2, Wallet, XCircle, UploadCloud, Trophy
 } from 'lucide-react'
 import AppLayout from '@/Layouts/AppLayout'
 import { Card, StatCard, Badge, Button } from '@/Components/UI'
@@ -92,8 +92,21 @@ export default function AdminDashboard({ role, stats, recent_payments = [], depa
             </p>
           </div>
           <div className="flex gap-3">
-             <Button variant="outline" size="sm" iconLeft={<BarChart3 size={16} />}>Export Reports</Button>
-             <Button variant="primary" size="sm" iconLeft={<ArrowUpRight size={16} />}>System Settings</Button>
+             {isExamOfficer ? (
+               <>
+                 <Link href={route('exam_officer.results.import')}>
+                   <Button variant="primary" size="sm" iconLeft={<UploadCloud size={16} />}>Import Results</Button>
+                 </Link>
+                 <Link href={route('exam_officer.results.index')}>
+                   <Button variant="outline" size="sm" iconLeft={<Trophy size={16} />}>Master Results</Button>
+                 </Link>
+               </>
+             ) : (
+               <>
+                 <Button variant="outline" size="sm" iconLeft={<BarChart3 size={16} />}>Export Reports</Button>
+                 <Button variant="primary" size="sm" iconLeft={<ArrowUpRight size={16} />}>System Settings</Button>
+               </>
+             )}
           </div>
         </div>
       </motion.div>

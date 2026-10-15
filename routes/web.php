@@ -76,6 +76,7 @@ Route::middleware(['identify.tenant', 'auth', 'tenant.access'])->group(function 
         Route::post('/payments/initialize/{invoice}', [\App\Http\Controllers\Student\PaymentController::class, 'initialize'])->name('payments.initialize');
         Route::match(['get', 'post'], '/payments/verify/{reference}',   [\App\Http\Controllers\Student\PaymentController::class, 'verify'])->name('payments.verify');
         Route::get('/results',            [\App\Http\Controllers\Student\ResultController::class, 'index'])->name('results');
+        Route::post('/results/passport',  [\App\Http\Controllers\Student\ResultController::class, 'uploadPassport'])->name('results.passport');
         Route::get('/announcements',      [\App\Http\Controllers\Student\AnnouncementController::class, 'index'])->name('announcements');
         Route::get('/profile',            [\App\Http\Controllers\Student\ProfileController::class, 'edit'])->name('profile');
         Route::get('/force-password-change',  [\App\Http\Controllers\Student\PasswordResetController::class, 'showForceChange'])->name('password.force');
@@ -163,6 +164,8 @@ Route::middleware(['identify.tenant', 'auth', 'tenant.access'])->group(function 
 
         // Result release (provost-exclusive)
         Route::post('/results/release-all',         [\App\Http\Controllers\Provost\DashboardController::class, 'releaseAll'])->name('results.release_all');
+        Route::post('/results/release-department',  [\App\Http\Controllers\Provost\DashboardController::class, 'releaseDepartment'])->name('results.release_department');
+        Route::post('/results/block-department',    [\App\Http\Controllers\Provost\DashboardController::class, 'blockDepartment'])->name('results.block_department');
         Route::post('/results/{course}/release',    [\App\Http\Controllers\Provost\DashboardController::class, 'releaseCourse'])->name('results.release_course');
         Route::post('/results/{course}/reject',     [\App\Http\Controllers\Provost\DashboardController::class, 'rejectCourse'])->name('results.reject');
 
@@ -237,6 +240,11 @@ Route::middleware(['identify.tenant', 'auth', 'tenant.access'])->group(function 
     Route::middleware(['role:exam_officer'])
         ->prefix('exam-office')->name('exam_officer.')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\ExamOfficer\DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/results/import', [\App\Http\Controllers\ExamOfficer\ResultImportController::class, 'index'])->name('results.import');
+        Route::post('/results/import', [\App\Http\Controllers\ExamOfficer\ResultImportController::class, 'store'])->name('results.import.store');
+        Route::post('/results/preview', [\App\Http\Controllers\ExamOfficer\ResultImportController::class, 'preview'])->name('results.preview');
+        Route::post('/courses/{course}/credit-units', [\App\Http\Controllers\ExamOfficer\ResultImportController::class, 'updateCourseUnits'])->name('courses.update_units');
+        Route::get('/results', [\App\Http\Controllers\ExamOfficer\ResultImportController::class, 'results'])->name('results.index');
     });
 
     /*
