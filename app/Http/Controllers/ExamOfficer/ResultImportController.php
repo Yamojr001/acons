@@ -916,4 +916,270 @@ class ResultImportController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Master Broadsheet view: Each student has a single row with their reg number, name,
+     * and each course's CA, Exam, and Total scores side-by-side across the row.
+     */
+    public function broadsheet(Request $request)
+    {
+        $semesters   = Semester::with('academicSession')->orderByDesc('id')->get();
+        $departments = Department::orderBy('name')->get();
+
+        $selectedSemesterId = $request->input('semester_id');
+        $semester = null;
+        if ($selectedSemesterId) {
+            $semester = Semester::with('academicSession')->find($selectedSemesterId);
+        }
+        if (!$semester) {
+            $semester = Semester::where('is_current', true)->with('academicSession')->first() ?? $semesters->first();
+        }
+
+        $selectedDepartmentId = $request->input('department_id');
+        $search               = $request->input('search');
+
+        // Courses for this semester
+        $coursesQuery = Course::whereHas('registrations', fn($r) => $r->where('semester_id', $semester->id))
+            ->when($selectedDepartmentId, fn($q) => $q->where('department_id', $selectedDepartmentId))
+            ->orderBy('code');
+
+        $courses = $coursesQuery->get(['id', 'code', 'name', 'credit_units', 'department_id']);
+
+        // Students registered in this semester
+        $studentsQuery = Student::with(['user', 'department'])
+            ->whereHas('registrations', function ($q) use ($semester, $selectedDepartmentId) {
+                $q->where('semester_id', $semester->id);
+            })
+            ->when($selectedDepartmentId, function ($q) use ($selectedDepartmentId) {
+                $q->where('department_id', $selectedDepartmentId);
+            })
+            ->when($search, function ($q) use ($search) {
+                $q->where(function ($sq) use ($search) {
+                    $sq->where('matriculation_number', 'like', "%{$search}%")
+                       ->orWhereHas('user', fn($uq) => $uq->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
+                });
+            })
+            ->orderBy('matriculation_number');
+
+        $students = $studentsQuery->get();
+
+        // Fetch all registrations with grades for these students in this semester
+        $registrations = CourseRegistration::where('semester_id', $semester->id)
+            ->whereIn('student_id', $students->pluck('id'))
+            ->with('grade')
+            ->get()
+            ->groupBy('student_id');
+
+        // Build each student's consolidated row
+        $rows = $students->map(function ($student) use ($courses, $registrations) {
+            $studentRegs = $registrations->get($student->id, collect())->keyBy('course_id');
+
+            $courseScores = [];
+            $totalScore   = 0;
+            $totalUnits   = 0;
+            $totalPoints  = 0;
+            $passedCount  = 0;
+            $failedCount  = 0;
+
+            foreach ($courses as $course) {
+                $reg   = $studentRegs->get($course->id);
+                $grade = $reg?->grade;
+
+                if ($grade) {
+                    $units = (float)($course->credit_units ?: 2);
+                    $score = $grade->total_score !== null ? (float)$grade->total_score : 0;
+                    $totalScore  += $score;
+                    $totalUnits  += $units;
+                    $totalPoints += ((float)$grade->grade_points * $units);
+
+                    if ($grade->grade_letter === 'F' || $grade->is_absent || $score < 50) {
+                        $failedCount++;
+                    } else {
+                        $passedCount++;
+                    }
+
+                    $courseScores[$course->id] = [
+                        'ca'        => $grade->ca_score !== null ? (float)$grade->ca_score : null,
+                        'exam'      => $grade->exam_score !== null ? (float)$grade->exam_score : null,
+                        'total'     => $grade->total_score !== null ? (float)$grade->total_score : null,
+                        'grade'     => $grade->grade_letter,
+                        'points'    => (float)$grade->grade_points,
+                        'is_absent' => (bool)$grade->is_absent,
+                        'status'    => $grade->approval_status,
+                    ];
+                } else {
+                    $courseScores[$course->id] = null;
+                }
+            }
+
+            $gpa = $totalUnits > 0 ? round($totalPoints / $totalUnits, 2) : 0.00;
+
+            $remark = 'PASS';
+            if ($failedCount > 0) {
+                $remark = $failedCount >= 3 ? 'REPEAT' : 'RESIT';
+            }
+
+            return [
+                'id'            => $student->id,
+                'matric_number' => $student->matriculation_number,
+                'name'          => $student->user?->name ?? $student->matriculation_number,
+                'email'         => $student->user?->email,
+                'avatar_url'    => $student->user?->avatar_url,
+                'department'    => $student->department?->name ?? 'General',
+                'level'         => $student->current_level,
+                'scores'        => $courseScores,
+                'summary'       => [
+                    'total_score'  => round($totalScore, 1),
+                    'total_units'  => $totalUnits,
+                    'gpa'          => $gpa,
+                    'passed_count' => $passedCount,
+                    'failed_count' => $failedCount,
+                    'remark'       => $remark,
+                ],
+            ];
+        });
+
+        // Summary statistics for broadsheet
+        $totalStudents = $rows->count();
+        $passedStudents = $rows->filter(fn($r) => $r['summary']['failed_count'] === 0)->count();
+        $resitStudents  = $rows->filter(fn($r) => $r['summary']['failed_count'] > 0)->count();
+        $avgScore       = $totalStudents > 0 ? round($rows->avg(fn($r) => $r['summary']['total_score']), 1) : 0;
+        $avgGpa         = $totalStudents > 0 ? round($rows->avg(fn($r) => $r['summary']['gpa']), 2) : 0.00;
+
+        return Inertia::render('ExamOfficer/Broadsheet', [
+            'semester'     => $semester,
+            'semesters'    => $semesters,
+            'departments'  => $departments,
+            'courses'      => $courses,
+            'students'     => $rows,
+            'filters'      => [
+                'semester_id'   => $semester->id,
+                'department_id' => $selectedDepartmentId ? (int)$selectedDepartmentId : null,
+                'search'        => $search,
+            ],
+            'stats'        => [
+                'total_students'  => $totalStudents,
+                'passed_students' => $passedStudents,
+                'resit_students'  => $resitStudents,
+                'avg_score'       => $avgScore,
+                'avg_gpa'         => $avgGpa,
+            ],
+        ]);
+    }
+
+    /**
+     * Export consolidated broadsheet to CSV
+     */
+    public function exportBroadsheet(Request $request)
+    {
+        $selectedSemesterId = $request->input('semester_id');
+        $semester = Semester::with('academicSession')->find($selectedSemesterId)
+            ?? Semester::where('is_current', true)->with('academicSession')->first();
+
+        if (!$semester) {
+            return back()->with('error', 'Semester not found.');
+        }
+
+        $selectedDepartmentId = $request->input('department_id');
+
+        $courses = Course::whereHas('registrations', fn($r) => $r->where('semester_id', $semester->id))
+            ->when($selectedDepartmentId, fn($q) => $q->where('department_id', $selectedDepartmentId))
+            ->orderBy('code')
+            ->get();
+
+        $students = Student::with(['user', 'department'])
+            ->whereHas('registrations', fn($q) => $q->where('semester_id', $semester->id))
+            ->when($selectedDepartmentId, fn($q) => $q->where('department_id', $selectedDepartmentId))
+            ->orderBy('matriculation_number')
+            ->get();
+
+        $registrations = CourseRegistration::where('semester_id', $semester->id)
+            ->whereIn('student_id', $students->pluck('id'))
+            ->with('grade')
+            ->get()
+            ->groupBy('student_id');
+
+        $filename = 'Master_Broadsheet_' . str_replace(['/', ' '], '_', $semester->name) . '_' . date('Ymd_His') . '.csv';
+
+        $headers = [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        $callback = function () use ($students, $courses, $registrations) {
+            $handle = fopen('php://output', 'w');
+            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM
+
+            // Header Row: S/N, Matric No, Student Name, Department, Courses (CA, Exam, Total, Grade), Summary
+            $headerRow1 = ['S/N', 'Registration No.', 'Student Name', 'Department'];
+            foreach ($courses as $c) {
+                $headerRow1[] = "{$c->code} - CA (/30)";
+                $headerRow1[] = "{$c->code} - Exam (/70)";
+                $headerRow1[] = "{$c->code} - Total (/100)";
+                $headerRow1[] = "{$c->code} - Grade";
+            }
+            $headerRow1[] = 'Total Score';
+            $headerRow1[] = 'Credit Units';
+            $headerRow1[] = 'GPA';
+            $headerRow1[] = 'Remark';
+            fputcsv($handle, $headerRow1);
+
+            $sn = 1;
+            foreach ($students as $student) {
+                $studentRegs = $registrations->get($student->id, collect())->keyBy('course_id');
+                $row = [
+                    $sn++,
+                    $student->matriculation_number,
+                    $student->user?->name ?? $student->matriculation_number,
+                    $student->department?->name ?? 'General',
+                ];
+
+                $totalScore  = 0;
+                $totalUnits  = 0;
+                $totalPoints = 0;
+                $failedCount = 0;
+
+                foreach ($courses as $course) {
+                    $reg = $studentRegs->get($course->id);
+                    $grade = $reg?->grade;
+
+                    if ($grade) {
+                        $units = (float)($course->credit_units ?: 2);
+                        $tot   = $grade->total_score !== null ? (float)$grade->total_score : 0;
+                        $totalScore  += $tot;
+                        $totalUnits  += $units;
+                        $totalPoints += ((float)$grade->grade_points * $units);
+
+                        if ($grade->grade_letter === 'F' || $grade->is_absent || $tot < 50) {
+                            $failedCount++;
+                        }
+
+                        $row[] = $grade->ca_score !== null ? $grade->ca_score : '—';
+                        $row[] = $grade->exam_score !== null ? $grade->exam_score : '—';
+                        $row[] = $grade->total_score !== null ? $grade->total_score : '—';
+                        $row[] = $grade->grade_letter ?? '—';
+                    } else {
+                        $row[] = '—';
+                        $row[] = '—';
+                        $row[] = '—';
+                        $row[] = '—';
+                    }
+                }
+
+                $gpa = $totalUnits > 0 ? round($totalPoints / $totalUnits, 2) : 0.00;
+                $remark = $failedCount > 0 ? ($failedCount >= 3 ? 'REPEAT' : 'RESIT') : 'PASS';
+
+                $row[] = round($totalScore, 1);
+                $row[] = $totalUnits;
+                $row[] = number_format($gpa, 2);
+                $row[] = $remark;
+
+                fputcsv($handle, $row);
+            }
+
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
 }

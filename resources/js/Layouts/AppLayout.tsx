@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList, BarChart3,
   DollarSign, Bell, Settings, LogOut, Menu, X, School, UserCheck, BookMarked,
   PenLine, Home, Calendar, FileText, Megaphone, User, Shield, Activity,
-  CreditCard, Trophy, Wallet, Building2, CheckCircle
+  CreditCard, Trophy, Wallet, Building2, CheckCircle, FileSpreadsheet
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { Avatar, Badge, NairaIcon } from '@/Components/UI'
@@ -72,9 +72,10 @@ const navConfig: Record<string, Array<{ label: string; href: string; icon: React
     { label: 'Grades Approval', href: '/hod/results',          icon: <CheckCircle size={17} /> },
   ],
   exam_officer: [
-    { label: 'Dashboard',      href: '/exam-office/dashboard',      icon: <LayoutDashboard size={17} /> },
-    { label: 'Import Results', href: '/exam-office/results/import', icon: <FileText size={17} /> },
-    { label: 'Master Results', href: '/exam-office/results',        icon: <Trophy size={17} /> },
+    { label: 'Dashboard',         href: '/exam-office/dashboard',      icon: <LayoutDashboard size={17} /> },
+    { label: 'Import Results',    href: '/exam-office/results/import', icon: <FileText size={17} /> },
+    { label: 'Master Results',    href: '/exam-office/results',        icon: <Trophy size={17} /> },
+    { label: 'Master Broadsheet', href: '/exam-office/broadsheet',     icon: <FileSpreadsheet size={17} /> },
   ],
   lecturer: [
     { label: 'Dashboard',     href: '/lecturer/dashboard',     icon: <LayoutDashboard size={17} /> },
@@ -138,7 +139,11 @@ function Sidebar({ open, onClose, tenant, user, currentPath }: SidebarProps) {
         <nav className="flex-1 overflow-y-auto py-4 px-3 scrollbar-thin">
           <div className="space-y-0.5">
             {nav.map((item, i) => {
-              const isActive = currentPath === item.href || (item.href !== '/' && currentPath.startsWith(item.href))
+              const isActive = currentPath === item.href || (
+                item.href !== '/' && 
+                currentPath.startsWith(item.href) && 
+                !nav.some(other => other.href !== item.href && currentPath.startsWith(other.href) && other.href.length > item.href.length)
+              )
               return (
                 <motion.div key={item.href} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.025 + 0.05 }}>
                   <Link href={item.href} onClick={() => window.innerWidth < 1024 && onClose()}

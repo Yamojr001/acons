@@ -171,6 +171,11 @@ export default function Results({
             </p>
           </div>
           <div className="flex items-center gap-2.5">
+            <Link href={route('exam_officer.results.broadsheet', selectedSemester ? { semester_id: selectedSemester } : {})}>
+              <Button variant="outline" size="sm" iconLeft={<FileSpreadsheet size={15} />}>
+                Master Broadsheet View
+              </Button>
+            </Link>
             <Link href={route('exam_officer.results.import')}>
               <Button variant="primary" size="sm" iconLeft={<UploadCloud size={15} />}>
                 Import Results

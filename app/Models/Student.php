@@ -53,6 +53,7 @@ class Student extends Model
     public function invoices(): HasMany      { return $this->hasMany(StudentInvoice::class); }
     public function payments()               { return $this->hasManyThrough(Payment::class, StudentInvoice::class); }
     public function registrations(): HasMany { return $this->hasMany(CourseRegistration::class); }
+    public function courseRegistrations(): HasMany { return $this->hasMany(CourseRegistration::class); }
     public function academicRecords(): HasMany { return $this->hasMany(AcademicRecord::class); }
 
     public function recalculateAcademicStatus(): void

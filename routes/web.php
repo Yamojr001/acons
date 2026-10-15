@@ -245,6 +245,8 @@ Route::middleware(['identify.tenant', 'auth', 'tenant.access'])->group(function 
         Route::post('/results/preview', [\App\Http\Controllers\ExamOfficer\ResultImportController::class, 'preview'])->name('results.preview');
         Route::post('/courses/{course}/credit-units', [\App\Http\Controllers\ExamOfficer\ResultImportController::class, 'updateCourseUnits'])->name('courses.update_units');
         Route::get('/results', [\App\Http\Controllers\ExamOfficer\ResultImportController::class, 'results'])->name('results.index');
+        Route::get('/broadsheet', [\App\Http\Controllers\ExamOfficer\ResultImportController::class, 'broadsheet'])->name('results.broadsheet');
+        Route::get('/broadsheet/export', [\App\Http\Controllers\ExamOfficer\ResultImportController::class, 'exportBroadsheet'])->name('results.broadsheet.export');
     });
 
     /*
