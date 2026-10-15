@@ -52,8 +52,8 @@ export default function ResultEntry({ courses, students, selectedCourseId, selec
     
     // Prevent exceeding max capacity
     if (numValue !== null) {
-      if (field === 'ca_score' && numValue > 30) numValue = 30;
-      if (field === 'exam_score' && numValue > 70) numValue = 70;
+      if (field === 'ca_score' && numValue > 20) numValue = 20;
+      if (field === 'exam_score' && numValue > 80) numValue = 80;
       if (numValue < 0) numValue = 0;
     }
 
@@ -248,8 +248,8 @@ export default function ResultEntry({ courses, students, selectedCourseId, selec
                       <tr>
                         <th className="px-6 py-4">Matric Number</th>
                         <th className="px-6 py-4">Student Name</th>
-                        <th className="px-6 py-4 text-center w-32">CA (30)</th>
-                        <th className="px-6 py-4 text-center w-32">Exam (70)</th>
+                        <th className="px-6 py-4 text-center w-32">CA (20)</th>
+                        <th className="px-6 py-4 text-center w-32">Exam (80)</th>
                         <th className="px-6 py-4 text-center w-24">Total</th>
                         <th className="px-6 py-4 text-center w-24">Grade</th>
                         <th className="px-6 py-4 text-center w-32">Status</th>
@@ -268,7 +268,7 @@ export default function ResultEntry({ courses, students, selectedCourseId, selec
                             <input 
                               type="number"
                               min={0}
-                              max={30}
+                              max={20}
                               disabled={res.is_absent || isSheetLocked}
                               value={res.ca_score === null ? '' : res.ca_score}
                               onChange={(e) => handleScoreChange(i, 'ca_score', e.target.value)}
@@ -281,7 +281,7 @@ export default function ResultEntry({ courses, students, selectedCourseId, selec
                             <input 
                               type="number"
                               min={0}
-                              max={70}
+                              max={80}
                               disabled={res.is_absent || isSheetLocked}
                               value={res.exam_score === null ? '' : res.exam_score}
                               onChange={(e) => handleScoreChange(i, 'exam_score', e.target.value)}

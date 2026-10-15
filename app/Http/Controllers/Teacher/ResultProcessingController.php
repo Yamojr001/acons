@@ -45,8 +45,8 @@ class ResultProcessingController extends Controller
         $request->validate([
             'grades' => 'required|array',
             'grades.*.registration_id' => 'required|exists:course_registrations,id',
-            'grades.*.ca_score' => 'nullable|numeric|min:0|max:40',
-            'grades.*.exam_score' => 'nullable|numeric|min:0|max:100',
+            'grades.*.ca_score' => 'nullable|numeric|min:0|max:20',
+            'grades.*.exam_score' => 'nullable|numeric|min:0|max:80',
         ]);
 
         DB::transaction(function () use ($request, $tenant) {

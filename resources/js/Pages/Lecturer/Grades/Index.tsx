@@ -56,9 +56,9 @@ export default function LecturerGradesIndex({ course, registrations, gradingScal
 
     const numValue = value === '' ? '' : Math.max(0, Number(value))
     
-    // Prevent exceeding limits (CA: 40 max, Exam: 60/100 depending on rules. We'll enforce 40/60 here conceptually)
-    if (field === 'ca_score' && Number(numValue) > 40) return
-    if (field === 'exam_score' && Number(numValue) > 60) return
+    // Prevent exceeding limits (CA: 20 max, Exam: 80 max)
+    if (field === 'ca_score' && Number(numValue) > 20) return
+    if (field === 'exam_score' && Number(numValue) > 80) return
 
     const newGrades = [...data.grades]
     newGrades[index] = { ...newGrades[index], [field]: numValue }
@@ -150,8 +150,8 @@ export default function LecturerGradesIndex({ course, registrations, gradingScal
               <tr>
                 <th className="px-6 py-4">Matric No.</th>
                 <th className="px-6 py-4">Student Name</th>
-                <th className="px-6 py-4 w-32">C.A (40)</th>
-                <th className="px-6 py-4 w-32">Exam (60)</th>
+                <th className="px-6 py-4 w-32">C.A (20)</th>
+                <th className="px-6 py-4 w-32">Exam (80)</th>
                 <th className="px-6 py-4 text-center">Total</th>
                 <th className="px-6 py-4 text-center">Grade</th>
               </tr>

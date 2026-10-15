@@ -130,7 +130,7 @@ export default function MasterBroadsheet({
               Master Broadsheet Preview
             </h1>
             <p className="text-sm text-surface-500 mt-0.5">
-              Single-row student score broadsheet matrix with CA (/30), Examination (/70), and Total (/100) per course.
+              Single-row student score broadsheet matrix with CA (/20), Examination (/80), and Total (/100) per course.
             </p>
           </div>
 
@@ -509,7 +509,7 @@ export default function MasterBroadsheet({
                 <span className="w-2.5 h-2.5 rounded-full bg-danger-500" /> Fail / Resit (&lt; 50)
               </span>
               <span className="text-surface-400">·</span>
-              <span className="text-surface-500">CA: /30 · Exam: /70 · Total: /100</span>
+              <span className="text-surface-500">CA: /20 · Exam: /80 · Total: /100</span>
             </div>
           </div>
         </Card>

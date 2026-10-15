@@ -86,8 +86,8 @@ class ResultProcessingController extends Controller
             'course_id' => 'required|exists:courses,id',
             'results' => 'required|array',
             'results.*.registration_id' => 'required|exists:course_registrations,id',
-            'results.*.ca_score' => 'nullable|numeric|min:0|max:30',
-            'results.*.exam_score' => 'nullable|numeric|min:0|max:70',
+            'results.*.ca_score' => 'nullable|numeric|min:0|max:20',
+            'results.*.exam_score' => 'nullable|numeric|min:0|max:80',
             'results.*.is_absent' => 'boolean',
         ]);
 

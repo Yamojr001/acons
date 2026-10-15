@@ -260,8 +260,8 @@ export default function Results({
                 <th className="py-3 px-4">Candidate Name</th>
                 <th className="py-3 px-4">Course</th>
                 <th className="py-3 px-4 text-center">Semester</th>
-                <th className="py-3 px-4 text-right">CA (/30)</th>
-                <th className="py-3 px-4 text-right">Exam (/70)</th>
+                <th className="py-3 px-4 text-right">CA (/20)</th>
+                <th className="py-3 px-4 text-right">Exam (/80)</th>
                 <th className="py-3 px-4 text-right font-bold text-surface-900">Total (/100)</th>
                 <th className="py-3 px-4 text-center">Grade</th>
                 <th className="py-3 px-4 text-center">Status</th>

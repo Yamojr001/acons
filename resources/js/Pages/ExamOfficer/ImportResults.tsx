@@ -735,11 +735,11 @@ export default function ImportResults({
             <div className="space-y-2.5 text-xs text-surface-600">
               <div className="flex items-center justify-between p-2 rounded-lg bg-surface-50 border border-surface-100">
                 <span className="font-medium text-surface-800">Continuous Assessment (CA)</span>
-                <span className="font-mono font-bold text-brand-700">Max 30 Marks</span>
+                <span className="font-mono font-bold text-brand-700">Max 20 Marks</span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-surface-50 border border-surface-100">
                 <span className="font-medium text-surface-800">Exam (OBJ + Essay)</span>
-                <span className="font-mono font-bold text-brand-700">Max 70 Marks</span>
+                <span className="font-mono font-bold text-brand-700">Max 80 Marks</span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-surface-50 border border-surface-100">
                 <span className="font-medium text-surface-800">Total Course Composite</span>

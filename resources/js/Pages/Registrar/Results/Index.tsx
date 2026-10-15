@@ -414,8 +414,8 @@ export default function RegistrarResultsIndex({ courses = [], semester_name, is_
                             <tr>
                               <th className="px-4 py-3 font-semibold text-surface-600 text-xs">Student</th>
                               <th className="px-4 py-3 font-semibold text-surface-600 text-xs">Matric Number</th>
-                              <th className="px-4 py-3 font-semibold text-surface-600 text-xs text-center">CA (30)</th>
-                              <th className="px-4 py-3 font-semibold text-surface-600 text-xs text-center">Exam (70)</th>
+                              <th className="px-4 py-3 font-semibold text-surface-600 text-xs text-center">CA (20)</th>
+                              <th className="px-4 py-3 font-semibold text-surface-600 text-xs text-center">Exam (80)</th>
                               <th className="px-4 py-3 font-semibold text-surface-600 text-xs text-center">Total</th>
                               <th className="px-4 py-3 font-semibold text-surface-600 text-xs text-center">Grade</th>
                               <th className="px-4 py-3 font-semibold text-surface-600 text-xs text-right">Status</th>

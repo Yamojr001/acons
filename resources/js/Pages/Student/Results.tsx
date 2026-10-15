@@ -355,8 +355,8 @@ export default function StudentResults({
                         <th className="py-2 px-2 w-24">Course Code</th>
                         <th className="py-2 px-2">Course Title</th>
                         <th className="py-2 px-2 text-center w-14">Units</th>
-                        <th className="py-2 px-2 text-center w-14">CA (30)</th>
-                        <th className="py-2 px-2 text-center w-16">Exam (70)</th>
+                        <th className="py-2 px-2 text-center w-14">CA (20)</th>
+                        <th className="py-2 px-2 text-center w-16">Exam (80)</th>
                         <th className="py-2 px-2 text-center w-16">Total (100)</th>
                         <th className="py-2 px-2 text-center w-14">Grade</th>
                         <th className="py-2 px-2 text-left w-20">Remark</th>

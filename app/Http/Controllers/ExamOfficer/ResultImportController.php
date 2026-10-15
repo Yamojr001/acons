@@ -510,12 +510,12 @@ class ResultImportController extends Controller
                         $existingStudentsCount++;
                     }
 
-                    // Extract Scores: CA (/30), OBJ, ESSAY, Exam (/70), Total (/100)
+                    // Extract Scores: CA (/20), OBJ, ESSAY, Exam (/80), Total (/100)
                     $caVal = null;
                     if ($caCol) {
                         $rawCa = $sheet->getCellByColumnAndRow($caCol, $r)->getValue();
                         if ($rawCa !== null && trim((string)$rawCa) !== '' && is_numeric($rawCa)) {
-                            $caVal = min(30, max(0, (float)$rawCa));
+                            $caVal = min(20, max(0, (float)$rawCa));
                         }
                     }
 
@@ -537,11 +537,11 @@ class ResultImportController extends Controller
 
                     $examVal = null;
                     if ($objVal !== null || $essayVal !== null) {
-                        $examVal = min(70, max(0, ($objVal ?? 0) + ($essayVal ?? 0)));
+                        $examVal = min(80, max(0, ($objVal ?? 0) + ($essayVal ?? 0)));
                     } elseif ($examCol) {
                         $rawExam = $sheet->getCellByColumnAndRow($examCol, $r)->getValue();
                         if ($rawExam !== null && trim((string)$rawExam) !== '' && is_numeric($rawExam)) {
-                            $examVal = min(70, max(0, (float)$rawExam));
+                            $examVal = min(80, max(0, (float)$rawExam));
                         }
                     }
 
@@ -787,12 +787,12 @@ class ResultImportController extends Controller
                     ]);
 
                     if ($uploadType === 'ca') {
-                        $grade->ca_score = $score !== null ? min(30, max(0, $score)) : null;
+                        $grade->ca_score = $score !== null ? min(20, max(0, $score)) : null;
                         if ($grade->exam_score !== null && $grade->ca_score !== null) {
                             $grade->total_score = round($grade->ca_score + $grade->exam_score, 2);
                         }
                     } else { // 'exam' or 'full'
-                        $grade->exam_score = $score !== null ? min(70, max(0, $score)) : null;
+                        $grade->exam_score = $score !== null ? min(80, max(0, $score)) : null;
                         if ($grade->ca_score !== null && $grade->exam_score !== null) {
                             $grade->total_score = round($grade->ca_score + $grade->exam_score, 2);
                         } else {
@@ -1113,8 +1113,8 @@ class ResultImportController extends Controller
             // Header Row: S/N, Matric No, Student Name, Department, Courses (CA, Exam, Total, Grade), Summary
             $headerRow1 = ['S/N', 'Registration No.', 'Student Name', 'Department'];
             foreach ($courses as $c) {
-                $headerRow1[] = "{$c->code} - CA (/30)";
-                $headerRow1[] = "{$c->code} - Exam (/70)";
+                $headerRow1[] = "{$c->code} - CA (/20)";
+                $headerRow1[] = "{$c->code} - Exam (/80)";
                 $headerRow1[] = "{$c->code} - Total (/100)";
                 $headerRow1[] = "{$c->code} - Grade";
             }
