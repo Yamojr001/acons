@@ -100,6 +100,7 @@ export default function ImportResults({
 
   const { data, setData, post, processing, errors, reset, progress } = useForm<{
     file: File | null
+    import_mode: 'individual' | 'master'
     upload_type: 'full' | 'ca' | 'exam'
     course_id: string | number
     course_name: string
@@ -113,6 +114,7 @@ export default function ImportResults({
     current_level: string
   }>({
     file: null,
+    import_mode: 'individual',
     upload_type: 'full',
     course_id: '',
     course_name: '',
@@ -127,10 +129,12 @@ export default function ImportResults({
   })
 
   // Trigger preview analysis on file selection
-  const analyzeFile = async (file: File) => {
+  const analyzeFile = async (file: File, modeOverride?: 'individual' | 'master') => {
     setPreviewLoading(true)
+    const activeMode = modeOverride || data.import_mode
     const formData = new FormData()
     formData.append('file', file)
+    formData.append('import_mode', activeMode)
 
     try {
       const response = await axios.post(route('exam_officer.results.preview'), formData, {
@@ -147,9 +151,14 @@ export default function ImportResults({
           initialUnits[c.name] = c.credit_units || 2
         })
         setCourseUnitsMap(initialUnits)
-        setData('course_units', initialUnits)
 
-        if (response.data.mode === 'single' && response.data.courses.length > 0) {
+        if (response.data.mode === 'multi') {
+          setData((prev) => ({
+            ...prev,
+            import_mode: 'master',
+            course_units: initialUnits,
+          }))
+        } else if (response.data.courses.length > 0) {
           const first = response.data.courses[0]
           setData((prev) => ({
             ...prev,
@@ -165,6 +174,13 @@ export default function ImportResults({
       console.warn('File preview note:', err)
     } finally {
       setPreviewLoading(false)
+    }
+  }
+
+  const handleModeChange = (newMode: 'individual' | 'master') => {
+    setData('import_mode', newMode)
+    if (data.file) {
+      analyzeFile(data.file, newMode)
     }
   }
 
@@ -266,10 +282,10 @@ export default function ImportResults({
               <ShieldCheck size={14} /> Examination Records Office
             </div>
             <h1 className="text-2xl sm:text-3xl font-display font-bold text-surface-900 tracking-tight">
-              Import Course Results
+              Import Examination Results
             </h1>
             <p className="text-sm text-surface-500 mt-1 max-w-2xl">
-              Upload course score sheets with custom Credit Units for each course. Continuous Assessment (CA) is out of 30, Examination is out of 70 (OBJ + Essay).
+              Upload individual course sheets or complete cohort master broadsheets with custom Credit Units. Continuous Assessment (CA) is out of 20, Examination is out of 80 (OBJ + Essay).
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -354,10 +370,55 @@ export default function ImportResults({
           <Card className="p-6 sm:p-8 bg-white border border-surface-200 shadow-xs">
             <form onSubmit={handleSubmit} className="space-y-6">
               
+              {/* Import Mode Switcher */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-surface-700 uppercase tracking-wider">
+                  Import Mode <span className="text-danger-500">*</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-1.5 rounded-xl bg-surface-100 border border-surface-200">
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange('individual')}
+                    className={`flex items-center gap-3 p-3 rounded-lg text-left transition-all ${
+                      data.import_mode === 'individual'
+                        ? 'bg-white text-surface-900 shadow-xs border border-surface-200 ring-1 ring-brand-500/20'
+                        : 'text-surface-600 hover:text-surface-900 hover:bg-surface-200/50'
+                    }`}
+                  >
+                    <div className={`p-2 rounded-lg shrink-0 ${data.import_mode === 'individual' ? 'bg-brand-50 text-brand-700' : 'bg-surface-200 text-surface-600'}`}>
+                      <BookOpen size={18} />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-xs sm:text-sm">Individual Course Sheet</div>
+                      <div className="text-[11px] text-surface-500">Single course upload (e.g. OSCE, HUMAN PHYSIOLOGY II)</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange('master')}
+                    className={`flex items-center gap-3 p-3 rounded-lg text-left transition-all ${
+                      data.import_mode === 'master'
+                        ? 'bg-white text-surface-900 shadow-xs border border-surface-200 ring-1 ring-brand-500/20'
+                        : 'text-surface-600 hover:text-surface-900 hover:bg-surface-200/50'
+                    }`}
+                  >
+                    <div className={`p-2 rounded-lg shrink-0 ${data.import_mode === 'master' ? 'bg-brand-50 text-brand-700' : 'bg-surface-200 text-surface-600'}`}>
+                      <Layers size={18} />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-xs sm:text-sm">Master Broadsheet Import</div>
+                      <div className="text-[11px] text-surface-500">Multi-course sheet (e.g. ND 1ST YR 2ND SEM EXAM SCORE SHEET)</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               {/* File Dropzone */}
               <div>
                 <label className="block text-sm font-semibold text-surface-800 mb-2">
-                  Excel Score Sheet (.xlsx, .xls, .csv) <span className="text-danger-500">*</span>
+                  {data.import_mode === 'master' ? 'Master Broadsheet Excel File (.xlsx, .xls, .csv)' : 'Course Score Sheet (.xlsx, .xls, .csv)'}{' '}
+                  <span className="text-danger-500">*</span>
                 </label>
 
                 <div
@@ -398,10 +459,15 @@ export default function ImportResults({
                         <UploadCloud size={24} />
                       </div>
                       <div className="text-sm font-semibold text-surface-800">
-                        Drop score sheet here or <span className="text-brand-600 underline">browse computer</span>
+                        {data.import_mode === 'master'
+                          ? 'Drop master broadsheet here or '
+                          : 'Drop score sheet here or '}
+                        <span className="text-brand-600 underline">browse computer</span>
                       </div>
                       <div className="text-xs text-surface-500 mt-1">
-                        Supports: HUMAN PHYSIOLOGY II, OSCE, INTERPERSONAL COM, FOUNDATION OF NURSING...
+                        {data.import_mode === 'master'
+                          ? 'Supports: Multi-course cohort sheets (e.g. ND 1ST YR 2ND SEM EXAM SCORE SHEET.xlsx)'
+                          : 'Supports: HUMAN PHYSIOLOGY II, OSCE, INTERPERSONAL COM, FOUNDATION OF NURSING...'}
                       </div>
                     </div>
                   )}
@@ -413,23 +479,33 @@ export default function ImportResults({
               {previewLoading && (
                 <div className="p-4 rounded-xl bg-brand-50/60 border border-brand-200 flex items-center gap-3 text-brand-800 text-xs">
                   <Loader2 size={16} className="animate-spin text-brand-600" />
-                  <span>Analyzing spreadsheet structure, courses, and score columns...</span>
+                  <span>Analyzing spreadsheet structure, course columns, and student candidate rows...</span>
                 </div>
               )}
 
               {/* Dynamic Per-Course Credit Unit Selection */}
               {previewData && previewData.courses.length > 0 && (
                 <div className="p-4 sm:p-5 rounded-xl bg-brand-50/30 border border-brand-200 space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-brand-900 flex items-center gap-1.5">
-                      <Sparkles size={14} className="text-brand-600" /> Select Credit Units for Each Course in this Sheet
+                      <Sparkles size={14} className="text-brand-600" />
+                      {previewData.mode === 'multi' || data.import_mode === 'master'
+                        ? 'Master Broadsheet: Configure Credit Units for Each Course'
+                        : 'Single Course Sheet: Configure Credit Units'}
                     </span>
-                    <span className="text-xs text-brand-700 font-medium bg-brand-100/60 px-2 py-0.5 rounded">
-                      {previewData.student_count} Candidates Detected
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-brand-800 bg-brand-100/70 px-2 py-0.5 rounded">
+                        {previewData.courses.length} {previewData.courses.length === 1 ? 'Course' : 'Courses'} Detected
+                      </span>
+                      <span className="text-xs text-brand-700 font-medium bg-brand-100/60 px-2 py-0.5 rounded">
+                        {previewData.student_count} Candidates
+                      </span>
+                    </div>
                   </div>
                   <p className="text-xs text-surface-600">
-                    Set the exact credit load for each course below. This is automatically saved and used to calculate students' GPA and CGPA.
+                    {previewData.mode === 'multi' || data.import_mode === 'master'
+                      ? 'Each detected course column from your master sheet is listed below. Review or adjust the credit units (1U–6U) before importing.'
+                      : 'Set the exact credit load for this course. This is automatically saved and used to calculate students\' GPA and CGPA.'}
                   </p>
 
                   <div className="space-y-3 pt-1">
@@ -479,8 +555,21 @@ export default function ImportResults({
                 </div>
               )}
 
-              {/* If no file preview yet: Manual Course & Credit Units selector */}
-              {!previewData && (
+              {/* In Master mode with no file preview yet */}
+              {!previewData && data.import_mode === 'master' && (
+                <div className="p-4 rounded-xl bg-surface-50 border border-surface-200 flex items-start gap-3 text-xs text-surface-600">
+                  <Info size={16} className="text-brand-600 mt-0.5 shrink-0" />
+                  <div>
+                    <span className="font-semibold text-surface-800">Master Broadsheet Mode:</span>
+                    <p className="mt-0.5 text-surface-600 leading-relaxed">
+                      Drop or select your comprehensive master spreadsheet above. All 10+ course score columns (e.g. PHC, D/PSC, F/NSG, H/ANA, OSCE, etc.) will be automatically scanned so you can verify credit units and import all subject scores simultaneously.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* In Individual mode with no file preview yet: Manual Course & Credit Units selector */}
+              {!previewData && data.import_mode === 'individual' && (
                 <div className="p-4 rounded-xl bg-surface-50 border border-surface-200 space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold uppercase tracking-wider text-surface-700 flex items-center gap-1.5">
@@ -491,7 +580,7 @@ export default function ImportResults({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-surface-700 mb-1.5">
-                        Select Course (or detect automatically from file)
+                        Select Course (or detect automatically from sheet)
                       </label>
                       <select
                         value={data.course_id}
@@ -546,7 +635,9 @@ export default function ImportResults({
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-semibold text-xs sm:text-sm">Complete Sheet</span>
+                      <span className="font-semibold text-xs sm:text-sm">
+                        {data.import_mode === 'master' ? 'Composite Scores (/100)' : 'Complete Sheet'}
+                      </span>
                       <input
                         type="radio"
                         name="upload_type"
@@ -557,7 +648,9 @@ export default function ImportResults({
                       />
                     </div>
                     <p className="text-[11px] text-surface-500 leading-relaxed">
-                      CA (/30) + Exam (/70) [OBJ + Essay] = Total (/100). Recommended.
+                      {data.import_mode === 'master'
+                        ? 'Master broadsheet scores (0-100) with auto-derived exam marks (/80) & college grades. Recommended.'
+                        : 'CA (/20) + Exam (/80) [OBJ + Essay] = Total (/100). Recommended.'}
                     </p>
                   </label>
 
@@ -569,7 +662,7 @@ export default function ImportResults({
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-semibold text-xs sm:text-sm">CA Only (/30)</span>
+                      <span className="font-semibold text-xs sm:text-sm">CA Only (/20)</span>
                       <input
                         type="radio"
                         name="upload_type"
@@ -580,7 +673,7 @@ export default function ImportResults({
                       />
                     </div>
                     <p className="text-[11px] text-surface-500 leading-relaxed">
-                      Continuous Assessment test marks (out of 30).
+                      Continuous Assessment test marks (capped at /20).
                     </p>
                   </label>
 
@@ -592,7 +685,7 @@ export default function ImportResults({
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-semibold text-xs sm:text-sm">Exam Only (/70)</span>
+                      <span className="font-semibold text-xs sm:text-sm">Exam Only (/80)</span>
                       <input
                         type="radio"
                         name="upload_type"
@@ -603,7 +696,7 @@ export default function ImportResults({
                       />
                     </div>
                     <p className="text-[11px] text-surface-500 leading-relaxed">
-                      Examination marks (OBJ + Essay, out of 70).
+                      Examination marks (OBJ + Essay, capped at /80).
                     </p>
                   </label>
                 </div>

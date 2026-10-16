@@ -40,7 +40,7 @@ class ResultImportController extends Controller
         'SOCIO' => ['name' => 'Sociology', 'code' => 'SOCIO', 'units' => 2],
         'ENG' => ['name' => 'English Language', 'code' => 'ENG', 'units' => 2],
         'N/INFO' => ['name' => 'Nursing Informatics', 'code' => 'N/INFO', 'units' => 2],
-        'F/NSG' => ['name' => 'Foundations of Nursing', 'code' => 'F/NSG', 'units' => 3],
+        'F/NSG' => ['name' => 'Foundations of Nursing II', 'code' => 'NUS 121', 'units' => 3],
         'CITIZEN' => ['name' => 'Citizenship Education', 'code' => 'CITIZEN', 'units' => 2],
         'ANAT' => ['name' => 'Anatomy & Physiology', 'code' => 'ANAT', 'units' => 3],
         'CHEM' => ['name' => 'Chemistry', 'code' => 'CHEM', 'units' => 2],
@@ -48,6 +48,16 @@ class ResultImportController extends Controller
         'MICRO' => ['name' => 'Microbiology', 'code' => 'MICRO', 'units' => 2],
         'PHYSC' => ['name' => 'Physics', 'code' => 'PHYSC', 'units' => 2],
         'INSTR' => ['name' => 'Medical Instrumentation', 'code' => 'INSTR', 'units' => 2],
+        // Master Score Sheet (ND 1st Yr 2nd Sem) course codes
+        'PHC' => ['name' => 'Primary Health Care', 'code' => 'PHC 121', 'units' => 2],
+        'D/PSC' => ['name' => 'Developmental Psychology', 'code' => 'DPS 121', 'units' => 2],
+        'H/ANA' => ['name' => 'Human Anatomy II', 'code' => 'ANA 121', 'units' => 3],
+        'H/PHS' => ['name' => 'Human Physiology II', 'code' => 'NUS 122', 'units' => 2],
+        'NUTR' => ['name' => 'Nutrition & Dietetics', 'code' => 'NUT 121', 'units' => 2],
+        'IPC' => ['name' => 'Interpersonal Communication & IPC', 'code' => 'IPC 121', 'units' => 2],
+        'ENTR' => ['name' => 'Entrepreneurship Education', 'code' => 'EED 126', 'units' => 2],
+        'PHM' => ['name' => 'Pharmacology in Nursing', 'code' => 'PHM 121', 'units' => 2],
+        'OSCE' => ['name' => 'Objective Structured Clinical Examination (OSCE)', 'code' => 'OSCE 121', 'units' => 3],
     ];
 
     /**
@@ -134,12 +144,14 @@ class ResultImportController extends Controller
                 }
             }
 
+            $explicitMode = $request->input('import_mode');
             $regCol = null;
             $caCol = null;
             $objCol = null;
             $essayCol = null;
             $examCol = null;
             $totalCol = null;
+            $remarkCol = null;
             $broadsheetCourseCols = [];
 
             for ($c = 1; $c <= $highestColIndex; $c++) {
@@ -148,16 +160,34 @@ class ResultImportController extends Controller
                 $upperVal = strtoupper($rawVal);
 
                 if (preg_match('/reg(istration)?\s*(no|num|number)?|matric/i', $rawVal)) $regCol = $c;
+                elseif (preg_match('/(candidate(\'s)?\s*)?name/i', $rawVal)) continue;
                 elseif ($upperVal === 'CA' || preg_match('/^C\.?A\.?$/', $upperVal) || preg_match('/continuous\s*assess/i', $rawVal)) $caCol = $c;
                 elseif ($upperVal === 'OBJ' || preg_match('/objective/i', $rawVal)) $objCol = $c;
                 elseif ($upperVal === 'ESSAY' || preg_match('/theory/i', $rawVal)) $essayCol = $c;
                 elseif (preg_match('/^(exam|examination)$/i', $rawVal)) $examCol = $c;
-                elseif (preg_match('/^(total|total\s*score|final\s*score|sum)$/i', $rawVal)) $totalCol = $c;
-                elseif (preg_match('/^(s\/?n|no\.?|codes?|name|candidate|sex|gender|remarks?|gpa|cgpa|pos|position|comment)$/i', $rawVal)) continue;
+                elseif (preg_match('/^(total|total\s*score|final\s*score|sum)$/i', $rawVal)) {
+                    $sample = $sheet->getCellByColumnAndRow($c, $headerRow + 1)->getValue();
+                    if (is_string($sample) && preg_match('/^(pass|resit|reseat|withdraw|fail)/i', trim($sample))) {
+                        $remarkCol = $c;
+                    } else {
+                        $totalCol = $c;
+                    }
+                }
+                elseif (preg_match('/^(s\/?n|no\.?|codes?|sex|gender|remarks?|gpa|cgpa|pos|position|comment)$/i', $rawVal)) continue;
                 else $broadsheetCourseCols[$c] = $rawVal;
             }
 
-            $isSingle = ($caCol !== null || $totalCol !== null || $examCol !== null || $objCol !== null || $essayCol !== null);
+            if ($explicitMode === 'master') {
+                $isSingle = false;
+            } elseif ($explicitMode === 'individual') {
+                $isSingle = true;
+            } else {
+                if (count($broadsheetCourseCols) >= 2) {
+                    $isSingle = false;
+                } else {
+                    $isSingle = ($caCol !== null || $totalCol !== null || $examCol !== null || $objCol !== null || $essayCol !== null);
+                }
+            }
 
             $courses = [];
             if ($isSingle) {
@@ -209,7 +239,7 @@ class ResultImportController extends Controller
             if ($regCol && $headerRow) {
                 for ($r = $headerRow + 1; $r <= $highestRow; $r++) {
                     $val = trim((string)$sheet->getCellByColumnAndRow($regCol, $r)->getValue());
-                    if (!empty($val) && preg_match('/[a-z0-9]/i', $val) && !preg_match('/^(signed|management|statistics|no\.\s*of|total)/i', $val) && !preg_match('/^[0-9]+$/', $val)) {
+                    if (!empty($val) && preg_match('/[a-z0-9]/i', $val) && !preg_match('/^(signed|management|statistics|no\.\s*of|total)/i', $val) && !preg_match('/^[0-9]+$/', $val) && str_contains($val, '/')) {
                         $studentCount++;
                     }
                 }
@@ -238,6 +268,7 @@ class ResultImportController extends Controller
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv|max:30720',
             'upload_type' => 'required|in:full,ca,exam',
+            'import_mode' => 'nullable|in:individual,master,auto',
             'course_id' => 'nullable|exists:courses,id',
             'course_name' => 'nullable|string|max:255',
             'course_code' => 'nullable|string|max:50',
@@ -367,7 +398,12 @@ class ResultImportController extends Controller
                 } elseif (preg_match('/^(exam|examination)$/i', $rawVal)) {
                     $examCol = $c;
                 } elseif (preg_match('/^(total|total\s*score|final\s*score|sum)$/i', $rawVal)) {
-                    $totalCol = $c;
+                    $sample = $sheet->getCellByColumnAndRow($c, $headerRow + 1)->getValue();
+                    if (is_string($sample) && preg_match('/^(pass|resit|reseat|withdraw|fail)/i', trim($sample))) {
+                        $remarkCol = $c;
+                    } else {
+                        $totalCol = $c;
+                    }
                 } elseif (preg_match('/^(s\/?n|no\.?|codes?|gpa|cgpa|pos|position|comment)$/i', $rawVal)) {
                     continue;
                 } else {
@@ -379,7 +415,18 @@ class ResultImportController extends Controller
                 return back()->with('error', 'Registration number column could not be detected in row ' . $headerRow . '.');
             }
 
-            $isSingleCourseSheet = ($caCol !== null || $totalCol !== null || $examCol !== null || $objCol !== null || $essayCol !== null || $request->filled('course_id'));
+            $explicitMode = $request->input('import_mode');
+            if ($explicitMode === 'master') {
+                $isSingleCourseSheet = false;
+            } elseif ($explicitMode === 'individual') {
+                $isSingleCourseSheet = true;
+            } else {
+                if (count($broadsheetCourseCols) >= 2 && !$request->filled('course_id')) {
+                    $isSingleCourseSheet = false;
+                } else {
+                    $isSingleCourseSheet = ($caCol !== null || $totalCol !== null || $examCol !== null || $objCol !== null || $essayCol !== null || $request->filled('course_id'));
+                }
+            }
             $semesterType = stripos($semester->name, 'second') !== false ? 'second' : 'first';
 
             // =========================================================================
@@ -687,7 +734,7 @@ class ResultImportController extends Controller
 
                 if (empty($regNo)) continue;
                 if (preg_match('/^(signed|management|statistics|no\.\s*of|total|passed|withdrawn|resit|absent)/i', $regNo)) continue;
-                if (preg_match('/^[0-9]+$/', $regNo)) continue;
+                if (preg_match('/^[0-9]+$/', $regNo) || !str_contains($regNo, '/')) continue;
 
                 $name = $nameCol ? trim((string)$sheet->getCellByColumnAndRow($nameCol, $r)->getValue()) : '';
                 if (preg_match('/^(statistics|no\.\s*of|total|signed|management)/i', $name)) continue;
@@ -791,12 +838,17 @@ class ResultImportController extends Controller
                         if ($grade->exam_score !== null && $grade->ca_score !== null) {
                             $grade->total_score = round($grade->ca_score + $grade->exam_score, 2);
                         }
-                    } else { // 'exam' or 'full'
+                    } elseif ($uploadType === 'exam') {
                         $grade->exam_score = $score !== null ? min(80, max(0, $score)) : null;
                         if ($grade->ca_score !== null && $grade->exam_score !== null) {
                             $grade->total_score = round($grade->ca_score + $grade->exam_score, 2);
                         } else {
-                            $grade->total_score = $score;
+                            $grade->total_score = $grade->exam_score;
+                        }
+                    } else { // 'full' (composite 0-100 course score from master score sheet)
+                        $grade->total_score = $score !== null ? min(100, max(0, $score)) : null;
+                        if ($grade->exam_score === null && $grade->total_score !== null) {
+                            $grade->exam_score = min(80, $grade->total_score);
                         }
                     }
 
@@ -832,9 +884,9 @@ class ResultImportController extends Controller
             DB::commit();
 
             $totalProcessed = $newStudentsCount + $existingStudentsCount;
-            return redirect()->route('exam_officer.results.index', [
+            return redirect()->route('exam_officer.results.broadsheet', [
                 'semester_id' => $semester->id,
-            ])->with('success', "Broadsheet results imported successfully! {$totalProcessed} students processed across " . count($courseMap) . " courses. Results are BLOCKED from student view until the Provost officially releases results for this department and semester.");
+            ])->with('success', "Master Broadsheet results imported successfully! {$totalProcessed} students processed across " . count($courseMap) . " courses ({$totalGradesRecorded} course grades recorded). Results are BLOCKED from student view until the Provost officially releases results for this department and semester.");
 
         } catch (\Exception $e) {
             DB::rollBack();
