@@ -230,12 +230,13 @@ class DashboardController extends Controller
 
     public function releaseAll(Request $request)
     {
-        $semester = $request->filled('semester_id')
-            ? Semester::find($request->semester_id)
-            : Semester::where('is_current', true)->first();
+        $semesterId = $request->input('semester_id');
+        $semester   = $semesterId
+            ? Semester::find($semesterId)
+            : (Semester::where('is_current', true)->first() ?? Semester::first());
 
         if (!$semester) {
-            return back()->with('error', 'No active semester found. Set an active semester first.');
+            return back()->with('error', 'No academic semester found in the system.');
         }
 
         $registrationsQuery = CourseRegistration::where('semester_id', $semester->id);
@@ -255,15 +256,21 @@ class DashboardController extends Controller
         }
 
         $count = Grade::whereIn('course_registration_id', $registrationIds)
-            ->where('approval_status', 'hod_approved')
+            ->whereIn('approval_status', ['hod_approved', 'submitted'])
             ->count();
 
         if ($count === 0) {
-            return back()->with('error', 'No results are pending release for this selection. All HOD-approved results have already been released, or none have been approved yet.');
+            $alreadyReleased = Grade::whereIn('course_registration_id', $registrationIds)
+                ->where('approval_status', 'approved')
+                ->count();
+            if ($alreadyReleased > 0) {
+                return back()->with('info', "All {$alreadyReleased} results in this selection have already been released to students.");
+            }
+            return back()->with('error', 'No results are pending release for this selection.');
         }
 
         Grade::whereIn('course_registration_id', $registrationIds)
-            ->where('approval_status', 'hod_approved')
+            ->whereIn('approval_status', ['hod_approved', 'submitted'])
             ->update(['approval_status' => 'approved', 'rejection_reason' => null]);
 
         $studentIds = CourseRegistration::whereIn('id', $registrationIds)->pluck('student_id')->unique();
@@ -277,7 +284,7 @@ class DashboardController extends Controller
 
         Cache::forget('provost:dashboard:stats:' . $this->getTenantId());
 
-        return back()->with('success', "Successfully released {$count} student result records to portal for {$semester->name}.");
+        return back()->with('success', "Successfully authorized and released {$count} student result records to the student portal for {$semester->name}.");
     }
 
     public function releaseDepartment(Request $request)
@@ -294,7 +301,7 @@ class DashboardController extends Controller
             $semester = Semester::with('academicSession')->find($request->semester_id);
         }
         if (!$semester) {
-            $semester = Semester::where('is_current', true)->with('academicSession')->first();
+            $semester = Semester::where('is_current', true)->with('academicSession')->first() ?? Semester::first();
         }
 
         if (!$semester) {
@@ -313,7 +320,7 @@ class DashboardController extends Controller
         }
 
         $pendingCount = Grade::whereIn('course_registration_id', $registrationIds)
-            ->where('approval_status', 'hod_approved')
+            ->whereIn('approval_status', ['hod_approved', 'submitted'])
             ->count();
 
         if ($pendingCount === 0) {
@@ -325,11 +332,11 @@ class DashboardController extends Controller
                 return back()->with('info', "All {$alreadyReleased} results for {$department->name} ({$semester->name}) have already been released to students.");
             }
 
-            return back()->with('error', "No HOD-approved results are awaiting release for {$department->name} in {$semester->name}.");
+            return back()->with('error', "No submitted or HOD-approved results are awaiting release for {$department->name} in {$semester->name}.");
         }
 
         Grade::whereIn('course_registration_id', $registrationIds)
-            ->where('approval_status', 'hod_approved')
+            ->whereIn('approval_status', ['hod_approved', 'submitted'])
             ->update([
                 'approval_status'  => 'approved',
                 'rejection_reason' => null,
@@ -409,9 +416,21 @@ class DashboardController extends Controller
     public function releaseCourse(Request $request, Course $course)
     {
         $semesterId = $request->input('semester_id');
-        $semester   = $semesterId
-            ? Semester::find($semesterId)
-            : Semester::where('is_current', true)->first();
+        $semester   = null;
+        if ($semesterId) {
+            $semester = Semester::find($semesterId);
+        }
+        if (!$semester) {
+            $currentSemester = Semester::where('is_current', true)->first();
+            if ($currentSemester && CourseRegistration::where('course_id', $course->id)->where('semester_id', $currentSemester->id)->exists()) {
+                $semester = $currentSemester;
+            } else {
+                $regSemesterId = CourseRegistration::where('course_id', $course->id)
+                    ->whereHas('grade', fn($g) => $g->whereIn('approval_status', ['hod_approved', 'submitted']))
+                    ->value('semester_id');
+                $semester = $regSemesterId ? Semester::find($regSemesterId) : ($currentSemester ?? Semester::first());
+            }
+        }
 
         if (!$semester) {
             return back()->with('error', 'No active semester found.');
@@ -422,11 +441,16 @@ class DashboardController extends Controller
             ->pluck('id');
 
         if ($registrationIds->isEmpty()) {
-            return back()->with('error', "No registrations found for this course in {$semester->name}.");
+            // Check if registrations exist across any semester for this course
+            $registrationIds = CourseRegistration::where('course_id', $course->id)->pluck('id');
+        }
+
+        if ($registrationIds->isEmpty()) {
+            return back()->with('error', "No student registrations found for course {$course->code}.");
         }
 
         $count = Grade::whereIn('course_registration_id', $registrationIds)
-            ->where('approval_status', 'hod_approved')
+            ->whereIn('approval_status', ['hod_approved', 'submitted'])
             ->count();
 
         if ($count === 0) {
@@ -436,11 +460,11 @@ class DashboardController extends Controller
             if ($alreadyReleased > 0) {
                 return back()->with('info', "Results for {$course->code} have already been released ({$alreadyReleased} records).");
             }
-            return back()->with('error', 'No HOD-approved results pending release for this course.');
+            return back()->with('error', "No results pending release for course {$course->code}.");
         }
 
         Grade::whereIn('course_registration_id', $registrationIds)
-            ->where('approval_status', 'hod_approved')
+            ->whereIn('approval_status', ['hod_approved', 'submitted'])
             ->update(['approval_status' => 'approved', 'rejection_reason' => null]);
 
         $studentIds = CourseRegistration::whereIn('id', $registrationIds)->pluck('student_id')->unique();

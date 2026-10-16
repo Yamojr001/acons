@@ -1,4 +1,4 @@
-import { Head, useForm, router } from '@inertiajs/react'
+import { Head, router } from '@inertiajs/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckCircle, AlertCircle, X, Search,
@@ -97,30 +97,10 @@ export default function ProvostResults({
   const [isRejectOpen, setIsRejectOpen] = useState(false)
   const [isBlockDepartmentOpen, setIsBlockDepartmentOpen] = useState(false)
 
-  const releaseAllForm = useForm({
-    semester_id: selected_semester_id ?? current_semester?.id,
-    department_id: selected_department_id,
-  })
-
-  const releaseDeptForm = useForm({
-    department_id: selected_department_id || (departments[0]?.id ?? null),
-    semester_id: selected_semester_id ?? current_semester?.id,
-  })
-
-  const blockDeptForm = useForm({
-    department_id: selected_department_id || (departments[0]?.id ?? null),
-    semester_id: selected_semester_id ?? current_semester?.id,
-    reason: '',
-  })
-
-  const releaseCourseForm = useForm({
-    semester_id: selected_semester_id ?? current_semester?.id,
-  })
-
-  const rejectForm = useForm({
-    reason: '',
-    semester_id: selected_semester_id ?? current_semester?.id,
-  })
+  const [processingAction, setProcessingAction] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejectError, setRejectError] = useState<string | null>(null)
+  const [blockReason, setBlockReason] = useState('')
 
   const pendingCount = summary?.pending_grades_count ?? courses.reduce((sum, c) => sum + c.counts.hod_approved, 0)
   const releasedCount = summary?.released_grades_count ?? courses.reduce((sum, c) => sum + c.counts.approved, 0)
@@ -155,11 +135,13 @@ export default function ProvostResults({
       return
     }
 
-    releaseDeptForm.transform(() => ({
+    setProcessingAction(`dept-${targetDeptId}`)
+    router.post('/provost/results/release-department', {
       department_id: targetDeptId,
       semester_id: selected_semester_id ?? current_semester?.id,
-    })).post('/provost/results/release-department', {
+    }, {
       preserveScroll: true,
+      onFinish: () => setProcessingAction(null),
     })
   }
 
@@ -168,50 +150,71 @@ export default function ProvostResults({
     const targetDeptId = selected_department_id || departments[0]?.id
     if (!targetDeptId) return
 
-    blockDeptForm.transform((data) => ({
-      ...data,
+    setProcessingAction('block-dept')
+    router.post('/provost/results/block-department', {
       department_id: targetDeptId,
       semester_id: selected_semester_id ?? current_semester?.id,
-    })).post('/provost/results/block-department', {
+      reason: blockReason,
+    }, {
       preserveScroll: true,
       onSuccess: () => {
         setIsBlockDepartmentOpen(false)
-        blockDeptForm.reset()
-      }
+        setBlockReason('')
+      },
+      onFinish: () => setProcessingAction(null),
     })
   }
 
   const handleReleaseAll = () => {
-    if (!confirm(`Release ALL ${pendingCount} pending result records to students for ${current_semester?.name || 'the current semester'}?\n\nGrades will become immediately visible to students.`)) return
-    releaseAllForm.transform(() => ({
+    const semName = current_semester?.name || 'the current semester'
+    if (!confirm(`Release ALL ${pendingCount} pending result records to students for ${semName}?\n\nGrades will become immediately visible on student result portals.`)) return
+
+    setProcessingAction('all')
+    router.post('/provost/results/release-all', {
       semester_id: selected_semester_id ?? current_semester?.id,
-      department_id: selected_department_id,
-    })).post('/provost/results/release-all', { preserveScroll: true })
+      department_id: selected_department_id || undefined,
+    }, {
+      preserveScroll: true,
+      onFinish: () => setProcessingAction(null),
+    })
   }
 
   const handleReleaseCourse = (course: CourseResult) => {
-    if (!confirm(`Release results for ${course.code} — ${course.title} to students?\n\n${course.counts.hod_approved} grade records will be published immediately.`)) return
-    releaseCourseForm.transform(() => ({
+    const title = course.title || course.name || course.code
+    const count = course.counts.hod_approved > 0 ? course.counts.hod_approved : course.counts.total
+    if (!confirm(`Release results for ${course.code} — ${title} to students?\n\n${count} grade record(s) will be published immediately to student portals.`)) return
+
+    setProcessingAction(`course-${course.id}`)
+    router.post(`/provost/results/${course.id}/release`, {
       semester_id: selected_semester_id ?? current_semester?.id,
-    })).post(`/provost/results/${course.id}/release`, {
+    }, {
       preserveScroll: true,
-      onSuccess: () => setSelectedCourse(null)
+      onSuccess: () => setSelectedCourse(null),
+      onFinish: () => setProcessingAction(null),
     })
   }
 
   const handleRejectSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedCourse) return
-    rejectForm.transform((data) => ({
-      ...data,
+    if (!rejectReason.trim()) {
+      setRejectError('Please enter a rejection reason.')
+      return
+    }
+
+    setProcessingAction(`reject-${selectedCourse.id}`)
+    router.post(`/provost/results/${selectedCourse.id}/reject`, {
+      reason: rejectReason,
       semester_id: selected_semester_id ?? current_semester?.id,
-    })).post(`/provost/results/${selectedCourse.id}/reject`, {
+    }, {
       preserveScroll: true,
       onSuccess: () => {
         setIsRejectOpen(false)
         setSelectedCourse(null)
-        rejectForm.reset()
-      }
+        setRejectReason('')
+        setRejectError(null)
+      },
+      onFinish: () => setProcessingAction(null),
     })
   }
 
@@ -252,33 +255,42 @@ export default function ProvostResults({
 
         {/* Global / Department Release Actions */}
         <div className="flex flex-wrap items-center gap-2">
-          {activeDepartment ? (
+          {activeDepartment && (
             <Button
               variant="primary"
               className="bg-emerald-600 hover:bg-emerald-700 text-white border-none text-xs font-semibold py-2 h-9 px-3.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all"
               onClick={() => handleReleaseDepartment(activeDepartment.id)}
-              disabled={releaseDeptForm.processing || pendingCount === 0}
+              disabled={processingAction !== null || pendingCount === 0}
             >
               <Unlock size={14} />
-              {releaseDeptForm.processing ? 'Authorizing Release...' : `Release ${activeDepartment.code || 'Dept'} Results (${pendingCount})`}
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white border-none text-xs font-semibold py-2 h-9 px-3.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all"
-              onClick={handleReleaseAll}
-              disabled={releaseAllForm.processing || pendingCount === 0}
-            >
-              <Unlock size={14} />
-              {releaseAllForm.processing ? 'Releasing All...' : `Release All Pending (${pendingCount})`}
+              {processingAction === `dept-${activeDepartment.id}`
+                ? 'Authorizing Release...'
+                : `Release ${activeDepartment.code || 'Dept'} Results (${pendingCount})`}
             </Button>
           )}
+
+          <Button
+            variant={activeDepartment ? 'outline' : 'primary'}
+            className={`${
+              activeDepartment
+                ? 'border-emerald-600 text-emerald-700 hover:bg-emerald-50'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white border-none'
+            } text-xs font-semibold py-2 h-9 px-3.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all`}
+            onClick={handleReleaseAll}
+            disabled={processingAction !== null || pendingCount === 0}
+          >
+            <Unlock size={14} />
+            {processingAction === 'all'
+              ? 'Releasing All...'
+              : `Release All Pending (${pendingCount})`}
+          </Button>
 
           {releasedCount > 0 && activeDepartment && (
             <Button
               variant="outline"
               className="border-surface-300 text-surface-700 hover:bg-surface-50 text-xs font-semibold py-2 h-9 px-3 rounded-lg flex items-center gap-1.5"
               onClick={() => setIsBlockDepartmentOpen(true)}
+              disabled={processingAction !== null}
             >
               <Lock size={13} /> Withhold / Block
             </Button>
@@ -353,18 +365,20 @@ export default function ProvostResults({
               Exam records for <strong>{activeDepartment?.name || 'the selected scope'}</strong> in <strong>{current_semester?.name}</strong> are currently locked. Students cannot view their grades or transcripts until you click <strong>"Release {activeDepartment?.code || 'Department'} Results"</strong>.
             </p>
           </div>
-          {activeDepartment && (
-            <Button
-              variant="primary"
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white border-none text-xs font-semibold whitespace-nowrap self-center"
-              onClick={() => handleReleaseDepartment(activeDepartment.id)}
-              disabled={releaseDeptForm.processing}
-            >
-              <Unlock size={13} className="mr-1" />
-              Release Now
-            </Button>
-          )}
+          <Button
+            variant="primary"
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white border-none text-xs font-semibold whitespace-nowrap self-center"
+            onClick={activeDepartment ? () => handleReleaseDepartment(activeDepartment.id) : handleReleaseAll}
+            disabled={processingAction !== null}
+          >
+            <Unlock size={13} className="mr-1" />
+            {processingAction === 'all' || processingAction?.startsWith('dept-')
+              ? 'Releasing...'
+              : activeDepartment
+                ? `Release ${activeDepartment.code || 'Dept'} Now`
+                : 'Release All Now'}
+          </Button>
         </div>
       ) : (
         <div className="mb-6 p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center gap-3 text-emerald-950 text-xs">
@@ -517,15 +531,15 @@ export default function ProvostResults({
                     >
                       <Eye size={13} /> Details
                     </Button>
-                    {course.counts.hod_approved > 0 && (
+                    {(course.counts.hod_approved > 0 || course.counts.submitted > 0) && (
                       <Button
                         variant="primary"
                         size="sm"
                         className="flex-1 text-xs py-1.5 h-8 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-700 border-none flex items-center justify-center gap-1"
                         onClick={() => handleReleaseCourse(course)}
-                        disabled={releaseCourseForm.processing}
+                        disabled={processingAction !== null}
                       >
-                        <Unlock size={13} /> Release
+                        <Unlock size={13} /> {processingAction === `course-${course.id}` ? 'Releasing...' : 'Release'}
                       </Button>
                     )}
                   </div>
@@ -598,24 +612,24 @@ export default function ProvostResults({
                 </div>
 
                 {/* Course Actions */}
-                {selectedCourse.counts.hod_approved > 0 && !isRejectOpen && (
+                {(selectedCourse.counts.hod_approved > 0 || selectedCourse.counts.submitted > 0) && !isRejectOpen && (
                   <div className="space-y-3 pt-2">
                     <p className="text-xs font-semibold text-surface-500 uppercase tracking-wider">Provost Authority Action</p>
 
                     <div className="p-3.5 bg-emerald-50/60 border border-emerald-200 rounded-xl">
                       <p className="text-xs font-bold text-emerald-900">Authorize Release to Students</p>
                       <p className="text-xs text-emerald-700 mt-0.5">
-                        Immediately make {selectedCourse.counts.hod_approved} student results accessible on student result slips.
+                        Immediately make {selectedCourse.counts.hod_approved || selectedCourse.counts.total} student results accessible on student result slips.
                       </p>
                       <Button
                         variant="primary"
                         size="sm"
                         className="mt-2.5 bg-emerald-600 hover:bg-emerald-700 border-none text-xs font-semibold"
                         onClick={() => handleReleaseCourse(selectedCourse)}
-                        disabled={releaseCourseForm.processing}
+                        disabled={processingAction !== null}
                       >
                         <Unlock size={13} className="mr-1.5" />
-                        {releaseCourseForm.processing ? 'Releasing...' : 'Confirm Release to Students'}
+                        {processingAction === `course-${selectedCourse.id}` ? 'Releasing...' : 'Confirm Release to Students'}
                       </Button>
                     </div>
 
@@ -629,6 +643,7 @@ export default function ProvostResults({
                         size="sm"
                         className="mt-2.5 border-danger-300 text-danger-700 hover:bg-danger-50 text-xs font-semibold"
                         onClick={() => setIsRejectOpen(true)}
+                        disabled={processingAction !== null}
                       >
                         Reject & Request Revision
                       </Button>
@@ -649,9 +664,12 @@ export default function ProvostResults({
                       label="Explain reason for returning grades"
                       required
                       placeholder="Specify the reason (e.g., incorrect CA computation, missing test scores, data entry error)..."
-                      value={rejectForm.data.reason}
-                      onChange={(val) => rejectForm.setData('reason', val)}
-                      error={rejectForm.errors.reason}
+                      value={rejectReason}
+                      onChange={(val) => {
+                        setRejectReason(val)
+                        if (rejectError) setRejectError(null)
+                      }}
+                      error={rejectError || undefined}
                     />
                     <div className="flex gap-2">
                       <Button
@@ -659,9 +677,9 @@ export default function ProvostResults({
                         variant="primary"
                         size="sm"
                         className="flex-1 bg-danger-600 hover:bg-danger-700 border-none text-xs font-semibold"
-                        disabled={rejectForm.processing || !rejectForm.data.reason.trim()}
+                        disabled={processingAction !== null || !rejectReason.trim()}
                       >
-                        {rejectForm.processing ? 'Submitting...' : 'Confirm Rejection'}
+                        {processingAction?.startsWith('reject-') ? 'Submitting...' : 'Confirm Rejection'}
                       </Button>
                       <Button type="button" variant="outline" size="sm" onClick={() => setIsRejectOpen(false)} className="text-xs">
                         Cancel
@@ -710,8 +728,8 @@ export default function ProvostResults({
                 <TextareaField
                   label="Administrative Reason (Optional)"
                   placeholder="e.g., Audit in progress, pending senate clearance..."
-                  value={blockDeptForm.data.reason}
-                  onChange={(val) => blockDeptForm.setData('reason', val)}
+                  value={blockReason}
+                  onChange={(val) => setBlockReason(val)}
                 />
 
                 <div className="flex gap-2 justify-end pt-2">
@@ -723,9 +741,9 @@ export default function ProvostResults({
                     variant="primary"
                     size="sm"
                     className="bg-danger-600 hover:bg-danger-700 border-none text-xs font-semibold"
-                    disabled={blockDeptForm.processing}
+                    disabled={processingAction === 'block-dept'}
                   >
-                    {blockDeptForm.processing ? 'Withholding...' : 'Confirm Withhold'}
+                    {processingAction === 'block-dept' ? 'Withholding...' : 'Confirm Withhold'}
                   </Button>
                 </div>
               </form>
