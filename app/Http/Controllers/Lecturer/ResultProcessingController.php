@@ -114,10 +114,10 @@ class ResultProcessingController extends Controller
                 );
 
                 if ($isBasicNursing) {
-                    $gradeLetter = $total >= 50 ? 'PASS' : 'FAIL';
+                    $gradeLetter = $total >= 45 ? 'PASS' : 'FAIL';
                     $gradePoints = null; // No CGPA
                 } else {
-                    // ND/HND: A B C D E F and CGPA
+                    // ND/HND: A B C D F and CGPA (Pass mark 45)
                     if ($total >= 70) {
                         $gradeLetter = 'A';
                         $gradePoints = 4.00;
@@ -130,9 +130,6 @@ class ResultProcessingController extends Controller
                     } elseif ($total >= 45) {
                         $gradeLetter = 'D';
                         $gradePoints = 1.00;
-                    } elseif ($total >= 40) {
-                        $gradeLetter = 'E';
-                        $gradePoints = 0.50;
                     } else {
                         $gradeLetter = 'F';
                         $gradePoints = 0.00;
@@ -188,11 +185,10 @@ class ResultProcessingController extends Controller
 
     private function calculateGrade($score)
     {
-        if ($score >= 70) return ['A', 5.0];
-        if ($score >= 60) return ['B', 4.0];
-        if ($score >= 50) return ['C', 3.0];
-        if ($score >= 45) return ['D', 2.0];
-        if ($score >= 40) return ['E', 1.0];
+        if ($score >= 70) return ['A', 4.0];
+        if ($score >= 60) return ['B', 3.0];
+        if ($score >= 50) return ['C', 2.0];
+        if ($score >= 45) return ['D', 1.0];
         return ['F', 0.0];
     }
 }

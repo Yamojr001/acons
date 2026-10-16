@@ -25,7 +25,6 @@ class ResultProcessingController extends Controller
             if ($totalScore >= 60) return ['letter' => 'B', 'points' => 4.0];
             if ($totalScore >= 50) return ['letter' => 'C', 'points' => 3.0];
             if ($totalScore >= 45) return ['letter' => 'D', 'points' => 2.0];
-            if ($totalScore >= 40) return ['letter' => 'E', 'points' => 1.0];
             return ['letter' => 'F', 'points' => 0.0];
         }
 
@@ -35,6 +34,7 @@ class ResultProcessingController extends Controller
         if ($totalScore >= 60) return ['letter' => 'B', 'points' => 3.0];
         if ($totalScore >= 55) return ['letter' => 'BC', 'points' => 2.5];
         if ($totalScore >= 50) return ['letter' => 'C', 'points' => 2.0];
+        if ($totalScore >= 45) return ['letter' => 'D', 'points' => 1.0];
         return ['letter' => 'F', 'points' => 0.0];
     }
 

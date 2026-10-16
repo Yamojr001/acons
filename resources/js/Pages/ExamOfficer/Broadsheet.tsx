@@ -433,7 +433,7 @@ export default function MasterBroadsheet({
                             )
                           }
 
-                          const isFail = s.grade === 'F' || s.is_absent || (s.total !== null && s.total < 50)
+                          const isFail = s.grade === 'F' || s.is_absent || (s.total !== null && s.total < 45)
                           const totalDisplay = s.is_absent ? 'ABS' : s.total !== null ? s.total : '—'
 
                           return (

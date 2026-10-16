@@ -646,7 +646,6 @@ class ResultImportController extends Controller
                         elseif ($total >= 60) $grade->grade_letter = 'B';
                         elseif ($total >= 50) $grade->grade_letter = 'C';
                         elseif ($total >= 45) $grade->grade_letter = 'D';
-                        elseif ($total >= 40) $grade->grade_letter = 'E';
                         else $grade->grade_letter = 'F';
 
                         $grade->grade_points = match ($grade->grade_letter) {
@@ -654,7 +653,6 @@ class ResultImportController extends Controller
                             'B' => 3.00,
                             'C' => 2.00,
                             'D' => 1.00,
-                            'E' => 0.50,
                             default => 0.00,
                         };
                     }
@@ -860,7 +858,6 @@ class ResultImportController extends Controller
                         elseif ($total >= 60) $grade->grade_letter = 'B';
                         elseif ($total >= 50) $grade->grade_letter = 'C';
                         elseif ($total >= 45) $grade->grade_letter = 'D';
-                        elseif ($total >= 40) $grade->grade_letter = 'E';
                         else $grade->grade_letter = 'F';
 
                         $grade->grade_points = match ($grade->grade_letter) {
@@ -868,7 +865,6 @@ class ResultImportController extends Controller
                             'B' => 3.00,
                             'C' => 2.00,
                             'D' => 1.00,
-                            'E' => 0.50,
                             default => 0.00,
                         };
                     }
@@ -1044,7 +1040,7 @@ class ResultImportController extends Controller
                     $totalUnits  += $units;
                     $totalPoints += ((float)$grade->grade_points * $units);
 
-                    if ($grade->grade_letter === 'F' || $grade->is_absent || $score < 50) {
+                    if ($grade->grade_letter === 'F' || $grade->is_absent || $score < 45) {
                         $failedCount++;
                     } else {
                         $passedCount++;
@@ -1202,7 +1198,7 @@ class ResultImportController extends Controller
                         $totalUnits  += $units;
                         $totalPoints += ((float)$grade->grade_points * $units);
 
-                        if ($grade->grade_letter === 'F' || $grade->is_absent || $tot < 50) {
+                        if ($grade->grade_letter === 'F' || $grade->is_absent || $tot < 45) {
                             $failedCount++;
                         }
 

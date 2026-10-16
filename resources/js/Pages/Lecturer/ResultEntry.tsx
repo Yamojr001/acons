@@ -88,7 +88,6 @@ export default function ResultEntry({ courses, students, selectedCourseId, selec
     if (score >= 60) return 'B'
     if (score >= 50) return 'C'
     if (score >= 45) return 'D'
-    if (score >= 40) return 'E'
     return 'F'
   }
 

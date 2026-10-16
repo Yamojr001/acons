@@ -87,16 +87,13 @@ class Student extends Model
             stripos($this->current_level, 'Basic') !== false
         );
 
-        $failedRegistrations = $gradedRegistrations->filter(function ($reg) use ($isBasicNursing) {
+        $failedRegistrations = $gradedRegistrations->filter(function ($reg) {
             $grade = $reg->grade;
+            if (!$grade) return false;
             if ($grade->is_absent) {
                 return true;
             }
-            if ($isBasicNursing) {
-                return $grade->grade_letter === 'FAIL' || $grade->total_score < 50;
-            } else {
-                return $grade->grade_letter === 'F' || $grade->total_score < 40;
-            }
+            return $grade->grade_letter === 'FAIL' || $grade->grade_letter === 'F' || $grade->total_score < 45;
         });
 
         $failedCount = $failedRegistrations->count();

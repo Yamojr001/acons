@@ -838,9 +838,9 @@ export default function ImportResults({
                 <span className="font-medium text-surface-800">Total Course Composite</span>
                 <span className="font-mono font-bold text-surface-900">100 Marks</span>
               </div>
-              <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50/70 border border-amber-200 text-amber-900">
-                <span className="font-medium">Nursing Minimum Pass Mark</span>
-                <span className="font-mono font-bold">50% (Grade C)</span>
+              <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50/70 border border-emerald-200 text-emerald-900">
+                <span className="font-medium">General Minimum Pass Mark</span>
+                <span className="font-mono font-bold">45% (Grade D)</span>
               </div>
             </div>
           </Card>

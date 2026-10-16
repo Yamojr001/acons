@@ -84,7 +84,6 @@ export default function LecturerGradesIndex({ course, registrations, gradingScal
       if (total >= 60) return 'B'
       if (total >= 50) return 'C'
       if (total >= 45) return 'D'
-      if (total >= 40) return 'E'
       return 'F'
     } else {
       if (total >= 75) return 'A'
@@ -92,6 +91,7 @@ export default function LecturerGradesIndex({ course, registrations, gradingScal
       if (total >= 60) return 'B'
       if (total >= 55) return 'BC'
       if (total >= 50) return 'C'
+      if (total >= 45) return 'D'
       return 'F'
     }
   }
