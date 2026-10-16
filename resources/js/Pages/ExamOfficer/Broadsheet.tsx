@@ -1,8 +1,8 @@
+import React, { useState } from 'react'
 import { Head, Link, router } from '@inertiajs/react'
-import { useState } from 'react'
 import {
   FileText, Download, Printer, Search, UploadCloud,
-  CheckCircle, AlertCircle, Award, LayoutList, Grid, ArrowLeft
+  CheckCircle, AlertCircle, Award, LayoutList, Grid, ArrowLeft, Layers
 } from 'lucide-react'
 import AppLayout from '@/Layouts/AppLayout'
 import { Card, Badge, Button, EmptyState } from '@/Components/UI'
@@ -63,6 +63,7 @@ interface Props extends PageProps {
   }>
   courses: CourseItem[]
   students: StudentRow[]
+  has_breakdown?: boolean
   filters: {
     semester_id: number
     department_id: number | null
@@ -83,12 +84,22 @@ export default function MasterBroadsheet({
   departments = [],
   courses = [],
   students = [],
+  has_breakdown = false,
   filters,
   stats,
   auth
 }: Props) {
   const [searchTerm, setSearchTerm] = useState(filters.search || '')
   const tenant = auth?.tenant
+
+  // Check if any student in any course has a distinct CA score
+  const hasAnyCa = Boolean(has_breakdown) || students.some(st => 
+    Object.values(st.scores).some(s => s && s.ca !== null && s.ca !== undefined)
+  )
+
+  // When CA and Exam are merged (or user toggles), show only course totals
+  const [viewMode, setViewMode] = useState<'auto' | 'total' | 'detailed'>('auto')
+  const showDetailed = viewMode === 'detailed' || (viewMode === 'auto' && hasAnyCa)
 
   const handleFilterChange = (params: Partial<typeof filters>) => {
     router.get('/exam-office/broadsheet', {
@@ -130,11 +141,44 @@ export default function MasterBroadsheet({
               Master Broadsheet Preview
             </h1>
             <p className="text-sm text-surface-500 mt-0.5">
-              Single-row student score broadsheet matrix with CA (/20), Examination (/80), and Total (/100) per course.
+              {showDetailed
+                ? 'Single-row student score broadsheet matrix with CA (/20), Examination (/80), and Total (/100) per course.'
+                : 'Single-row student score broadsheet matrix showing course total scores (out of 100).'}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {hasAnyCa ? (
+              <div className="inline-flex rounded-lg border border-surface-200 p-0.5 bg-surface-100">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('total')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                    !showDetailed
+                      ? 'bg-white text-surface-900 shadow-xs'
+                      : 'text-surface-600 hover:text-surface-900'
+                  }`}
+                >
+                  Total Only
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('detailed')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                    showDetailed
+                      ? 'bg-white text-surface-900 shadow-xs'
+                      : 'text-surface-600 hover:text-surface-900'
+                  }`}
+                >
+                  CA / Exam / Total
+                </button>
+              </div>
+            ) : (
+              <span className="px-2.5 py-1 text-xs font-medium rounded-md bg-surface-100 text-surface-700 border border-surface-200 flex items-center gap-1.5">
+                <Layers size={13} className="text-brand-600" /> Course Totals (Merged)
+              </span>
+            )}
+
             <Link href={route('exam_officer.results.index', { semester_id: filters.semester_id })}>
               <Button variant="outline" size="sm" iconLeft={<LayoutList size={14} />}>
                 List View
@@ -302,7 +346,7 @@ export default function MasterBroadsheet({
           <div className="overflow-x-auto max-h-[75vh] print:max-h-none">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                {/* Header Row 1: Course Grouping Headers */}
+                {/* Header Row 1: Course Headers */}
                 <tr className="bg-surface-100 text-surface-800 border-b border-surface-200 font-bold sticky top-0 z-20 print:static">
                   {/* Fixed left headers */}
                   <th className="py-2.5 px-2.5 text-center w-12 sticky left-0 bg-surface-100 z-30 border-r border-surface-200 print:static">
@@ -315,12 +359,12 @@ export default function MasterBroadsheet({
                     Student Name
                   </th>
 
-                  {/* Course Group Headers: span 3 sub-columns (CA, Exam, Total) */}
+                  {/* Course Group Headers: span 3 if detailed breakdown, 1 if merged */}
                   {courses.map(course => (
                     <th
                       key={course.id}
-                      colSpan={3}
-                      className="py-2 px-2 text-center border-r-2 border-surface-200 bg-surface-50 whitespace-nowrap"
+                      colSpan={showDetailed ? 3 : 1}
+                      className="py-2 px-2 text-center border-r border-surface-200 bg-surface-50 whitespace-nowrap min-w-[70px]"
                     >
                       <div className="flex flex-col items-center">
                         <span className="font-mono font-bold text-brand-700 text-[11px]">
@@ -348,46 +392,48 @@ export default function MasterBroadsheet({
                   </th>
                 </tr>
 
-                {/* Header Row 2: Sub-columns (CA, Exam, Total) under each course */}
-                <tr className="bg-surface-50 text-surface-600 border-b-2 border-surface-300 font-semibold text-[10px] uppercase sticky top-[41px] z-20 print:static">
-                  {/* Left spacer columns */}
-                  <th className="py-1 px-1 text-center sticky left-0 bg-surface-50 z-30 border-r border-surface-200 print:static">
-                    —
-                  </th>
-                  <th className="py-1 px-1 text-center sticky left-12 bg-surface-50 z-30 border-r border-surface-200 print:static">
-                    —
-                  </th>
-                  <th className="py-1 px-1 text-center sticky left-48 bg-surface-50 z-30 border-r-2 border-surface-300 print:static">
-                    —
-                  </th>
+                {/* Header Row 2: Sub-columns (CA, Exam, Total) rendered only if detailed breakdown is active */}
+                {showDetailed && (
+                  <tr className="bg-surface-50 text-surface-600 border-b-2 border-surface-300 font-semibold text-[10px] uppercase sticky top-[41px] z-20 print:static">
+                    {/* Left spacer columns */}
+                    <th className="py-1 px-1 text-center sticky left-0 bg-surface-50 z-30 border-r border-surface-200 print:static">
+                      —
+                    </th>
+                    <th className="py-1 px-1 text-center sticky left-12 bg-surface-50 z-30 border-r border-surface-200 print:static">
+                      —
+                    </th>
+                    <th className="py-1 px-1 text-center sticky left-48 bg-surface-50 z-30 border-r-2 border-surface-300 print:static">
+                      —
+                    </th>
 
-                  {/* Sub-column triples for each course */}
-                  {courses.map(course => (
-                    <template key={`sub-${course.id}`}>
-                      <th className="py-1 px-1.5 text-right w-12 border-r border-surface-200 text-surface-500 font-mono">
-                        CA
-                      </th>
-                      <th className="py-1 px-1.5 text-right w-12 border-r border-surface-200 text-surface-500 font-mono">
-                        EX
-                      </th>
-                      <th className="py-1 px-1.5 text-right w-14 border-r-2 border-surface-300 text-surface-900 font-bold font-mono bg-surface-100/50">
-                        TOT
-                      </th>
-                    </template>
-                  ))}
+                    {/* Sub-column triples for each course */}
+                    {courses.map(course => (
+                      <React.Fragment key={`sub-${course.id}`}>
+                        <th className="py-1 px-1.5 text-right w-12 border-r border-surface-200 text-surface-500 font-mono">
+                          CA
+                        </th>
+                        <th className="py-1 px-1.5 text-right w-12 border-r border-surface-200 text-surface-500 font-mono">
+                          EX
+                        </th>
+                        <th className="py-1 px-1.5 text-right w-14 border-r-2 border-surface-300 text-surface-900 font-bold font-mono bg-surface-100/50">
+                          TOT
+                        </th>
+                      </React.Fragment>
+                    ))}
 
-                  {/* Right summary sub-headers */}
-                  <th className="py-1 px-1 text-center border-r border-surface-200 text-[9px]">Marks</th>
-                  <th className="py-1 px-1 text-center border-r border-surface-200 text-[9px]">Load</th>
-                  <th className="py-1 px-1 text-center border-r border-surface-200 text-[9px]">/4.00</th>
-                  <th className="py-1 px-1 text-center text-[9px]">Status</th>
-                </tr>
+                    {/* Right summary sub-headers */}
+                    <th className="py-1 px-1 text-center border-r border-surface-200 text-[9px]">Marks</th>
+                    <th className="py-1 px-1 text-center border-r border-surface-200 text-[9px]">Load</th>
+                    <th className="py-1 px-1 text-center border-r border-surface-200 text-[9px]">/4.00</th>
+                    <th className="py-1 px-1 text-center text-[9px]">Status</th>
+                  </tr>
+                )}
               </thead>
 
               <tbody className="divide-y divide-surface-200 bg-white">
                 {students.length === 0 ? (
                   <tr>
-                    <td colSpan={3 + (courses.length * 3) + 4} className="py-12 text-center text-surface-400">
+                    <td colSpan={3 + (courses.length * (showDetailed ? 3 : 1)) + 4} className="py-12 text-center text-surface-400">
                       No students found matching your search.
                     </td>
                   </tr>
@@ -413,48 +459,69 @@ export default function MasterBroadsheet({
                           {student.name}
                         </td>
 
-                        {/* Course Score Triples (CA, Exam, Total) */}
+                        {/* Course Score Cells */}
                         {courses.map(course => {
                           const s = student.scores[course.id]
 
                           if (!s) {
+                            if (showDetailed) {
+                              return (
+                                <React.Fragment key={`score-${course.id}`}>
+                                  <td className="py-2 px-1.5 text-right font-mono text-surface-300 border-r border-surface-200">
+                                    —
+                                  </td>
+                                  <td className="py-2 px-1.5 text-right font-mono text-surface-300 border-r border-surface-200">
+                                    —
+                                  </td>
+                                  <td className="py-2 px-1.5 text-right font-mono text-surface-300 border-r-2 border-surface-300 bg-surface-50/30">
+                                    —
+                                  </td>
+                                </React.Fragment>
+                              )
+                            }
                             return (
-                              <template key={`score-${course.id}`}>
-                                <td className="py-2 px-1.5 text-right font-mono text-surface-300 border-r border-surface-200">
-                                  —
-                                </td>
-                                <td className="py-2 px-1.5 text-right font-mono text-surface-300 border-r border-surface-200">
-                                  —
-                                </td>
-                                <td className="py-2 px-1.5 text-right font-mono text-surface-300 border-r-2 border-surface-300 bg-surface-50/30">
-                                  —
-                                </td>
-                              </template>
+                              <td key={`score-${course.id}`} className="py-2 px-2 text-center font-mono text-surface-300 border-r border-surface-200 text-xs">
+                                —
+                              </td>
                             )
                           }
 
                           const isFail = s.grade === 'F' || s.is_absent || (s.total !== null && s.total < 45)
                           const totalDisplay = s.is_absent ? 'ABS' : s.total !== null ? s.total : '—'
 
+                          if (showDetailed) {
+                            return (
+                              <React.Fragment key={`score-${course.id}`}>
+                                {/* CA Score */}
+                                <td className="py-2 px-1.5 text-right font-mono text-surface-600 border-r border-surface-200 text-[11px]">
+                                  {s.ca !== null ? s.ca : '—'}
+                                </td>
+
+                                {/* Exam Score */}
+                                <td className="py-2 px-1.5 text-right font-mono text-surface-600 border-r border-surface-200 text-[11px]">
+                                  {s.exam !== null ? s.exam : '—'}
+                                </td>
+
+                                {/* Total Score */}
+                                <td className={`py-2 px-1.5 text-right font-mono font-bold border-r-2 border-surface-300 text-[11px] ${
+                                  isFail ? 'text-danger-600 bg-danger-50/40' : 'text-surface-900 bg-surface-50/50'
+                                }`}>
+                                  {totalDisplay}
+                                </td>
+                              </React.Fragment>
+                            )
+                          }
+
+                          // When CA and Exam are merged: Show only the total of each course
                           return (
-                            <template key={`score-${course.id}`}>
-                              {/* CA Score */}
-                              <td className="py-2 px-1.5 text-right font-mono text-surface-600 border-r border-surface-200 text-[11px]">
-                                {s.ca !== null ? s.ca : '—'}
-                              </td>
-
-                              {/* Exam Score */}
-                              <td className="py-2 px-1.5 text-right font-mono text-surface-600 border-r border-surface-200 text-[11px]">
-                                {s.exam !== null ? s.exam : '—'}
-                              </td>
-
-                              {/* Total Score */}
-                              <td className={`py-2 px-1.5 text-right font-mono font-bold border-r-2 border-surface-300 text-[11px] ${
-                                isFail ? 'text-danger-600 bg-danger-50/40' : 'text-surface-900 bg-surface-50/50'
-                              }`}>
-                                {totalDisplay}
-                              </td>
-                            </template>
+                            <td
+                              key={`score-${course.id}`}
+                              className={`py-2 px-2 text-center font-mono font-bold border-r border-surface-200 text-xs ${
+                                isFail ? 'text-danger-600 bg-danger-50/40' : 'text-surface-900'
+                              }`}
+                            >
+                              {totalDisplay}
+                            </td>
                           )
                         })}
 

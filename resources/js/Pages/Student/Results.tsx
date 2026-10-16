@@ -62,6 +62,9 @@ export default function StudentResults({
   // By default select the most recent session/semester
   const [selectedSession, setSelectedSession] = useState<string>(groups[0]?.session_name || '')
   const currentGroup = groups.find(g => g.session_name === selectedSession) || groups[0]
+  const hasBreakdown = currentGroup?.grades?.some(
+    g => g.ca_score !== null && g.ca_score !== undefined
+  ) ?? false
 
   // Passport Upload Form
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -355,9 +358,13 @@ export default function StudentResults({
                         <th className="py-2 px-2 w-24">Course Code</th>
                         <th className="py-2 px-2">Course Title</th>
                         <th className="py-2 px-2 text-center w-14">Units</th>
-                        <th className="py-2 px-2 text-center w-14">CA (20)</th>
-                        <th className="py-2 px-2 text-center w-16">Exam (80)</th>
-                        <th className="py-2 px-2 text-center w-16">Total (100)</th>
+                        {hasBreakdown && (
+                          <>
+                            <th className="py-2 px-2 text-center w-14">CA (20)</th>
+                            <th className="py-2 px-2 text-center w-16">Exam (80)</th>
+                          </>
+                        )}
+                        <th className="py-2 px-2 text-center w-16">{hasBreakdown ? 'Total (100)' : 'Total Mark (100)'}</th>
                         <th className="py-2 px-2 text-center w-14">Grade</th>
                         <th className="py-2 px-2 text-left w-20">Remark</th>
                       </tr>
@@ -369,8 +376,12 @@ export default function StudentResults({
                           <td className="py-2 px-2 font-mono font-bold text-gray-900">{g.course_code}</td>
                           <td className="py-2 px-2 font-medium text-gray-800">{g.course_name}</td>
                           <td className="py-2 px-2 text-center font-mono">{g.units}</td>
-                          <td className="py-2 px-2 text-center font-mono text-gray-700">{g.ca_score !== null && g.ca_score !== undefined ? g.ca_score : '—'}</td>
-                          <td className="py-2 px-2 text-center font-mono text-gray-700">{g.exam_score !== null && g.exam_score !== undefined ? g.exam_score : '—'}</td>
+                          {hasBreakdown && (
+                            <>
+                              <td className="py-2 px-2 text-center font-mono text-gray-700">{g.ca_score !== null && g.ca_score !== undefined ? g.ca_score : '—'}</td>
+                              <td className="py-2 px-2 text-center font-mono text-gray-700">{g.exam_score !== null && g.exam_score !== undefined ? g.exam_score : '—'}</td>
+                            </>
+                          )}
                           <td className="py-2 px-2 text-center font-mono font-bold text-gray-900">{g.score}</td>
                           <td className="py-2 px-2 text-center font-bold">
                             <span className={g.grade === 'F' ? 'text-danger-600' : 'text-gray-900'}>

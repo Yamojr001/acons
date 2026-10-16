@@ -1094,18 +1094,30 @@ class ResultImportController extends Controller
         $avgScore       = $totalStudents > 0 ? round($rows->avg(fn($r) => $r['summary']['total_score']), 1) : 0;
         $avgGpa         = $totalStudents > 0 ? round($rows->avg(fn($r) => $r['summary']['gpa']), 2) : 0.00;
 
+        // Determine if any grade has a separate CA breakdown
+        $hasBreakdown = false;
+        foreach ($rows as $r) {
+            foreach ($r['scores'] as $sc) {
+                if ($sc && $sc['ca'] !== null) {
+                    $hasBreakdown = true;
+                    break 2;
+                }
+            }
+        }
+
         return Inertia::render('ExamOfficer/Broadsheet', [
-            'semester'     => $semester,
-            'semesters'    => $semesters,
-            'departments'  => $departments,
-            'courses'      => $courses,
-            'students'     => $rows,
-            'filters'      => [
+            'semester'      => $semester,
+            'semesters'     => $semesters,
+            'departments'   => $departments,
+            'courses'       => $courses,
+            'students'      => $rows,
+            'has_breakdown' => $hasBreakdown,
+            'filters'       => [
                 'semester_id'   => $semester->id,
                 'department_id' => $selectedDepartmentId ? (int)$selectedDepartmentId : null,
                 'search'        => $search,
             ],
-            'stats'        => [
+            'stats'         => [
                 'total_students'  => $totalStudents,
                 'passed_students' => $passedStudents,
                 'resit_students'  => $resitStudents,
@@ -1154,17 +1166,32 @@ class ResultImportController extends Controller
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ];
 
-        $callback = function () use ($students, $courses, $registrations) {
+        // Determine if any grade has a separate CA breakdown
+        $hasBreakdown = false;
+        foreach ($registrations as $studentRegs) {
+            foreach ($studentRegs as $reg) {
+                if ($reg->grade && $reg->grade->ca_score !== null) {
+                    $hasBreakdown = true;
+                    break 2;
+                }
+            }
+        }
+
+        $callback = function () use ($students, $courses, $registrations, $hasBreakdown) {
             $handle = fopen('php://output', 'w');
             fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM
 
-            // Header Row: S/N, Matric No, Student Name, Department, Courses (CA, Exam, Total, Grade), Summary
+            // Header Row: S/N, Matric No, Student Name, Department, Courses, Summary
             $headerRow1 = ['S/N', 'Registration No.', 'Student Name', 'Department'];
             foreach ($courses as $c) {
-                $headerRow1[] = "{$c->code} - CA (/20)";
-                $headerRow1[] = "{$c->code} - Exam (/80)";
-                $headerRow1[] = "{$c->code} - Total (/100)";
-                $headerRow1[] = "{$c->code} - Grade";
+                if ($hasBreakdown) {
+                    $headerRow1[] = "{$c->code} - CA (/20)";
+                    $headerRow1[] = "{$c->code} - Exam (/80)";
+                    $headerRow1[] = "{$c->code} - Total (/100)";
+                    $headerRow1[] = "{$c->code} - Grade";
+                } else {
+                    $headerRow1[] = "{$c->code} ({$c->credit_units}U)";
+                }
             }
             $headerRow1[] = 'Total Score';
             $headerRow1[] = 'Credit Units';
@@ -1202,15 +1229,23 @@ class ResultImportController extends Controller
                             $failedCount++;
                         }
 
-                        $row[] = $grade->ca_score !== null ? $grade->ca_score : '—';
-                        $row[] = $grade->exam_score !== null ? $grade->exam_score : '—';
-                        $row[] = $grade->total_score !== null ? $grade->total_score : '—';
-                        $row[] = $grade->grade_letter ?? '—';
+                        if ($hasBreakdown) {
+                            $row[] = $grade->ca_score !== null ? $grade->ca_score : '—';
+                            $row[] = $grade->exam_score !== null ? $grade->exam_score : '—';
+                            $row[] = $grade->total_score !== null ? $grade->total_score : '—';
+                            $row[] = $grade->grade_letter ?? '—';
+                        } else {
+                            $row[] = $grade->total_score !== null ? $grade->total_score : '—';
+                        }
                     } else {
-                        $row[] = '—';
-                        $row[] = '—';
-                        $row[] = '—';
-                        $row[] = '—';
+                        if ($hasBreakdown) {
+                            $row[] = '—';
+                            $row[] = '—';
+                            $row[] = '—';
+                            $row[] = '—';
+                        } else {
+                            $row[] = '—';
+                        }
                     }
                 }
 
