@@ -81,7 +81,11 @@ class Applicant extends Authenticatable
         'exam_date',
         'exam_venue',
         'seat_number',
-        'remarks'
+        'remarks',
+        'acceptance_fee_paid',
+        'acceptance_fee_amount',
+        'acceptance_fee_reference',
+        'acceptance_fee_paid_at',
     ];
 
     protected $appends = [
@@ -102,6 +106,9 @@ class Applicant extends Authenticatable
         'first_sitting_grades' => 'array',
         'second_sitting_grades' => 'array',
         'amount_paid' => 'decimal:2',
+        'acceptance_fee_paid' => 'boolean',
+        'acceptance_fee_amount' => 'decimal:2',
+        'acceptance_fee_paid_at' => 'datetime',
         'data' => 'array',
     ];
 

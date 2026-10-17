@@ -6,7 +6,7 @@ import {
   MapPin, Printer, Phone, Award, FileText,
   Lock, Unlock, ShieldCheck, Upload, Camera, Edit3, Plus,
   Trash2, AlertCircle, ChevronRight, User, BookOpen, AlertTriangle,
-  RefreshCw, X, Download, Check
+  RefreshCw, X, Download, Check, CreditCard
 } from 'lucide-react'
 
 interface ProgramOption {
@@ -52,10 +52,39 @@ export default function Dashboard({
   const [printSlipMode, setPrintSlipMode] = useState(false)
   const [letterMode, setLetterMode] = useState(false)
   const [examCardModal, setExamCardModal] = useState(false)
+  const [acceptanceModal, setAcceptanceModal] = useState(false)
+  const [payingAcceptance, setPayingAcceptance] = useState(false)
+  const [authorizingAcceptance, setAuthorizingAcceptance] = useState(false)
 
   const isAdmittedOrCleared = ['admitted', 'cleared'].includes(applicant.admission_status)
+  const isAcceptancePaid = Boolean(applicant.acceptance_fee_paid)
   const canEditQualifications = !isAdmittedOrCleared
   const hasPassport = Boolean(applicant.passport_photo)
+
+  const handlePayAcceptance = () => {
+    setPayingAcceptance(true)
+    router.post(route('admissions.acceptance_fee.pay', applicant.id), {}, {
+      onFinish: () => setPayingAcceptance(false),
+    })
+  }
+
+  const handleAuthorizeAcceptance = () => {
+    setAuthorizingAcceptance(true)
+    router.post(route('admissions.acceptance_fee.authorize', applicant.id), {}, {
+      onFinish: () => {
+        setAuthorizingAcceptance(false)
+        setAcceptanceModal(false)
+      },
+    })
+  }
+
+  const handleOpenLetter = () => {
+    if (!isAcceptancePaid) {
+      setAcceptanceModal(true)
+    } else {
+      setLetterMode(true)
+    }
+  }
 
   const handleLogout = () => {
     router.post(route('admissions.logout'))
@@ -458,12 +487,31 @@ export default function Dashboard({
         @media print {
           @page {
             size: A4 portrait;
-            margin: 10mm;
+            margin: 0;
           }
           body {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          .print-admission-sheet {
+            width: 210mm !important;
+            height: 297mm !important;
+            min-height: 297mm !important;
+            max-height: 297mm !important;
+            background-image: url('/assets/images/acons_letterhead.jpg') !important;
+            background-size: 100% 100% !important;
+            background-repeat: no-repeat !important;
+            background-position: top center !important;
+            padding-top: 45mm !important;
+            padding-bottom: 22mm !important;
+            padding-left: 18mm !important;
+            padding-right: 18mm !important;
+            box-sizing: border-box !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
           }
         }
       `}</style>
@@ -641,28 +689,85 @@ export default function Dashboard({
               
               {/* Provisional Admission Congratulatory Banner (if admitted) */}
               {isAdmittedOrCleared && (
-                <div className="bg-gradient-to-r from-red-950 via-blue-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 border border-surface-300 shadow-md space-y-4">
-                  <div className="flex items-center gap-2">
+                <div className="bg-gradient-to-r from-red-950 via-blue-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 border border-surface-300 shadow-md space-y-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <span className="text-[11px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
                       OFFICIAL ADMISSION CLEARANCE
                     </span>
+                    {isAcceptancePaid ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-300 bg-emerald-950/70 border border-emerald-500/30 px-3 py-1 rounded-full">
+                        <CheckCircle2 size={13} className="text-emerald-400" />
+                        Acceptance Fee Paid (₦10,000)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-300 bg-amber-950/70 border border-amber-500/30 px-3 py-1 rounded-full">
+                        <AlertCircle size={13} className="text-amber-400" />
+                        Acceptance Fee Required: ₦10,000
+                      </span>
+                    )}
                   </div>
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-display font-black leading-tight">
                       Congratulations, {applicant.full_name}!
                     </h1>
                     <p className="text-sm text-surface-200 leading-relaxed max-w-2xl mt-1.5">
-                      You have been granted provisional admission into the <strong className="font-extrabold text-white">{applicant.admitted_program?.name || appliedProgramName}</strong> program for the {academicSession?.name || '2025/2026'} academic session.
+                      You have been granted provisional admission into the <strong className="font-extrabold text-white">{applicant.admitted_program?.name || appliedProgramName}</strong> program for the {academicSession?.name || '2026/2027'} academic session.
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2.5 pt-2">
-                    <button
-                      onClick={() => setLetterMode(true)}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-blue-950 font-bold text-xs hover:bg-surface-100 shadow-sm transition-colors"
-                    >
-                      <Award size={14} className="text-blue-900" />
-                      <span>Print Provisional Admission Letter</span>
-                    </button>
+
+                  {/* Payment Alert Box when unpaid */}
+                  {!isAcceptancePaid && (
+                    <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/15 text-xs text-surface-100 space-y-2">
+                      <div className="flex items-center gap-2 font-bold text-amber-300 text-sm">
+                        <Lock size={15} />
+                        <span>₦10,000 Acceptance Fee Required to Unlock Admission Letter</span>
+                      </div>
+                      <p className="leading-relaxed">
+                        To download and print your official Provisional Offer of Admission Letter, you must pay a non-refundable Acceptance Fee of <strong className="text-white font-extrabold">₦10,000</strong>.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px] text-surface-200 border-t border-white/10 mt-2">
+                        <div>📅 <strong>Registration Window:</strong> Monday 19th Oct, 2026 – Friday 31st Oct, 2026</div>
+                        <div>🎓 <strong>Lectures Commence:</strong> 9th November, 2026</div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2.5 pt-1">
+                    {isAcceptancePaid ? (
+                      <>
+                        <a
+                          href={route('admissions.letter.download')}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-blue-950 font-bold text-xs hover:bg-surface-100 shadow-sm transition-colors"
+                        >
+                          <Download size={14} className="text-blue-900" />
+                          <span>Download Admission Letter (PDF)</span>
+                        </a>
+                        <button
+                          onClick={handleOpenLetter}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-900/90 text-white font-bold text-xs hover:bg-blue-900 border border-blue-800 transition-colors"
+                        >
+                          <Award size={14} />
+                          <span>Preview & Print Letter</span>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setAcceptanceModal(true)}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-500 shadow-md transition-colors"
+                        >
+                          <CreditCard size={14} />
+                          <span>Pay ₦10,000 Acceptance Fee</span>
+                        </button>
+                        <button
+                          onClick={() => setAcceptanceModal(true)}
+                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 text-white font-bold text-xs hover:bg-white/20 border border-white/20 transition-colors"
+                        >
+                          <Lock size={14} className="text-amber-400" />
+                          <span>Admission Letter (Locked)</span>
+                        </button>
+                      </>
+                    )}
                     <button
                       onClick={() => setPrintSlipMode(true)}
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-surface-800/80 text-white font-bold text-xs hover:bg-surface-800 border border-surface-700 transition-colors"
@@ -1663,24 +1768,47 @@ export default function Dashboard({
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-surface-500">Document 04</span>
                         {isAdmittedOrCleared ? (
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Admitted</span>
+                          isAcceptancePaid ? (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Unlocked & Cleared</span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">Fee Required (₦10,000)</span>
+                          )
                         ) : (
                           <span className="text-[10px] font-bold text-surface-500 bg-surface-100 px-2 py-0.5 rounded border border-surface-200">Pending Review</span>
                         )}
                       </div>
                       <h3 className="text-sm font-bold text-surface-900">Official Provisional Offer of Admission</h3>
                       <p className="text-xs text-surface-500 leading-relaxed">
-                        Formal letter from the Provost and Registry confirming placement and conditions.
+                        Formal letter from the Provost and Registry confirming placement, dates, and registration conditions.
                       </p>
                     </div>
                     {isAdmittedOrCleared ? (
-                      <button
-                        onClick={() => setLetterMode(true)}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-900 text-white font-bold text-xs hover:bg-blue-950 shadow-sm transition-colors"
-                      >
-                        <Award size={14} />
-                        <span>Download Admission Letter</span>
-                      </button>
+                      isAcceptancePaid ? (
+                        <div className="flex flex-wrap gap-2">
+                          <a
+                            href={route('admissions.letter.download')}
+                            className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-blue-900 text-white font-bold text-xs hover:bg-blue-950 shadow-sm transition-colors"
+                          >
+                            <Download size={14} />
+                            <span>Download PDF</span>
+                          </a>
+                          <button
+                            onClick={handleOpenLetter}
+                            className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-surface-300 text-surface-800 font-bold text-xs hover:bg-surface-50 shadow-sm transition-colors"
+                          >
+                            <Printer size={14} />
+                            <span>Print Preview</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setAcceptanceModal(true)}
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-500 shadow-md transition-colors"
+                        >
+                          <CreditCard size={14} />
+                          <span>Pay ₦10,000 Acceptance Fee</span>
+                        </button>
+                      )
                     ) : (
                       <button
                         disabled
@@ -1868,178 +1996,163 @@ export default function Dashboard({
       {/* ═══════════════════════════════════════════════════════════════════════
           MODAL 2: OFFICIAL PROVISIONAL ADMISSION LETTER PREVIEW & PRINT
          ═══════════════════════════════════════════════════════════════════════ */}
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MODAL 2: OFFICIAL PROVISIONAL ADMISSION LETTER PREVIEW & PRINT
+         ═══════════════════════════════════════════════════════════════════════ */}
       {letterMode && (
-        <div className="fixed inset-0 z-50 bg-black/60 overflow-y-auto p-4 flex items-start justify-center pt-10 print:p-0 print:bg-white print:static">
-          <div className="bg-white rounded-3xl w-full max-w-4xl p-8 sm:p-10 border border-surface-200 shadow-2xl space-y-8 print:border-none print:shadow-none print:p-0 relative">
+        <div className="fixed inset-0 z-50 bg-black/70 overflow-y-auto p-4 flex items-start justify-center pt-8 print:p-0 print:bg-white print:static">
+          <div className="bg-white rounded-3xl w-full max-w-4xl p-6 sm:p-8 border border-surface-200 shadow-2xl space-y-6 print:border-none print:shadow-none print:p-0 relative">
             
             {/* Print Action Bar */}
-            <div className="flex justify-between items-center bg-surface-50 border border-surface-200 p-4 rounded-2xl print:hidden">
-              <span className="text-xs font-bold text-surface-700 flex items-center gap-1.5">
-                <Award size={14} className="text-amber-600" />
-                ACONS Official Provisional Admission Letter Preview
-              </span>
-              <div className="flex gap-2">
+            <div className="flex flex-wrap justify-between items-center gap-3 bg-surface-50 border border-surface-200 p-4 rounded-2xl print:hidden">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold text-surface-800">
+                  ACONS Official Provisional Offer of Admission Letter
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-200 text-surface-700 font-bold">
+                  2026/2027 SESSION
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={route('admissions.letter.download')}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 text-white rounded-xl text-xs font-bold hover:bg-emerald-800 shadow-sm transition-colors"
+                >
+                  <Download size={14} /> Download PDF
+                </a>
                 <button 
                   onClick={() => window.print()}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-900 text-white rounded-xl text-xs font-bold hover:bg-blue-950 shadow-md"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-900 text-white rounded-xl text-xs font-bold hover:bg-blue-950 shadow-sm transition-colors"
                 >
                   <Printer size={14} /> Send to Printer
                 </button>
                 <button 
                   onClick={() => setLetterMode(false)}
-                  className="px-4 py-2 border border-surface-200 text-surface-600 rounded-xl text-xs font-bold hover:bg-surface-100"
+                  className="px-3.5 py-2 border border-surface-200 text-surface-700 rounded-xl text-xs font-bold hover:bg-surface-100 transition-colors"
                 >
-                  Close Preview
+                  Close
                 </button>
               </div>
             </div>
 
-            {/* Letter Paper Sheet */}
-            <div className="relative p-8 sm:p-12 bg-[#faf7f0] text-surface-900 border border-[#e8dfc7] shadow-inner font-serif text-sm leading-relaxed text-left mx-auto max-w-[800px] rounded-2xl print:bg-white print:border-none print:shadow-none print:p-0 print:mx-0">
-              
-              {/* Decorative faint background watermark logo */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] select-none">
-                <img src="/assets/images/acons_logo.png" alt="Watermark" className="w-[450px] h-[450px] object-contain" />
+            {/* Letter Paper Sheet matching ACONS ND ADMISSION LETTER.docx */}
+            <div 
+              className="print-admission-sheet relative bg-white text-black shadow-xl mx-auto rounded-none print:shadow-none print:m-0"
+              style={{
+                width: '100%',
+                maxWidth: '794px',
+                minHeight: '1123px',
+                backgroundImage: "url('/assets/images/acons_letterhead.jpg')",
+                backgroundSize: '100% 100%',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'top center',
+                paddingTop: '165px',
+                paddingBottom: '90px',
+                paddingLeft: '65px',
+                paddingRight: '65px',
+                boxSizing: 'border-box',
+                fontFamily: '"Times New Roman", Times, Georgia, serif',
+              }}
+            >
+              {/* Date */}
+              <div className="text-right font-bold text-[13px] mb-2 text-black">
+                16th October, 2026
               </div>
 
-              <div className="relative z-10 space-y-6">
-                
-                {/* Header Section */}
-                <div className="flex items-start justify-between border-b-2 border-[#8c7853] pb-4">
-                  <div className="flex items-center gap-4">
-                    <img src="/assets/images/acons_logo.png" alt="ACONS Logo" className="w-20 h-20 object-contain bg-white rounded-full p-1 border border-[#e8dfc7]" />
-                    <div className="space-y-0.5">
-                      <h1 className="text-3xl font-black tracking-tight text-blue-900 font-display leading-none">Ameenatu</h1>
-                      <h2 className="text-xl font-bold tracking-tight text-[#6b5832] font-display">College of Nursing</h2>
-                      <h3 className="text-base font-semibold tracking-wide text-surface-800 font-display">Sciences, Dutse</h3>
-                    </div>
-                  </div>
-                  <div className="text-right max-w-[240px] text-[10px] text-[#8c7853] font-sans font-bold leading-normal uppercase italic">
-                    <p className="text-blue-900 font-extrabold not-italic text-xs mb-1 tracking-wider">* Motto:</p>
-                    <p>Leading in nursing education,</p>
-                    <p>leading in health care Delivery</p>
-                  </div>
+              {/* Candidate Metadata */}
+              <table className="w-full text-[13px] mb-3 border-collapse text-black">
+                <tbody>
+                  <tr>
+                    <td className="w-44 py-0.5 text-black">Admission Number:</td>
+                    <td className="font-bold py-0.5 text-black">ACONS/ND/2026/{String(applicant.id).padStart(4, '0')}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 text-black">Name of Candidate:</td>
+                    <td className="font-bold py-0.5 text-black uppercase">{applicant.full_name}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 text-black">L.G.A:</td>
+                    <td className="font-bold py-0.5 text-black uppercase">{applicant.lga || 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 text-black">State:</td>
+                    <td className="font-bold py-0.5 text-black uppercase">{applicant.state_of_origin || 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 text-black">Phone Number:</td>
+                    <td className="font-bold py-0.5 text-black">{applicant.phone_number || 'N/A'}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Subject Title */}
+              <div className="text-center my-3 text-black">
+                <div className="font-bold text-[13.5px] uppercase tracking-wide">
+                  PROVISIONAL OFFER OF ADMISSION INTO ND/HND NURSING PROGRAM
                 </div>
-
-                {/* Date & Core Letter Metadata Block */}
-                <div className="relative">
-                  <div className="text-right font-sans font-bold text-surface-700 text-xs mb-2">
-                    Date: {new Date().toLocaleDateString('en-GB')}
-                  </div>
-
-                  <div className="space-y-2.5 max-w-[480px] font-sans text-xs">
-                    <div className="flex items-end">
-                      <span className="font-semibold text-surface-600 shrink-0">Admission Number:</span>
-                      <span className="border-b border-dashed border-[#8c7853] flex-1 ml-1 pl-2 font-mono font-bold text-blue-900">ACONS/2025/{applicant.id}</span>
-                    </div>
-                    <div className="flex items-end">
-                      <span className="font-semibold text-surface-600 shrink-0">Name of Candidate:</span>
-                      <span className="border-b border-dashed border-[#8c7853] flex-1 ml-1 pl-2 font-bold text-surface-900 uppercase">{applicant.full_name}</span>
-                    </div>
-                    <div className="flex items-end">
-                      <span className="font-semibold text-surface-600 shrink-0">L.G.A:</span>
-                      <span className="border-b border-dashed border-[#8c7853] flex-1 ml-1 pl-2 font-bold text-surface-950 uppercase">{applicant.lga || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-end">
-                      <span className="font-semibold text-surface-600 shrink-0">State:</span>
-                      <span className="border-b border-dashed border-[#8c7853] flex-1 ml-1 pl-2 font-bold text-surface-950 uppercase">{applicant.state_of_origin || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-end">
-                      <span className="font-semibold text-surface-600 shrink-0">Phone Number:</span>
-                      <span className="border-b border-dashed border-[#8c7853] flex-1 ml-1 pl-2 font-bold text-surface-900 font-mono">{applicant.phone_number}</span>
-                    </div>
-                  </div>
+                <div className="font-bold text-[13px]">
+                  ({academicSession?.name || '2026/2027'} ACADEMIC SESSION)
                 </div>
-
-                {/* Offer title subject block */}
-                <div className="text-center py-2 space-y-1">
-                  <h2 className="text-base font-black text-blue-900 uppercase tracking-tight underline decoration-2 decoration-[#8c7853] underline-offset-4">
-                    Provisional Offer of Admission into {applicant.admitted_program?.name || appliedProgramName}
-                  </h2>
-                  <p className="text-xs font-bold text-surface-800 font-sans tracking-wide">
-                    ({academicSession?.name || '2025/2026'} Academic Session)
-                  </p>
-                </div>
-
-                {/* Letter Body */}
-                <div className="space-y-4 text-xs font-serif leading-relaxed text-surface-800 text-justify">
-                  <p>
-                    Following your successful participation in the entrance screening exercise, you have been offered provisional admission to a four-years <strong className="font-bold text-surface-900">{applicant.admitted_program?.name || appliedProgramName}</strong> at Ameenatu College of Nursing Sciences (ACONS), Dutse.
-                  </p>
-
-                  <div className="space-y-3 pl-2">
-                    <p className="font-bold text-surface-900 border-b border-[#e8dfc7] pb-0.5">Conditions of Admission:</p>
-                    
-                    <div className="space-y-2.5">
-                      <div className="flex gap-2">
-                        <span className="font-bold text-blue-900 shrink-0">1.</span>
-                        <div className="space-y-1.5">
-                          <p className="font-semibold text-surface-900">Document Verification:</p>
-                          <p>You are required to present both the <strong className="font-bold text-surface-950 uppercase">ORIGINAL and PHOTOCOPY</strong> of the following documents during registration:</p>
-                          <ul className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[11px] font-sans pl-2 list-none">
-                            <li className="flex items-center gap-2"><div className="w-3.5 h-3.5 border border-surface-400 rounded-sm bg-white shrink-0" /> Primary School Leaving Certificate</li>
-                            <li className="flex items-center gap-2"><div className="w-3.5 h-3.5 border border-surface-400 rounded-sm bg-white shrink-0" /> SSCE Results (WAEC/NECO/NABTEB)</li>
-                            <li className="flex items-center gap-2"><div className="w-3.5 h-3.5 border border-surface-400 rounded-sm bg-white shrink-0" /> Previous School Testimonial</li>
-                            <li className="flex items-center gap-2"><div className="w-3.5 h-3.5 border border-surface-400 rounded-sm bg-white shrink-0" /> Birth Cert / Age Declaration</li>
-                            <li className="flex items-center gap-2"><div className="w-3.5 h-3.5 border border-surface-400 rounded-sm bg-white shrink-0" /> Indigene Certificate</li>
-                            <li className="flex items-center gap-2"><div className="w-3.5 h-3.5 border border-surface-400 rounded-sm bg-white shrink-0" /> Original Medical Fitness Cert</li>
-                            <li className="flex items-center gap-2"><div className="w-3.5 h-3.5 border border-surface-400 rounded-sm bg-white shrink-0" /> Two (2) Passport Photographs</li>
-                            <li className="flex items-center gap-2"><div className="w-3.5 h-3.5 border border-surface-400 rounded-sm bg-white shrink-0" /> Printed JAMB Slip</li>
-                          </ul>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <span className="font-bold text-blue-900 shrink-0">2.</span>
-                        <p><strong className="font-semibold text-surface-900">Disqualification Clause:</strong> If it is found at any point that you lack any of the required qualifications, your admission will be revoked immediately.</p>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <span className="font-bold text-blue-900 shrink-0">3.</span>
-                        <p><strong className="font-semibold text-surface-900">Registration Period:</strong> Registration will take place from <strong className="font-bold">{admissionForm?.registration_start_date ? new Date(admissionForm.registration_start_date).toLocaleDateString() : (academicSession ? new Date(academicSession.start_date).toLocaleDateString() : '1st November, 2025')}</strong>. Failure to complete registration within this time frame will result in the cancellation of your admission.</p>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <span className="font-bold text-blue-900 shrink-0">4.</span>
-                        <p><strong className="font-semibold text-surface-900">Name Policy:</strong> Changes to your name will not be permitted throughout the training period.</p>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <span className="font-bold text-blue-900 shrink-0">5.</span>
-                        <p><strong className="font-semibold text-surface-900">Additional Requirements:</strong> A list of additional items required for registration is attached for your reference.</p>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <span className="font-bold text-blue-900 shrink-0">6.</span>
-                        <p><strong className="font-semibold text-surface-900">Commencement of Lectures:</strong> <strong className="font-bold">{academicSession ? new Date(new Date(academicSession.start_date).getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString() : '14th November, 2025'}</strong>.</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="pt-2 font-bold text-center text-surface-900 font-sans tracking-wide">
-                    We look forward to welcoming you to the college. Congratulations!
-                  </p>
-                </div>
-
-                {/* Signatory Stamp Section */}
-                <div className="flex justify-center pt-4">
-                  <div className="relative text-center w-64 flex flex-col items-center">
-                    <div className="relative z-10 pt-2">
-                      <strong className="font-black text-surface-900 text-xs block font-sans">Abdullahi Adamu</strong>
-                      <span className="text-[10px] text-surface-500 font-bold uppercase tracking-wider block mt-0.5 font-sans">(Provost)</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer Address */}
-                <div className="border-t border-[#e8dfc7] pt-4 text-center space-y-1 text-[9px] font-sans font-bold text-surface-500 uppercase tracking-wider leading-relaxed">
-                  <p>Plot 36, Takur Site Road, Adjacent to Correctional Service Headquarters, Dutse, Jigawa State, Nigeria.</p>
-                  <p className="text-[#8c7853] text-[8px] tracking-widest">
-                    09081818180, 09099999965 &nbsp;|&nbsp; info@acons.edu.ng &nbsp;|&nbsp; aconsdutse@gmail.com
-                  </p>
-                </div>
-
               </div>
+
+              {/* Body */}
+              <div className="text-justify text-[13px] leading-relaxed mb-2.5 text-black">
+                Following your successful participation in the recent screening exercise, you have been offered provisional admission to a four-year ND/HND Nursing program at Ameenatu College of Nursing Sciences (ACONS), Dutse.
+              </div>
+
+              <div className="font-bold text-[13px] mt-2 mb-1 text-black">Conditions of Admission:</div>
+              <div className="font-bold text-[13px] mb-1 text-black">Document verification:</div>
+              <div className="text-[13px] mb-1.5 text-black">You are required to present both the ORIGINAL and PHOTOCOPY of the following documents during registration.</div>
+
+              <ul className="list-disc pl-6 text-[12.5px] leading-relaxed mb-2.5 space-y-0.5 text-black">
+                <li>Primary School Leaving Certificate</li>
+                <li>SSCE Statement/Certificate of results (WAEC, NECO, NABTEB or NBAIS), including the online printout</li>
+                <li>Testimonial from your previous school</li>
+                <li>Birth certificate or declaration of Age</li>
+                <li>Medical Certificate of Fitness (Original)</li>
+                <li>Two (2) recent passport-size photographs</li>
+              </ul>
+
+              <div className="text-justify text-[13px] leading-relaxed mb-2 text-black">
+                <strong className="font-bold">Disqualification Clause:</strong> If it is found at any point that you lack any of the required qualifications, your admission will be revoked immediately.
+              </div>
+
+              <div className="text-justify text-[13px] leading-relaxed mb-2 text-black">
+                <strong className="font-bold">Registration period:</strong> Registration will take place from <strong className="font-bold">Monday 19th October, 2026 to Friday 31st October, 2026</strong>. Failure to complete registration within this time frame will result in the cancellation of your admission.
+              </div>
+
+              <div className="text-justify text-[13px] leading-relaxed mb-2 text-black">
+                <strong className="font-bold">Acceptance Fee:</strong> Payment of a non-refundable Acceptance Fee of <strong className="font-bold">₦10,000</strong> is required prior to document verification and completion of registration.
+              </div>
+
+              <div className="text-justify text-[13px] leading-relaxed mb-2 text-black">
+                <strong className="font-bold">Name policy:</strong> Change of name is not permitted throughout the training period.
+              </div>
+
+              <div className="text-justify text-[13px] leading-relaxed mb-2 text-black">
+                <strong className="font-bold">Additional Requirements:</strong> A list of additional items required for registration is attached for your reference.
+              </div>
+
+              <div className="text-justify text-[13px] leading-relaxed mb-2.5 text-black">
+                <strong className="font-bold">Commencement of lectures:</strong> <strong className="font-bold">9th November, 2026</strong>.
+              </div>
+
+              <div className="text-center font-bold text-[13px] my-2.5 text-black">
+                We look forward to welcoming you to the college. Congratulations!
+              </div>
+
+              {/* Signatory */}
+              <div className="text-center mt-3 text-black">
+                <img 
+                  src="/assets/images/provost_signature.jpeg" 
+                  alt="Dr. Abdullahi Adamu Provost Signature" 
+                  className="h-9 mx-auto mb-1 object-contain"
+                />
+                <div className="font-bold text-[13px] leading-tight">Dr. Abdullahi Adamu</div>
+                <div className="text-[12px] leading-tight">(Provost)</div>
+              </div>
+
             </div>
 
           </div>
@@ -2083,6 +2196,121 @@ export default function Dashboard({
 
             {/* Printable Photocard Sheet */}
             {renderExamCardSheet()}
+
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MODAL 4: ACCEPTANCE FEE PAYMENT (₦10,000)
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {acceptanceModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm overflow-y-auto p-4 flex items-center justify-center">
+          <div className="bg-white rounded-3xl w-full max-w-lg p-6 sm:p-8 border border-surface-200 shadow-2xl space-y-6 relative">
+            
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 shrink-0">
+                  <CreditCard size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-surface-900 leading-tight">Acceptance Fee Settlement</h3>
+                  <p className="text-xs text-surface-500 mt-0.5">ACONS 2026/2027 Provisional Admission Offer</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setAcceptanceModal(false)}
+                className="text-surface-400 hover:text-surface-600 p-1 rounded-lg hover:bg-surface-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Fee summary card */}
+            <div className="bg-surface-50 rounded-2xl p-4 border border-surface-200 space-y-3">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-surface-500">Candidate Name:</span>
+                <span className="font-bold text-surface-900 uppercase">{applicant.full_name}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-surface-500">JAMB Reg Number:</span>
+                <span className="font-mono font-bold text-blue-900">{applicant.jamb_number}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-surface-500">Program Offered:</span>
+                <span className="font-semibold text-surface-800">{applicant.admitted_program?.name || 'ND/HND Nursing Program'}</span>
+              </div>
+              <div className="border-t border-surface-200 pt-3 flex justify-between items-baseline">
+                <div>
+                  <span className="text-xs font-bold text-surface-700 block">Acceptance Fee Amount</span>
+                  <span className="text-[10px] text-surface-400">Non-refundable institutional admission fee</span>
+                </div>
+                <span className="text-2xl font-black text-emerald-600 font-mono">₦10,000.00</span>
+              </div>
+            </div>
+
+            {/* Important dates notice */}
+            <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 text-xs text-amber-950 space-y-1.5">
+              <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                <AlertCircle size={14} className="text-amber-600 shrink-0" />
+                <span>Crucial Registration & Lecture Dates</span>
+              </div>
+              <ul className="list-disc pl-4 space-y-1 text-[11.5px] text-amber-900/90 leading-relaxed">
+                <li><strong>Registration Window:</strong> Monday 19th October, 2026 to Friday 31st October, 2026.</li>
+                <li><strong>Commencement of Lectures:</strong> 9th November, 2026.</li>
+                <li>Payment of this Acceptance Fee is required before your Official Provisional Offer of Admission Letter can be issued and downloaded.</li>
+              </ul>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-2.5 pt-2">
+              <button
+                type="button"
+                onClick={handlePayAcceptance}
+                disabled={payingAcceptance || authorizingAcceptance}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-blue-900 hover:bg-blue-950 text-white font-bold text-sm shadow-md transition-colors disabled:opacity-50"
+              >
+                {payingAcceptance ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    <span>Connecting to ZainPay...</span>
+                  </>
+                ) : (
+                  <>
+                    <CreditCard size={16} />
+                    <span>Pay ₦10,000 with ZainPay (Card / USSD / Bank)</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleAuthorizeAcceptance}
+                disabled={payingAcceptance || authorizingAcceptance}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-surface-200 bg-white hover:bg-surface-50 text-surface-700 font-bold text-xs transition-colors disabled:opacity-50"
+              >
+                {authorizingAcceptance ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>Authorizing clearance...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck size={14} className="text-emerald-600" />
+                    <span>Instant Clearance (Demo / Admin Bypass)</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAcceptanceModal(false)}
+                className="w-full py-2 text-center text-xs font-semibold text-surface-500 hover:text-surface-700 transition-colors"
+              >
+                Cancel and Return
+              </button>
+            </div>
 
           </div>
         </div>

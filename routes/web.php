@@ -46,6 +46,9 @@ Route::middleware(['identify.tenant'])->group(function () {
     Route::post('/admissions/pay/zainpay/init/{applicant}', [PublicApplicantController::class, 'zainpayInit'])->name('admissions.pay.zainpay.init');
     Route::match(['get', 'post'], '/admissions/pay/zainpay/verify/{applicant}', [PublicApplicantController::class, 'zainpayVerify'])->name('admissions.pay.verify');
     Route::post('/admissions/pay/authorize/{applicant}', [PublicApplicantController::class, 'authorizePayment'])->name('admissions.pay.authorize');
+    Route::post('/admissions/acceptance-fee/pay/{applicant}', [PublicApplicantController::class, 'initAcceptanceFeePayment'])->name('admissions.acceptance_fee.pay');
+    Route::match(['get', 'post'], '/admissions/acceptance-fee/verify/{applicant}', [PublicApplicantController::class, 'verifyAcceptanceFeePayment'])->name('admissions.acceptance_fee.verify');
+    Route::post('/admissions/acceptance-fee/authorize/{applicant}', [PublicApplicantController::class, 'authorizeAcceptanceFeePayment'])->name('admissions.acceptance_fee.authorize');
     Route::get('/admissions/login',               [PublicApplicantController::class, 'showLoginForm'])->name('admissions.login');
     Route::post('/admissions/login',              [PublicApplicantController::class, 'login'])->name('admissions.login.submit');
 
@@ -55,6 +58,7 @@ Route::middleware(['identify.tenant'])->group(function () {
         Route::post('/admissions/photo/upload',      [PublicApplicantController::class, 'uploadPhoto'])->name('admissions.photo.upload');
         Route::post('/admissions/exam/update',       [PublicApplicantController::class, 'updateExam'])->name('admissions.exam.update');
         Route::get('/admissions/exam-card/download', [PublicApplicantController::class, 'downloadExamCardPdf'])->name('admissions.exam.download');
+        Route::get('/admissions/admission-letter/download', [PublicApplicantController::class, 'downloadAdmissionLetterPdf'])->name('admissions.letter.download');
     });
 });
 
