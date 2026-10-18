@@ -13,36 +13,76 @@ class AuthController extends Controller {
     }
 
     public function login(Request $request) {
-        if ($request->filled('email') && !str_contains($request->email, '@')) {
-            $request->merge(['email' => strtolower(trim($request->email)) . '@acons.edu.ng']);
-        }
-
-        $email = strtolower(trim((string)$request->email));
+        $loginInput = trim((string)$request->email);
         $ip = $request->ip();
 
-        Log::info('Login process started', ['ip' => $ip, 'email' => $email]);
+        Log::info('Login process started', ['ip' => $ip, 'login' => $loginInput]);
 
-        $request->validate(['email' => 'required|email', 'password' => 'required|string']);
+        $request->validate(['email' => 'required|string', 'password' => 'required|string']);
 
-        // 1. IP-to-Email Student Lockout Check (2 Hours Window)
+        $key = 'login:'.$ip.':'.strtolower($loginInput);
+        $maxAttempts = config('auth.throttle.max_attempts', 5);
+
+        Log::info('Checking rate limit', ['key' => $key]);
+        if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+            Log::warning('Rate limit exceeded', ['login' => $loginInput]);
+            $secs = RateLimiter::availableIn($key);
+            throw ValidationException::withMessages(['email' => ["Too many attempts. Try again in {$secs} seconds."]]);
+        }
+
+        Log::info('Querying user from database', ['login' => $loginInput]);
+        $cleanPhone = preg_replace('/[^0-9]/', '', $loginInput);
+
+        try {
+            $user = User::where('is_active', true)
+                ->where(function ($query) use ($loginInput, $cleanPhone) {
+                    $query->where('email', strtolower($loginInput))
+                          ->orWhere('email', strtolower($loginInput) . '@acons.edu.ng');
+
+                    if (!empty($cleanPhone) && strlen($cleanPhone) >= 7) {
+                        $query->orWhere('phone', $cleanPhone)
+                              ->orWhere('phone', 'like', '%' . substr($cleanPhone, -10));
+                    }
+
+                    $query->orWhereHas('student', function ($sq) use ($loginInput) {
+                        $sq->where('matriculation_number', $loginInput)
+                          ->orWhere('jamb_registration_number', $loginInput);
+                    });
+                })
+                ->first();
+        } catch (\Exception $e) {
+            Log::error('Database error during user query', ['message' => $e->getMessage()]);
+            throw $e;
+        }
+
+        if (!$user) {
+            Log::warning('User not found or inactive', ['login' => $loginInput]);
+        } elseif (!Hash::check($request->password, $user->password)) {
+            Log::warning('Invalid password', ['login' => $loginInput]);
+        }
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            RateLimiter::hit($key, config('auth.throttle.decay_seconds', 900));
+            $remaining = RateLimiter::remaining($key, $maxAttempts);
+            throw ValidationException::withMessages(['email' => ["The provided credentials are incorrect. You have {$remaining} attempts remaining."]]);
+        }
+
+        // IP-to-Email Student Lockout Check (2 Hours Window)
         // Prevents students from logging into peers' accounts on the same device/IP to view others' results
-        $ipLockKey = 'ip_student_lock:' . $ip;
-        $ipLockData = \Illuminate\Support\Facades\Cache::get($ipLockKey);
+        if ($user->hasRole('student') || $user->role === 'student') {
+            $ipLockKey = 'ip_student_lock:' . $ip;
+            $ipLockData = \Illuminate\Support\Facades\Cache::get($ipLockKey);
 
-        if ($ipLockData && is_array($ipLockData)) {
-            $lockedEmail = strtolower($ipLockData['email'] ?? '');
-            $expiresAt   = $ipLockData['expires_at'] ?? 0;
+            if ($ipLockData && is_array($ipLockData)) {
+                $lockedEmail = strtolower($ipLockData['email'] ?? '');
+                $expiresAt   = $ipLockData['expires_at'] ?? 0;
 
-            if ($lockedEmail && $lockedEmail !== $email && now()->timestamp < $expiresAt) {
-                $targetUser = User::where('email', $email)->first();
-                $isStudentAttempt = !$targetUser || $targetUser->hasRole('student') || $targetUser->role === 'student';
-
-                if ($isStudentAttempt) {
+                if ($lockedEmail && $lockedEmail !== strtolower($user->email) && now()->timestamp < $expiresAt) {
                     $remainingMinutes = max(1, (int) ceil(($expiresAt - now()->timestamp) / 60));
                     Log::warning('IP lockout triggered: different student login attempted on locked device', [
                         'ip' => $ip,
                         'locked_to' => $lockedEmail,
-                        'attempted' => $email,
+                        'attempted' => $user->email,
                         'minutes_remaining' => $remainingMinutes,
                     ]);
 
@@ -60,36 +100,6 @@ class AuthController extends Controller {
             }
         }
 
-        $key = 'login:'.$ip.':'.$email;
-        $maxAttempts = config('auth.throttle.max_attempts', 5);
-
-        Log::info('Checking rate limit', ['key' => $key]);
-        if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
-            Log::warning('Rate limit exceeded', ['email' => $email]);
-            $secs = RateLimiter::availableIn($key);
-            throw ValidationException::withMessages(['email' => ["Too many attempts. Try again in {$secs} seconds."]]);
-        }
-
-        Log::info('Querying user from database', ['email' => $email]);
-        try {
-            $user = User::where('email', $email)->where('is_active', true)->first();
-        } catch (\Exception $e) {
-            Log::error('Database error during user query', ['message' => $e->getMessage()]);
-            throw $e;
-        }
-
-        if (!$user) {
-            Log::warning('User not found or inactive', ['email' => $email]);
-        } elseif (!Hash::check($request->password, $user->password)) {
-            Log::warning('Invalid password', ['email' => $email]);
-        }
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            RateLimiter::hit($key, config('auth.throttle.decay_seconds', 900));
-            $remaining = RateLimiter::remaining($key, $maxAttempts);
-            throw ValidationException::withMessages(['email' => ["The provided credentials are incorrect. You have {$remaining} attempts remaining."]]);
-        }
-
         Log::info('Authenticating user', ['user_id' => $user->id]);
         try {
             Auth::login($user, $request->boolean('remember'));
@@ -99,18 +109,18 @@ class AuthController extends Controller {
 
             // If the user is a student, bind this IP to their email for 2 hours
             if ($user->hasRole('student') || $user->role === 'student') {
+                $ipLockKey = 'ip_student_lock:' . $ip;
                 \Illuminate\Support\Facades\Cache::put($ipLockKey, [
-                    'email' => $email,
+                    'email' => strtolower($user->email),
                     'expires_at' => now()->addHours(2)->timestamp,
                 ], now()->addHours(2));
 
                 Log::info('Device/IP locked to student email for 2 hours', [
                     'ip' => $ip,
-                    'email' => $email,
+                    'email' => $user->email,
                     'expires_at' => now()->addHours(2)->toDateTimeString(),
                 ]);
             }
-
         } catch (\Exception $e) {
             Log::error('Error during Auth::login or session regeneration', ['message' => $e->getMessage()]);
             throw $e;

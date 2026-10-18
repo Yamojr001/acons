@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Hash;
 use App\Traits\BelongsToTenant;
 
 class Applicant extends Authenticatable
@@ -238,5 +239,126 @@ class Applicant extends Authenticatable
         }
 
         return $prefix . $nextSerial;
+    }
+
+    /**
+     * Automatically provisions a student account and user upon acceptance fee clearance.
+     * Uses applicant's phone number as both portal username and password.
+     */
+    public function provisionStudentAccount(): ?Student
+    {
+        $tenantId = $this->tenant_id ?: 1;
+        $rawPhone = trim((string)$this->phone_number);
+        $phoneDigits = preg_replace('/[^0-9]/', '', $rawPhone);
+        $phone = !empty($phoneDigits) ? $phoneDigits : ($rawPhone ?: '08000000000');
+
+        // Assign/ensure sequential admission number: ACONS/NUR/ND/26/001
+        $matricNumber = $this->registration_number;
+        if (empty($matricNumber)) {
+            $matricNumber = static::generateNextRegistrationNumber($this);
+            $this->update(['registration_number' => $matricNumber]);
+            $this->registration_number = $matricNumber;
+        }
+
+        // Email address: use applicant email if present and valid, otherwise phone-based domain email
+        $userEmail = (!empty($this->email) && filter_var($this->email, FILTER_VALIDATE_EMAIL))
+            ? strtolower(trim($this->email))
+            : ($phone . '@acons.edu.ng');
+
+        // Find or create User record
+        $user = User::where('tenant_id', $tenantId)
+            ->where(function ($q) use ($phone, $userEmail) {
+                $q->where('phone', $phone)
+                  ->orWhere('email', $userEmail);
+            })->first();
+
+        if (!$user) {
+            $user = User::create([
+                'tenant_id'             => $tenantId,
+                'name'                  => $this->full_name,
+                'email'                 => $userEmail,
+                'phone'                 => $phone,
+                'password'              => Hash::make($phone), // Phone number as password
+                'gender'                => strtolower($this->sex ?: 'other'),
+                'is_active'             => true,
+                'force_password_change' => false,
+            ]);
+            $user->assignRole(User::ROLE_STUDENT);
+        } else {
+            // Keep user profile synced
+            $user->update([
+                'phone'     => $phone,
+                'is_active' => true,
+            ]);
+            if (!$user->hasRole(User::ROLE_STUDENT)) {
+                $user->assignRole(User::ROLE_STUDENT);
+            }
+        }
+
+        // Determine Department and Program
+        $deptId = $this->admitted_department_id ?: 1;
+        $program = null;
+        if ($this->admitted_program_id) {
+            $program = Program::find($this->admitted_program_id);
+        }
+        if (!$program && $this->applied_program_id) {
+            $program = Program::find($this->applied_program_id);
+        }
+        if (!$program) {
+            $program = Program::where('department_id', $deptId)->first() ?: Program::first();
+        }
+
+        $programName = $program?->name ?? '';
+        $initialLevel = 'ND1';
+        if (stripos($programName, 'Basic') !== false || stripos($programName, 'General') !== false || stripos($programName, 'RN') !== false || stripos($programName, 'RM') !== false) {
+            $initialLevel = 'Basic Nursing Level 1';
+        }
+
+        $gender = strtolower($this->sex ?: 'other');
+        if (!in_array($gender, ['male', 'female', 'other'])) {
+            $gender = 'other';
+        }
+
+        // Find or create Student profile
+        $student = Student::where('user_id', $user->id)->first();
+        if (!$student) {
+            $student = Student::create([
+                'tenant_id'                => $tenantId,
+                'user_id'                  => $user->id,
+                'department_id'            => $deptId,
+                'program_id'               => $program?->id,
+                'matriculation_number'     => $matricNumber,
+                'phone_number'             => $phone,
+                'status'                   => 'active',
+                'current_level'            => $initialLevel,
+                'jamb_registration_number' => $this->jamb_number,
+                'date_of_birth'            => $this->dob ? $this->dob->format('Y-m-d') : '2000-01-01',
+                'gender'                   => $gender,
+                'nationality'              => $this->nationality ?? 'Nigerian',
+                'state_of_origin'          => $this->state_of_origin,
+                'lga'                      => $this->lga,
+                'academic_status'          => 'normal',
+                'years_in_current_level'   => 1,
+            ]);
+        } else {
+            if ($student->matriculation_number !== $matricNumber) {
+                $student->update([
+                    'matriculation_number' => $matricNumber,
+                    'status'               => 'active',
+                ]);
+            }
+        }
+
+        // Update applicant status to cleared (physical clearance bypassed)
+        if ($this->status !== 'cleared' || $this->admission_status !== 'cleared') {
+            $this->update([
+                'status'           => 'cleared',
+                'admission_status' => 'cleared',
+            ]);
+            $this->status = 'cleared';
+            $this->admission_status = 'cleared';
+        }
+
+        return $student;
     }
 }

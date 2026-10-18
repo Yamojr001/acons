@@ -6,7 +6,7 @@ import {
   MapPin, Printer, Phone, Award, FileText,
   Lock, Unlock, ShieldCheck, Upload, Camera, Edit3, Plus,
   Trash2, AlertCircle, ChevronRight, User, BookOpen, AlertTriangle,
-  RefreshCw, X, Download, Check, CreditCard
+  RefreshCw, X, Download, Check, CreditCard, LogIn
 } from 'lucide-react'
 
 interface ProgramOption {
@@ -765,6 +765,50 @@ export default function Dashboard({
                       <span>Print Application Slip</span>
                     </button>
                   </div>
+
+                  {/* Student Portal Account Activated - Automatic Clearance */}
+                  {isAcceptancePaid && (
+                    <div className="bg-emerald-950/60 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 space-y-3 mt-3 text-white">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/20 pb-2.5">
+                        <div className="flex items-center gap-2 text-emerald-300 font-bold text-sm">
+                          <CheckCircle2 size={16} className="text-emerald-400" />
+                          <span>Student Portal Account Activated (Physical Clearance Bypassed)</span>
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          Enrolled • Active Student
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-100/90 leading-relaxed">
+                        Per institution policy, physical clearance is no longer required. Your student profile has been created automatically. Use your registered phone number as both your username and password to log in.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                        <div className="bg-black/40 rounded-xl p-3 border border-emerald-500/20">
+                          <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider block mb-1">Admission / Matric No</span>
+                          <span className="text-xs sm:text-sm font-mono font-bold text-white select-all">{applicant.registration_number || 'ACONS/NUR/ND/26/001'}</span>
+                        </div>
+                        <div className="bg-black/40 rounded-xl p-3 border border-emerald-500/20">
+                          <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider block mb-1">Portal Username</span>
+                          <span className="text-xs sm:text-sm font-mono font-bold text-white select-all">{applicant.phone_number || 'Your Phone Number'}</span>
+                        </div>
+                        <div className="bg-black/40 rounded-xl p-3 border border-emerald-500/20">
+                          <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider block mb-1">Portal Password</span>
+                          <span className="text-xs sm:text-sm font-mono font-bold text-white select-all">{applicant.phone_number || 'Your Phone Number'}</span>
+                        </div>
+                      </div>
+                      <div className="pt-2 flex flex-wrap items-center justify-between gap-3">
+                        <a
+                          href="/login"
+                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs hover:bg-emerald-400 shadow-md transition-all transform hover:-translate-y-0.5"
+                        >
+                          <LogIn size={14} />
+                          <span>Log In to Student Portal →</span>
+                        </a>
+                        <span className="text-[11px] text-emerald-300/80">
+                          Log in to proceed to Semester Registration and Course Enrollment.
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

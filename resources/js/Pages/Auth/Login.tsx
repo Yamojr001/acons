@@ -76,9 +76,9 @@ export default function Login({ status, canResetPassword }: LoginProps) {
 
         <form onSubmit={submit} className="space-y-4" noValidate>
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <Input label="Email address" type="email" id="email" value={data.email}
+            <Input label="Email or Phone Number" type="text" id="email" value={data.email}
               onChange={e => setData('email', e.target.value)}
-              placeholder="you@school.com" autoComplete="email" autoFocus
+              placeholder="e.g. 09041444531 or user@school.com" autoComplete="username" autoFocus
               error={countdown === 0 ? errors.email : undefined} leftIcon={<Mail size={15} />} required disabled={countdown > 0} />
           </motion.div>
 
