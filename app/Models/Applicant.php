@@ -86,6 +86,7 @@ class Applicant extends Authenticatable
         'acceptance_fee_amount',
         'acceptance_fee_reference',
         'acceptance_fee_paid_at',
+        'registration_number',
     ];
 
     protected $appends = [
@@ -207,5 +208,30 @@ class Applicant extends Authenticatable
             'program'               => $this->appliedProgram?->name ?? 'Basic Nursing',
             'passport_photo'        => $this->passport_photo,
         ];
+    }
+
+    /**
+     * Generate sequential registration number starting from 001 based on acceptance payment.
+     */
+    public static function generateNextRegistrationNumber(self $applicant): string
+    {
+        $year = '2026';
+        $section = $applicant->admitted_section ?: 'ND';
+        $prefix = "ACONS/{$section}/{$year}/";
+
+        // Find the highest serial among applicants who have paid acceptance fee and have a registration number
+        $lastReg = static::where('registration_number', 'like', $prefix . '%')
+            ->orderByRaw("CAST(SUBSTRING_INDEX(registration_number, '/', -1) AS UNSIGNED) DESC")
+            ->value('registration_number');
+
+        if ($lastReg) {
+            $parts = explode('/', $lastReg);
+            $lastSerial = (int) end($parts);
+            $nextSerial = str_pad($lastSerial + 1, 3, '0', STR_PAD_LEFT);
+        } else {
+            $nextSerial = '001';
+        }
+
+        return $prefix . $nextSerial;
     }
 }

@@ -25,17 +25,17 @@
             z-index: -100;
         }
         .content {
-            padding-top: 45mm;
+            padding-top: 64mm;
             padding-left: 20mm;
             padding-right: 20mm;
-            padding-bottom: 22mm;
+            padding-bottom: 20mm;
             box-sizing: border-box;
         }
         .date-line {
             text-align: right;
             font-weight: bold;
             font-size: 10pt;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
         .meta-table {
             width: 100%;
@@ -48,7 +48,7 @@
             vertical-align: bottom;
         }
         .meta-label {
-            width: 145px;
+            width: 155px;
             color: #111111;
         }
         .meta-value {
@@ -57,17 +57,18 @@
         }
         .title-box {
             text-align: center;
-            margin: 8px 0 10px 0;
+            margin: 10px 0 12px 0;
         }
         .title-main {
-            font-size: 10.5pt;
+            font-size: 11pt;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 0.3px;
         }
         .title-sub {
-            font-size: 10pt;
+            font-size: 10.5pt;
             font-weight: bold;
+            margin-top: 2px;
         }
         .intro-p {
             text-align: justify;
@@ -147,8 +148,8 @@
 
         <table class="meta-table">
             <tr>
-                <td class="meta-label">Admission Number:</td>
-                <td class="meta-value">ACONS/ND/2026/{{ str_pad($applicant->id, 4, '0', STR_PAD_LEFT) }}</td>
+                <td class="meta-label">Registration Number:</td>
+                <td class="meta-value">{{ $applicant->registration_number ?? ('ACONS/ND/2026/' . str_pad($applicant->id, 3, '0', STR_PAD_LEFT)) }}</td>
             </tr>
             <tr>
                 <td class="meta-label">Name of Candidate:</td>
@@ -170,7 +171,7 @@
 
         <div class="title-box">
             <div class="title-main">PROVISIONAL OFFER OF ADMISSION INTO ND/HND NURSING PROGRAM</div>
-            <div class="title-sub">({{ $academicSession->name ?? '2026/2027' }} ACADEMIC SESSION)</div>
+            <div class="title-sub">(2026/2027 ACADEMIC SESSION)</div>
         </div>
 
         <div class="intro-p">
@@ -199,7 +200,7 @@
         </div>
 
         <div class="clause">
-            <strong>Acceptance Fee:</strong> Payment of a non-refundable Acceptance Fee of <strong>₦10,000</strong> is required prior to document verification and completion of registration.
+            <strong>Acceptance Fee:</strong> Payment of a non-refundable Acceptance Fee of <strong><span style="font-family: DejaVu Sans;">&#8358;</span>10,000</strong> is required prior to document verification and completion of registration.
         </div>
 
         <div class="clause">

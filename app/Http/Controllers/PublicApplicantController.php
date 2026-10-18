@@ -471,6 +471,12 @@ class PublicApplicantController extends Controller
         $applicant = Auth::guard('applicant')->user();
         $tenant = app('currentTenant');
         
+        // Auto-assign sequential registration number starting from 001 if acceptance fee is paid
+        if ($applicant->acceptance_fee_paid && empty($applicant->registration_number)) {
+            $regNum = Applicant::generateNextRegistrationNumber($applicant);
+            $applicant->update(['registration_number' => $regNum]);
+        }
+
         $applicantWithProgram = Applicant::with(['admittedProgram', 'appliedProgram'])->find($applicant->id);
         $academicSession = \App\Models\AcademicSession::where('tenant_id', $tenant->id ?? 1)->where('is_current', true)->first();
         $admissionForm = \App\Models\AdmissionForm::where('tenant_id', $tenant->id ?? 1)->where('is_active', true)->first();
@@ -824,11 +830,13 @@ class PublicApplicantController extends Controller
         }
 
         if ($isVerified) {
+            $regNum = $applicant->registration_number ?: Applicant::generateNextRegistrationNumber($applicant);
             $applicant->update([
                 'acceptance_fee_paid'      => true,
                 'acceptance_fee_amount'    => $amountPaid > 0 ? $amountPaid : 10000.00,
                 'acceptance_fee_reference' => $txnRef,
                 'acceptance_fee_paid_at'   => now(),
+                'registration_number'      => $regNum,
             ]);
 
             // SMS notification
@@ -836,7 +844,7 @@ class PublicApplicantController extends Controller
                 try {
                     app(\App\Services\SmsService::class)->send(
                         $applicant->phone_number,
-                        "Dear {$applicant->full_name}, your ACONS Acceptance Fee payment of NGN 10,000 was confirmed (Ref: {$txnRef}). Your Official Admission Letter is now unlocked. Access your portal at: " . url('/admissions/login')
+                        "Dear {$applicant->full_name}, your ACONS Acceptance Fee payment of NGN 10,000 was confirmed (Reg No: {$regNum}, Ref: {$txnRef}). Your Official Admission Letter is now unlocked. Access your portal at: " . url('/admissions/login')
                     );
                 } catch (\Throwable) {}
             }
@@ -847,7 +855,7 @@ class PublicApplicantController extends Controller
             } catch (\Throwable) {}
 
             return redirect()->route('admissions.dashboard')
-                ->with('success', 'Acceptance fee payment of N10,000 has been verified! Your Official Provisional Offer of Admission Letter is now unlocked.');
+                ->with('success', 'Acceptance fee payment of N10,000 has been verified! Reg No: ' . $regNum . '. Your Official Provisional Offer of Admission Letter is now unlocked.');
         }
 
         return redirect()->route('admissions.dashboard')
@@ -865,24 +873,26 @@ class PublicApplicantController extends Controller
         }
 
         $ref = 'ACON_ACC_' . strtoupper(Str::random(10));
+        $regNum = $applicant->registration_number ?: Applicant::generateNextRegistrationNumber($applicant);
         $applicant->update([
             'acceptance_fee_paid'      => true,
             'acceptance_fee_amount'    => 10000.00,
             'acceptance_fee_reference' => $ref,
             'acceptance_fee_paid_at'   => now(),
+            'registration_number'      => $regNum,
         ]);
 
         if (!empty($applicant->phone_number)) {
             try {
                 app(\App\Services\SmsService::class)->send(
                     $applicant->phone_number,
-                    "Dear {$applicant->full_name}, your ACONS Acceptance Fee of NGN 10,000 has been cleared. Ref: {$ref}. You can now download your Official Admission Letter at: " . url('/admissions/login')
+                    "Dear {$applicant->full_name}, your ACONS Acceptance Fee of NGN 10,000 has been cleared (Reg No: {$regNum}, Ref: {$ref}). You can now download your Official Admission Letter at: " . url('/admissions/login')
                 );
             } catch (\Throwable) {}
         }
 
         return redirect()->route('admissions.dashboard')
-            ->with('success', 'Acceptance fee of N10,000 authorized successfully! Your Official Provisional Admission Letter is unlocked.');
+            ->with('success', 'Acceptance fee of N10,000 authorized successfully! Reg No: ' . $regNum . '. Your Official Provisional Admission Letter is unlocked.');
     }
 
     /**
@@ -907,6 +917,14 @@ class PublicApplicantController extends Controller
 
         $tenant = app('currentTenant');
         $applicantWithProgram = Applicant::with(['admittedProgram', 'appliedProgram'])->find($applicant->id);
+        
+        // Ensure registration number is generated if missing
+        if (empty($applicantWithProgram->registration_number)) {
+            $regNum = Applicant::generateNextRegistrationNumber($applicantWithProgram);
+            $applicantWithProgram->update(['registration_number' => $regNum]);
+            $applicantWithProgram->registration_number = $regNum;
+        }
+
         $academicSession = \App\Models\AcademicSession::where('tenant_id', $tenant->id ?? 1)->where('is_current', true)->first();
 
         // Prepare Base64 letterhead and provost signature

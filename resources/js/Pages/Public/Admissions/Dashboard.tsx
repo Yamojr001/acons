@@ -505,10 +505,10 @@ export default function Dashboard({
             background-size: 100% 100% !important;
             background-repeat: no-repeat !important;
             background-position: top center !important;
-            padding-top: 45mm !important;
-            padding-bottom: 22mm !important;
-            padding-left: 18mm !important;
-            padding-right: 18mm !important;
+            padding-top: 64mm !important;
+            padding-bottom: 20mm !important;
+            padding-left: 20mm !important;
+            padding-right: 20mm !important;
             box-sizing: border-box !important;
             page-break-after: avoid !important;
             page-break-inside: avoid !important;
@@ -2047,8 +2047,8 @@ export default function Dashboard({
                 backgroundSize: '100% 100%',
                 backgroundRepeat: 'no-repeat',
                 backgroundPosition: 'top center',
-                paddingTop: '165px',
-                paddingBottom: '90px',
+                paddingTop: '240px',
+                paddingBottom: '80px',
                 paddingLeft: '65px',
                 paddingRight: '65px',
                 boxSizing: 'border-box',
@@ -2064,8 +2064,10 @@ export default function Dashboard({
               <table className="w-full text-[13px] mb-3 border-collapse text-black">
                 <tbody>
                   <tr>
-                    <td className="w-44 py-0.5 text-black">Admission Number:</td>
-                    <td className="font-bold py-0.5 text-black">ACONS/ND/2026/{String(applicant.id).padStart(4, '0')}</td>
+                    <td className="w-48 py-0.5 text-black">Registration Number:</td>
+                    <td className="font-bold py-0.5 text-black font-mono">
+                      {applicant.registration_number || `ACONS/ND/2026/${String(applicant.id).padStart(3, '0')}`}
+                    </td>
                   </tr>
                   <tr>
                     <td className="py-0.5 text-black">Name of Candidate:</td>
@@ -2092,7 +2094,7 @@ export default function Dashboard({
                   PROVISIONAL OFFER OF ADMISSION INTO ND/HND NURSING PROGRAM
                 </div>
                 <div className="font-bold text-[13px]">
-                  ({academicSession?.name || '2026/2027'} ACADEMIC SESSION)
+                  (2026/2027 ACADEMIC SESSION)
                 </div>
               </div>
 
