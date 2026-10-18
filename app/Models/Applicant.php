@@ -211,13 +211,18 @@ class Applicant extends Authenticatable
     }
 
     /**
-     * Generate sequential registration number starting from 001 based on acceptance payment.
+     * Generate sequential admission / registration number starting from 001 based on acceptance payment.
+     * Format: ACONS/NUR/ND/26/001
      */
     public static function generateNextRegistrationNumber(self $applicant): string
     {
-        $year = '2026';
+        $year = '26';
+        $deptCode = 'NUR';
+        if ($applicant->admittedDepartment && str_contains(strtolower($applicant->admittedDepartment->name), 'midwifer')) {
+            $deptCode = 'MID';
+        }
         $section = $applicant->admitted_section ?: 'ND';
-        $prefix = "ACONS/{$section}/{$year}/";
+        $prefix = "ACONS/{$deptCode}/{$section}/{$year}/";
 
         // Find the highest serial among applicants who have paid acceptance fee and have a registration number
         $lastReg = static::where('registration_number', 'like', $prefix . '%')

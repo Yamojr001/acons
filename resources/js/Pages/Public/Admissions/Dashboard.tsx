@@ -2053,9 +2053,9 @@ export default function Dashboard({
               <table className="w-full text-[13px] mb-3 border-collapse text-black">
                 <tbody>
                   <tr>
-                    <td className="w-48 py-0.5 text-black">Registration Number:</td>
+                    <td className="w-48 py-0.5 text-black">Admission Number:</td>
                     <td className="font-bold py-0.5 text-black font-mono">
-                      {applicant.registration_number || `ACONS/ND/2026/${String(applicant.id).padStart(3, '0')}`}
+                      {applicant.registration_number || `ACONS/NUR/ND/26/${String(applicant.id).padStart(3, '0')}`}
                     </td>
                   </tr>
                   <tr>

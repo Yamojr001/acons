@@ -148,8 +148,8 @@
 
         <table class="meta-table">
             <tr>
-                <td class="meta-label">Registration Number:</td>
-                <td class="meta-value">{{ $applicant->registration_number ?? ('ACONS/ND/2026/' . str_pad($applicant->id, 3, '0', STR_PAD_LEFT)) }}</td>
+                <td class="meta-label">Admission Number:</td>
+                <td class="meta-value">{{ $applicant->registration_number ?? ('ACONS/NUR/ND/26/' . str_pad($applicant->id, 3, '0', STR_PAD_LEFT)) }}</td>
             </tr>
             <tr>
                 <td class="meta-label">Name of Candidate:</td>
