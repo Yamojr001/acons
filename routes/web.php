@@ -231,6 +231,7 @@ Route::middleware(['identify.tenant', 'auth', 'tenant.access'])->group(function 
         Route::post('/open/{form}',                 [\App\Http\Controllers\AdmissionOfficer\AdmissionController::class, 'updateOpenAdmission'])->name('open.update');
         Route::get('/applicants',                   [\App\Http\Controllers\Registrar\DashboardController::class, 'admissions'])->name('applicants');
         Route::get('/admitted',                     [\App\Http\Controllers\AdmissionOfficer\AdmissionController::class, 'admittedList'])->name('admitted');
+        Route::post('/admitted/sync-paid',          [\App\Http\Controllers\AdmissionOfficer\AdmissionController::class, 'syncPaidApplicants'])->name('admitted.sync_paid');
         Route::get('/announcements',                [\App\Http\Controllers\AdmissionOfficer\AdmissionController::class, 'announcementsIndex'])->name('announcements.index');
         Route::post('/announcements',               [\App\Http\Controllers\AdmissionOfficer\AdmissionController::class, 'announcementsStore'])->name('announcements.store');
         Route::post('/announcements/{announcement}/retry-sms', [\App\Http\Controllers\AdmissionOfficer\AdmissionController::class, 'retryAnnouncementSms'])->name('announcements.retry_sms');

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Head, Link, router } from '@inertiajs/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Search, Eye, Clock, CheckCircle, Award, Calendar, X 
+  Search, Eye, Clock, CheckCircle, Award, Calendar, X, RefreshCw 
 } from 'lucide-react'
 import AppLayout from '@/Layouts/AppLayout'
 import { Card, Button, Badge, Avatar } from '@/Components/UI'
@@ -31,6 +31,21 @@ export default function AdmittedStudents({ applications, filters, availableYears
   const [search, setSearch] = useState(filters.search || '')
   const [selectedApp, setSelectedApp] = useState<any>(null)
   const [viewModalOpen, setViewModalOpen] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+
+  const handleSyncPaid = () => {
+    if (confirm('This will scan all candidates who have paid acceptance fees and automatically provision their portal User & Student accounts (using their phone number as username and password). Proceed with sync?')) {
+      router.post(
+        route('admission_officer.admitted.sync_paid'),
+        {},
+        {
+          preserveScroll: true,
+          onStart: () => setSyncing(true),
+          onFinish: () => setSyncing(false),
+        }
+      )
+    }
+  }
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value)
@@ -72,6 +87,18 @@ export default function AdmittedStudents({ applications, filters, availableYears
         <div>
            <h1 className="text-3xl font-display font-bold text-surface-900">Admitted Students</h1>
            <p className="text-sm text-surface-500 mt-1">Review the roster of all applicants currently offered provisional admission or fully cleared into the student register.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncPaid}
+            disabled={syncing}
+            className="flex items-center gap-2 border-surface-300 text-surface-700 hover:bg-surface-50 shadow-sm"
+          >
+            <RefreshCw size={14} className={syncing ? 'animate-spin text-brand-600' : 'text-surface-500'} />
+            <span>{syncing ? 'Syncing...' : 'Sync Paid to Portal Users'}</span>
+          </Button>
         </div>
       </div>
 

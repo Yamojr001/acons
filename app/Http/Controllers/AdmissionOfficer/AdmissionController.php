@@ -115,6 +115,34 @@ class AdmissionController extends Controller
         ]);
     }
 
+    public function syncPaidApplicants(Request $request)
+    {
+        $query = Applicant::where(function ($q) {
+            $q->where('acceptance_fee_paid', true)
+              ->orWhereNotNull('acceptance_fee_paid_at')
+              ->orWhere('status', 'cleared')
+              ->orWhere('admission_status', 'cleared')
+              ->orWhereNotNull('acceptance_fee_reference');
+        });
+
+        $applicants = $query->get();
+        $count = 0;
+
+        foreach ($applicants as $applicant) {
+            if (!$applicant->acceptance_fee_paid) {
+                $applicant->update([
+                    'acceptance_fee_paid' => true,
+                    'acceptance_fee_paid_at' => now(),
+                ]);
+                $applicant->acceptance_fee_paid = true;
+            }
+            $applicant->provisionStudentAccount();
+            $count++;
+        }
+
+        return redirect()->back()->with('success', "Sync completed successfully! Processed {$count} paid applicant(s) into the portal Users & Students directory.");
+    }
+
     public function announcementsIndex()
     {
         $tenant = app('currentTenant');
