@@ -454,8 +454,8 @@ export default function AdmissionIndex({
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-surface-600">
-                    {app.data?.program || app.form?.title || 'General Admission'}
+                  <td className="px-6 py-4 text-sm font-medium text-surface-700">
+                    {app.applied_program?.name || app.admitted_program?.name || (app.data?.program && app.data.program !== 'Basic Nursing' ? app.data.program : 'ND/HND Nursing')}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 text-xs text-surface-500">
@@ -658,7 +658,7 @@ export default function AdmissionIndex({
                           <div className="bg-white p-2.5 rounded-lg border border-surface-100">
                             <span className="block text-[10px] uppercase font-bold text-surface-400">Program / Track</span>
                             <span className="font-semibold text-surface-800 truncate block mt-0.5">
-                              {selectedApp.data?.program || selectedApp.applied_program?.name || selectedApp.form?.title || 'General Admission'}
+                              {selectedApp.applied_program?.name || selectedApp.admitted_program?.name || (selectedApp.data?.program && selectedApp.data.program !== 'Basic Nursing' ? selectedApp.data.program : 'ND/HND Nursing')}
                             </span>
                           </div>
                           <div className="bg-white p-2.5 rounded-lg border border-surface-100">

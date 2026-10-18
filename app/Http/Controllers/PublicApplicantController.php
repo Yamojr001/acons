@@ -140,7 +140,7 @@ class PublicApplicantController extends Controller
 
             // States
             'admission_form_id' => \App\Models\AdmissionForm::where('tenant_id', $tenant->id)->where('is_active', true)->value('id'),
-            'applied_program_id' => $request->applied_program_id,
+            'applied_program_id' => $request->applied_program_id ?: (\App\Models\Program::where('tenant_id', $tenant->id)->first()?->id ?? 1),
             'payment_status' => 'pending',
             'admission_status' => 'pending',
             'status' => 'pending',

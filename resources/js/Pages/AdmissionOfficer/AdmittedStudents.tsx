@@ -318,7 +318,7 @@ export default function AdmittedStudents({ applications, filters, availableYears
                           <div className="bg-white p-2.5 rounded-lg border border-surface-100">
                             <span className="block text-[10px] uppercase font-bold text-surface-400">Department / Program</span>
                             <span className="font-semibold text-surface-800 truncate block mt-0.5">
-                              {selectedApp.admitted_department?.name || selectedApp.data?.program || 'Nursing / Midwifery'}
+                              {selectedApp.admitted_program?.name || selectedApp.applied_program?.name || selectedApp.admitted_department?.name || 'ND/HND Nursing'}
                             </span>
                           </div>
                           <div className="bg-white p-2.5 rounded-lg border border-surface-100">

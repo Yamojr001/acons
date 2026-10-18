@@ -205,7 +205,7 @@ class Applicant extends Authenticatable
             'parent_phone'          => $this->parent_phone,
             'parent_address'        => $this->parent_address,
             'sponsor_name_address'  => $this->sponsor_name_address,
-            'program'               => $this->appliedProgram?->name ?? 'Basic Nursing',
+            'program'               => $this->appliedProgram?->name ?? ($this->admittedProgram?->name ?? 'ND/HND Nursing'),
             'passport_photo'        => $this->passport_photo,
         ];
     }

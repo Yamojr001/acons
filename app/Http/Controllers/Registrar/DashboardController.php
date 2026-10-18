@@ -184,10 +184,10 @@ class DashboardController extends Controller
             'pending' => (clone $baseQuery)->whereIn('status', ['pending', 'under_review'])->count(),
         ];
 
-        $allApps = (clone $query)->with(['form', 'admittedDepartment', 'appliedProgram'])->get();
+        $allApps = (clone $query)->with(['form', 'admittedDepartment', 'appliedProgram', 'admittedProgram'])->get();
         $deptYearStats = $allApps->groupBy(function($app) {
             $y = $app->created_at ? $app->created_at->format('Y') : date('Y');
-            $dept = $app->appliedProgram?->name ?? ($app->admittedDepartment?->name ?? ($app->form ? $app->form->title : 'General'));
+            $dept = $app->appliedProgram?->name ?? ($app->admittedProgram?->name ?? ($app->admittedDepartment?->name ?? ($app->form ? $app->form->title : 'ND/HND Nursing')));
             return $dept . ' (' . $y . ')';
         })->map->count();
 
@@ -196,7 +196,7 @@ class DashboardController extends Controller
             ? 9999 
             : (is_numeric($perPageInput) ? max((int)$perPageInput, 5) : 20);
 
-        $applications = (clone $query)->with(['form', 'admittedDepartment', 'appliedProgram'])->latest()->paginate($perPage)->withQueryString();
+        $applications = (clone $query)->with(['form', 'admittedDepartment', 'appliedProgram', 'admittedProgram'])->latest()->paginate($perPage)->withQueryString();
         
         $availableYears = \App\Models\Applicant::where('tenant_id', $tenantId)
             ->pluck('created_at')
