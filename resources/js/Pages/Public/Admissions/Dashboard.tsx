@@ -301,7 +301,7 @@ export default function Dashboard({
 
         <div className="text-right shrink-0">
           <span className="text-[10px] font-bold text-surface-400 block uppercase">SESSION</span>
-          <span className="text-xs font-black text-surface-800 uppercase block">{academicSession?.name || '2025/2026'}</span>
+          <span className="text-xs font-black text-surface-800 uppercase block">{academicSession?.name || '2026/2027'}</span>
           <span className="text-[10px] font-mono font-bold text-red-900 block mt-1">SLIP NO: ACONS/{applicant.id}</span>
         </div>
       </div>
@@ -518,7 +518,7 @@ export default function Dashboard({
               <div className="flex items-center gap-2">
                 <span className="font-display font-black text-sm tracking-tight text-surface-900 leading-none">ACONS PORTAL</span>
                 <span className="hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-surface-100 text-surface-600 border border-surface-200">
-                  {academicSession?.name || '2025/2026'}
+                  {academicSession?.name || '2026/2027'}
                 </span>
               </div>
               <span className="text-[11px] text-surface-500 block mt-0.5">Ameenatu College of Nursing Sciences</span>

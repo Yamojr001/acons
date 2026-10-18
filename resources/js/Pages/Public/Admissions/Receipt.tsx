@@ -49,7 +49,7 @@ export default function Receipt({
     window.print()
   }
 
-  const sessionName = academicSession?.name || '2025/2026'
+  const sessionName = academicSession?.name || '2026/2027'
 
   return (
     <>
