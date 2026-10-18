@@ -210,7 +210,7 @@ class DashboardController extends Controller
         }
         
         $activeForm = \App\Models\AdmissionForm::where('tenant_id', $tenantId)->where('is_active', true)->first();
-        $defaultClearanceSchedule = $activeForm ? $activeForm->default_clearance_schedule : 'Mondays and Tuesdays between 10am and 2pm at the HOD\'s Office (starting May 25th).';
+        $defaultClearanceSchedule = $activeForm ? ($activeForm->default_clearance_schedule ?? '') : '';
         
         return Inertia::render('Registrar/Admissions/Index', [
             'applications' => $applications,
@@ -414,7 +414,7 @@ class DashboardController extends Controller
         $request->validate([
             'department_id' => 'required|exists:departments,id',
             'section' => 'required|in:ND,HND',
-            'clearance_schedule' => 'required|string',
+            'clearance_schedule' => 'nullable|string',
         ]);
 
         $program = \App\Models\Program::where('department_id', $request->department_id)->first();
@@ -425,7 +425,7 @@ class DashboardController extends Controller
             'admitted_department_id' => $request->department_id,
             'admitted_program_id' => $program?->id,
             'admitted_section' => $request->section,
-            'clearance_schedule' => $request->clearance_schedule,
+            'clearance_schedule' => $request->clearance_schedule ?: null,
         ]);
 
         $dept = Department::find($request->department_id);
@@ -436,7 +436,7 @@ class DashboardController extends Controller
                     $application->full_name,
                     $dept->name,
                     $request->section,
-                    $request->clearance_schedule
+                    $request->clearance_schedule ?: 'As announced by the Academic Affairs Division'
                 )
             );
         } catch (\Exception $e) {
@@ -446,10 +446,11 @@ class DashboardController extends Controller
         // Send transactional SMS notification via Sendar
         $phone = $application->phone_number;
         if (!empty($phone)) {
+            $clearanceText = !empty($request->clearance_schedule) ? " Clearance starts {$request->clearance_schedule}." : "";
             try {
                 app(\App\Services\SmsService::class)->send(
                     $phone,
-                    "Congratulations {$application->full_name}! You have been offered provisional admission into {$dept->name} ({$request->section}) at ACONS. Clearance starts {$request->clearance_schedule}."
+                    "Congratulations {$application->full_name}! You have been offered provisional admission into {$dept->name} ({$request->section}) at ACONS.{$clearanceText}"
                 );
             } catch (\Throwable) {}
         }

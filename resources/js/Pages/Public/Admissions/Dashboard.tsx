@@ -54,7 +54,6 @@ export default function Dashboard({
   const [examCardModal, setExamCardModal] = useState(false)
   const [acceptanceModal, setAcceptanceModal] = useState(false)
   const [payingAcceptance, setPayingAcceptance] = useState(false)
-  const [authorizingAcceptance, setAuthorizingAcceptance] = useState(false)
 
   const isAdmittedOrCleared = ['admitted', 'cleared'].includes(applicant.admission_status)
   const isAcceptancePaid = Boolean(applicant.acceptance_fee_paid)
@@ -65,16 +64,6 @@ export default function Dashboard({
     setPayingAcceptance(true)
     router.post(route('admissions.acceptance_fee.pay', applicant.id), {}, {
       onFinish: () => setPayingAcceptance(false),
-    })
-  }
-
-  const handleAuthorizeAcceptance = () => {
-    setAuthorizingAcceptance(true)
-    router.post(route('admissions.acceptance_fee.authorize', applicant.id), {}, {
-      onFinish: () => {
-        setAuthorizingAcceptance(false)
-        setAcceptanceModal(false)
-      },
     })
   }
 
@@ -2270,7 +2259,7 @@ export default function Dashboard({
               <button
                 type="button"
                 onClick={handlePayAcceptance}
-                disabled={payingAcceptance || authorizingAcceptance}
+                disabled={payingAcceptance}
                 className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-blue-900 hover:bg-blue-950 text-white font-bold text-sm shadow-md transition-colors disabled:opacity-50"
               >
                 {payingAcceptance ? (
@@ -2282,25 +2271,6 @@ export default function Dashboard({
                   <>
                     <CreditCard size={16} />
                     <span>Pay ₦10,000 with ZainPay (Card / USSD / Bank)</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleAuthorizeAcceptance}
-                disabled={payingAcceptance || authorizingAcceptance}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-surface-200 bg-white hover:bg-surface-50 text-surface-700 font-bold text-xs transition-colors disabled:opacity-50"
-              >
-                {authorizingAcceptance ? (
-                  <>
-                    <RefreshCw size={14} className="animate-spin" />
-                    <span>Authorizing clearance...</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck size={14} className="text-emerald-600" />
-                    <span>Instant Clearance (Demo / Admin Bypass)</span>
                   </>
                 )}
               </button>

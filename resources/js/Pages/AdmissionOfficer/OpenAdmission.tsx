@@ -183,15 +183,15 @@ export default function OpenAdmission({ form, sessions }: Props) {
                   Default Scheduled Clearance Info
                 </h3>
                 <div>
-                  <label className="block text-xs font-bold text-surface-500 uppercase tracking-wider mb-2">Clearance Schedule Text</label>
+                  <label className="block text-xs font-bold text-surface-500 uppercase tracking-wider mb-2">Clearance Schedule Text (Optional)</label>
                   <textarea 
                     rows={3}
-                    placeholder="e.g. Mondays and Tuesdays between 10am and 2pm at the HOD's Office (starting May 25th)."
+                    placeholder="e.g. Venue, date, and time for physical clearance (Optional)"
                     value={data.default_clearance_schedule}
                     onChange={(e) => setData('default_clearance_schedule', e.target.value)}
                     className="w-full px-4 py-3 bg-white border border-surface-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all resize-none"
                   />
-                  <p className="text-xs text-surface-400 mt-1">This text will be prefilled automatically whenever you offer admission to any student, preventing repetitive typing.</p>
+                  <p className="text-xs text-surface-400 mt-1">Optional. If provided, this text will prefill when admitting candidates. Leave blank if not yet determined.</p>
                   {errors.default_clearance_schedule && <p className="text-xs text-danger-500 mt-1">{errors.default_clearance_schedule}</p>}
                 </div>
               </div>
