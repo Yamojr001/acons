@@ -16,9 +16,8 @@ class AdmissionController extends Controller
 {
     private function getOrCreateDefaultForm()
     {
-        $tenant = app('currentTenant');
         return AdmissionForm::firstOrCreate(
-            ['tenant_id' => $tenant->id],
+            ['is_active' => true],
             [
                 'title' => 'General Admission Form',
                 'description' => 'Admissions application for Nursing and Midwifery programs.',
@@ -145,11 +144,8 @@ class AdmissionController extends Controller
 
     public function announcementsIndex()
     {
-        $tenant = app('currentTenant');
-        
         // Fetch past announcements targeted at applicants with recipient delivery counts
-        $announcements = Announcement::where('tenant_id', $tenant->id)
-            ->where('audience', 'applicant')
+        $announcements = Announcement::where('audience', 'applicant')
             ->withCount([
                 'recipients as total_recipients',
                 'recipients as sms_sent_count' => fn($q) => $q->where('sms_status', 'sent'),
@@ -175,10 +171,8 @@ class AdmissionController extends Controller
             'channel' => 'required|in:email,sms,both'
         ]);
 
-        $tenant = app('currentTenant');
-
         // 1. Fetch target applicants
-        $query = Applicant::where('tenant_id', $tenant->id);
+        $query = Applicant::query();
 
         if ($request->target === 'pending') {
             $query->whereIn('status', ['pending', 'under_review']);
@@ -199,7 +193,6 @@ class AdmissionController extends Controller
 
         // 2. Create Announcement record
         $announcement = Announcement::create([
-            'tenant_id'        => $tenant->id,
             'created_by'       => auth()->id() ?? 1,
             'title'            => $request->subject,
             'body'             => $request->message,
@@ -220,7 +213,6 @@ class AdmissionController extends Controller
             $formattedPhone = $phone ? $smsService->formatPhoneNumber($phone) : null;
 
             $recipient = BroadcastRecipient::create([
-                'tenant_id'        => $tenant->id,
                 'announcement_id'  => $announcement->id,
                 'recipient_type'   => Applicant::class,
                 'recipient_id'     => $applicant->id,
@@ -283,9 +275,6 @@ class AdmissionController extends Controller
      */
     public function retryAnnouncementSms(Request $request, Announcement $announcement)
     {
-        $tenant = app('currentTenant');
-        abort_if($announcement->tenant_id !== $tenant->id, 403);
-
         // Find failed/unsent recipients strictly
         $query = $announcement->recipients()->where('sms_status', '!=', 'sent');
 
@@ -322,9 +311,6 @@ class AdmissionController extends Controller
      */
     public function announcementRecipients(Announcement $announcement)
     {
-        $tenant = app('currentTenant');
-        abort_if($announcement->tenant_id !== $tenant->id, 403);
-
         $recipients = $announcement->recipients()
             ->orderByRaw("CASE WHEN sms_status = 'failed' THEN 1 WHEN sms_status = 'pending' THEN 2 ELSE 3 END")
             ->orderBy('recipient_name', 'asc')
@@ -363,9 +349,6 @@ class AdmissionController extends Controller
      */
     public function updateRecipientPhone(Request $request, BroadcastRecipient $recipient)
     {
-        $tenant = app('currentTenant');
-        abort_if($recipient->tenant_id !== $tenant->id, 403);
-
         $request->validate([
             'phone' => 'required|string|min:10|max:15'
         ]);

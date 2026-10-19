@@ -7,18 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Traits\BelongsToTenant;
 
 class Faculty extends Model
 {
-    use SoftDeletes, HasFactory, BelongsToTenant;
+    use SoftDeletes, HasFactory;
 
-    protected $fillable = ['tenant_id', 'name', 'code', 'dean_id'];
-
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(Tenant::class);
-    }
+    protected $fillable = ['name', 'code', 'dean_id'];
 
     public function dean(): BelongsTo
     {

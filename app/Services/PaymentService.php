@@ -56,7 +56,7 @@ class PaymentService
             'mode'        => 'payment',
             'success_url' => $callbackUrl . '?gateway=stripe&status=success&ref={CHECKOUT_SESSION_ID}',
             'cancel_url'  => $callbackUrl . '?gateway=stripe&status=cancelled',
-            'metadata'    => ['fee_id' => $fee->id, 'tenant_id' => $fee->tenant_id],
+            'metadata'    => ['fee_id' => $fee->id],
         ]);
 
         return [
@@ -92,7 +92,7 @@ class PaymentService
                 'email'        => $fee->student->user->email,
                 'currency'     => 'NGN',
                 'callback_url' => $callbackUrl . '?gateway=paystack&ref=' . $reference,
-                'metadata'     => ['fee_id' => $fee->id, 'tenant_id' => $fee->tenant_id],
+                'metadata'     => ['fee_id' => $fee->id],
             ])->json();
 
         if (! ($response['status'] ?? false)) {
@@ -271,7 +271,6 @@ class PaymentService
 
         // Log to global Transaction ledger
         Transaction::create([
-            'tenant_id'      => $payment->tenant_id,
             'user_id'        => $payment->student->user_id,
             'payable_type'   => Fee::class,
             'payable_id'     => $payment->fee_id,

@@ -650,7 +650,7 @@ class ZainpayReconciliationService
     protected function ensureApplicantFormLinked(Applicant $applicant): void
     {
         if (empty($applicant->admission_form_id)) {
-            $defaultFormId = AdmissionForm::where('tenant_id', $applicant->tenant_id ?: 1)->where('is_active', true)->value('id');
+            $defaultFormId = AdmissionForm::where('is_active', true)->value('id');
             if ($defaultFormId) {
                 $applicant->update(['admission_form_id' => $defaultFormId]);
             }

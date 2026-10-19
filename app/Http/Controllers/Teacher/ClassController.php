@@ -23,7 +23,7 @@ class ClassController extends Controller
 
     public function subjects(ClassRoom $class): Response
     {
-        $tenant = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
         if ($class->teacher_id !== Auth::user()->teacher->id) {
             abort(403, 'Unauthorized. Only the Class Master can manage subjects.');
         }
@@ -37,13 +37,12 @@ class ClassController extends Controller
             'classroom' => $class,
             'subjects' => $allSubjects,
             'teachers' => $teachers,
-            'teacherMode' => $tenant->teacher_mode
+            'teacherMode' => $institution->teacher_mode ?? 'per_course'
         ]);
     }
 
     public function updateSubjects(Request $request, ClassRoom $class)
     {
-        $tenant = app('currentTenant');
         if ($class->teacher_id !== Auth::user()->teacher->id) {
             abort(403);
         }
@@ -57,8 +56,10 @@ class ClassController extends Controller
         // Sync subjects
         $class->subjects()->sync($request->subjects ?? []);
 
+        $institution = \App\Models\InstitutionSetting::current();
+
         // Sync subject teachers if in per_subject mode
-        if ($tenant->teacher_mode === 'per_subject' && $request->has('assignments')) {
+        if (($institution->teacher_mode ?? 'per_class') === 'per_subject' && $request->has('assignments')) {
             // Delete old assignments
             $class->subjectTeachers()->delete();
             $assignments = [];

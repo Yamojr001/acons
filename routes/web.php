@@ -20,7 +20,7 @@ Route::prefix('webhooks')->name('webhooks.')->group(function () {
 /*
 |─── PUBLIC (no auth required) ──────────────────────────────────────────────
 */
-Route::middleware(['identify.tenant'])->group(function () {
+Route::group([], function () {
     Route::get('/', [LandingController::class, 'index'])->name('landing');
 
     // Auth
@@ -65,7 +65,7 @@ Route::middleware(['identify.tenant'])->group(function () {
 /*
 |─── AUTHENTICATED ROUTES ────────────────────────────────────────────────────
 */
-Route::middleware(['identify.tenant', 'auth', 'tenant.access'])->group(function () {
+Route::middleware(['auth'])->group(function () {
 
     /*
     |── STUDENT ─────────────────────────────────────────────────────────────

@@ -14,21 +14,19 @@ class PublicAdmissionController extends Controller
 {
     public function show(Request $request, AdmissionForm $form): Response
     {
-        $tenant = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
         abort_if(!$form->is_active, 404, 'This admission form is no longer active.');
-        abort_if($form->tenant_id !== $tenant->id, 404);
 
         return Inertia::render('Public/AdmissionApply', [
-            'tenant' => $tenant,
+            'institution' => $institution,
+            'tenant' => $institution,
             'form' => $form
         ]);
     }
 
     public function submit(Request $request, AdmissionForm $form)
     {
-        $tenant = app('currentTenant');
         abort_if(!$form->is_active, 404, 'This admission form is no longer active.');
-        abort_if($form->tenant_id !== $tenant->id, 404);
 
         $request->validate([
             'applicant_name' => 'required|string|max:255',
@@ -40,7 +38,6 @@ class PublicAdmissionController extends Controller
         $phone = $request->data['phone_number'] ?? $request->data['phone'] ?? '08000000000';
 
         Applicant::create([
-            'tenant_id' => $tenant->id,
             'admission_form_id' => $form->id,
             'full_name' => $request->applicant_name,
             'email' => $request->applicant_email,

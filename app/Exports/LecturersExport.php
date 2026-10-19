@@ -10,11 +10,8 @@ use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 
 class LecturersExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
 {
-    protected $tenantId;
-
-    public function __construct($tenantId)
+    public function __construct()
     {
-        $this->tenantId = $tenantId;
     }
 
     /**
@@ -23,7 +20,6 @@ class LecturersExport implements FromCollection, WithHeadings, WithMapping, Shou
     public function collection()
     {
         return Lecturer::with(['user', 'department'])
-            ->where('tenant_id', $this->tenantId)
             ->latest()
             ->get();
     }

@@ -3,17 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 
 class Student extends Model
 {
     use SoftDeletes;
-    use BelongsToTenant;
 
     protected $fillable = [
-        'tenant_id',
         'user_id',
         'department_id',
         'program_id',
@@ -46,7 +43,6 @@ class Student extends Model
         'reseat_course_ids' => 'array',
     ];
 
-    public function tenant(): BelongsTo      { return $this->belongsTo(Tenant::class); }
     public function user(): BelongsTo        { return $this->belongsTo(User::class); }
     public function department(): BelongsTo  { return $this->belongsTo(Department::class); }
     public function program(): BelongsTo     { return $this->belongsTo(Program::class); }

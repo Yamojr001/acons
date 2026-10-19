@@ -14,10 +14,8 @@ class DashboardController extends Controller
     {
         $user    = Auth::user();
         $student = $user->student->load(['user', 'department', 'program']);
-        $tenant  = app('currentTenant');
 
-        $currentSemester = Semester::where('tenant_id', $tenant->id)
-            ->where('is_current', true)
+        $currentSemester = Semester::where('is_current', true)
             ->first();
 
         // 1. Calculate CGPA (Mocking if no records exist, or calculate if they do)

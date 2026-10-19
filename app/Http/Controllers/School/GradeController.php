@@ -55,7 +55,8 @@ class GradeController extends Controller
             'classrooms' => $classrooms,
             'students'   => $students,
             'filters'    => $request->only('class_room_id','term'),
-            'tenant'     => app('currentTenant'),
+            'tenant'      => \App\Models\InstitutionSetting::current(),
+            'institution' => \App\Models\InstitutionSetting::current(),
         ]);
     }
 
@@ -74,7 +75,6 @@ class GradeController extends Controller
                 Grade::updateOrCreate(
                     ['student_id' => $g['student_id'], 'exam_id' => $exam->id],
                     [
-                        'tenant_id'    => $exam->tenant_id,
                         'score'        => min($g['score'], $exam->total_marks),
                         'grade_letter' => Grade::letterGrade($g['score'], $exam->total_marks),
                         'remarks'      => $g['remarks'] ?? null,

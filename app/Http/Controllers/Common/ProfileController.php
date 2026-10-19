@@ -56,7 +56,7 @@ class ProfileController extends Controller
             $student = $user->student;
             $request->validate([
                 'name' => 'required|string|max:255',
-                'email' => 'required|email|max:255|unique:users,email,' . $user->id . ',id,tenant_id,' . $user->tenant_id,
+                'email' => 'required|email|max:255|unique:users,email,' . $user->id,
                 'phone_number' => 'nullable|string|max:20',
                 'gender' => 'required|in:male,female,other',
                 'address' => 'nullable|string',
@@ -93,7 +93,7 @@ class ProfileController extends Controller
             $lecturer = $user->lecturer;
             $request->validate([
                 'name' => 'required|string|max:255',
-                'email' => 'required|email|max:255|unique:users,email,' . $user->id . ',id,tenant_id,' . $user->tenant_id,
+                'email' => 'required|email|max:255|unique:users,email,' . $user->id,
                 'phone_number' => 'nullable|string|max:20',
                 'gender' => 'required|in:male,female,other',
                 'address' => 'nullable|string',
@@ -129,7 +129,7 @@ class ProfileController extends Controller
         // Generic administrative staff profile update
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users,email,' . $user->id . ',id,tenant_id,' . $user->tenant_id,
+            'email' => 'required|email|max:255|unique:users,email,' . $user->id,
             'phone' => 'nullable|string|max:20',
             'gender' => 'required|in:male,female,other',
         ]);

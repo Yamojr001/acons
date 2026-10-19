@@ -55,10 +55,9 @@ class DashboardController extends Controller
 
     public function fees()
     {
-        $tenant = app('currentTenant');
-        $fees = Fee::where('tenant_id', $tenant->id)->with(['department', 'academicSession'])->latest()->paginate(20);
-        $departments = Department::where('tenant_id', $tenant->id)->get();
-        $academic_sessions = \App\Models\AcademicSession::where('tenant_id', $tenant->id)->get();
+        $fees = Fee::with(['department', 'academicSession'])->latest()->paginate(20);
+        $departments = Department::all();
+        $academic_sessions = \App\Models\AcademicSession::all();
 
         return Inertia::render('Bursar/Fees/Index', [
             'fees' => $fees,
@@ -69,7 +68,6 @@ class DashboardController extends Controller
 
     public function payments()
     {
-        $tenant = app('currentTenant');
         $payments = Payment::with(['student.user', 'student.department', 'studentInvoice'])
             ->whereNotIn('id', function($query) {
                 $query->select('parent_id')->from('payments')->whereNotNull('parent_id');
@@ -82,19 +80,18 @@ class DashboardController extends Controller
             'name' => $s->user->name . ' (' . $s->matriculation_number . ')'
         ]);
 
-        $fees = Fee::where('tenant_id', $tenant->id)->get()->map(fn($f) => [
+        $fees = Fee::all()->map(fn($f) => [
             'id' => $f->id,
             'name' => $f->name . ' - ' . number_format($f->amount, 2),
             'amount' => $f->amount
         ]);
 
-        $totalIncome = Payment::where('tenant_id', $tenant->id)
-            ->where('status', 'successful')
+        $totalIncome = Payment::where('status', 'successful')
             ->whereNotIn('id', function($query) {
                 $query->select('parent_id')->from('payments')->whereNotNull('parent_id');
             })
             ->sum('amount');
-        $totalSpent = \App\Models\Transaction::where('tenant_id', $tenant->id)->where('type', 'expense')->where('status', 'successful')->sum('amount');
+        $totalSpent = \App\Models\Transaction::where('type', 'expense')->where('status', 'successful')->sum('amount');
         $currentBalance = $totalIncome - $totalSpent;
 
         return Inertia::render('Bursar/Payments/Index', [
@@ -111,8 +108,6 @@ class DashboardController extends Controller
 
     public function storePayment(Request $request)
     {
-        $tenant = app('currentTenant');
-
         $request->validate([
             'student_id' => 'required|exists:students,id',
             'fee_id' => 'required|exists:fees,id',
@@ -130,7 +125,6 @@ class DashboardController extends Controller
             [
                 'student_id' => $request->student_id,
                 'fee_id' => $request->fee_id,
-                'tenant_id' => $tenant->id
             ],
             [
                 'amount_due' => $fee->amount,
@@ -140,7 +134,6 @@ class DashboardController extends Controller
         );
 
         $payment = Payment::create([
-            'tenant_id' => $tenant->id,
             'student_invoice_id' => $invoice->id,
             'amount' => $request->amount,
             'reference' => $request->reference,
@@ -164,10 +157,7 @@ class DashboardController extends Controller
 
     public function reports()
     {
-        $tenant = app('currentTenant');
-
-        $monthly_revenue = Payment::where('tenant_id', $tenant->id)
-            ->where('status', 'successful')
+        $monthly_revenue = Payment::where('status', 'successful')
             ->selectRaw("DATE_FORMAT(created_at, '%b %Y') as month, SUM(amount) as collected")
             ->groupBy(\Illuminate\Support\Facades\DB::raw("DATE_FORMAT(created_at,'%Y-%m')"), \Illuminate\Support\Facades\DB::raw("DATE_FORMAT(created_at,'%b %Y')"))
             ->orderBy(\Illuminate\Support\Facades\DB::raw("DATE_FORMAT(created_at,'%Y-%m')"))
@@ -189,8 +179,7 @@ class DashboardController extends Controller
             ]);
         }
 
-        $payment_methods = Payment::where('tenant_id', $tenant->id)
-            ->where('status', 'successful')
+        $payment_methods = Payment::where('status', 'successful')
             ->selectRaw("payment_gateway as method, SUM(amount) as amount, COUNT(*) as count")
             ->groupBy('payment_gateway')
             ->get()
@@ -209,8 +198,7 @@ class DashboardController extends Controller
             ]);
         }
 
-        $fee_collection_by_class = \App\Models\Student::where('tenant_id', $tenant->id)
-            ->select('current_level as class')
+        $fee_collection_by_class = \App\Models\Student::select('current_level as class')
             ->selectRaw("COUNT(*) as students_count")
             ->groupBy('current_level')
             ->get()
@@ -232,8 +220,8 @@ class DashboardController extends Controller
             ]);
         }
 
-        $total_collected = Payment::where('tenant_id', $tenant->id)->where('status', 'successful')->sum('amount') ?: 680000;
-        $total_expected = StudentInvoice::where('tenant_id', $tenant->id)->sum('amount_due') ?: 750000;
+        $total_collected = Payment::where('status', 'successful')->sum('amount') ?: 680000;
+        $total_expected = StudentInvoice::sum('amount_due') ?: 750000;
         $collection_rate = $total_expected > 0 ? round(($total_collected / $total_expected) * 100, 1) : 0;
         $overdue_amount = max(0, $total_expected - $total_collected);
 
@@ -254,8 +242,6 @@ class DashboardController extends Controller
 
     public function updatePayment(Request $request, Payment $payment)
     {
-        $tenant = app('currentTenant');
-
         $request->validate([
             'student_id' => 'required|exists:students,id',
             'fee_id' => 'required|exists:fees,id',
@@ -274,7 +260,6 @@ class DashboardController extends Controller
                 [
                     'student_id' => $request->student_id,
                     'fee_id' => $request->fee_id,
-                    'tenant_id' => $tenant->id
                 ],
                 [
                     'amount_due' => $fee->amount,
@@ -294,7 +279,6 @@ class DashboardController extends Controller
             $newInvoice->save();
 
             $newPayment = Payment::create([
-                'tenant_id' => $tenant->id,
                 'parent_id' => $payment->id,
                 'student_invoice_id' => $newInvoice->id,
                 'amount' => $request->amount,
@@ -325,7 +309,6 @@ class DashboardController extends Controller
             [
                 'student_id' => $request->student_id,
                 'fee_id' => $request->fee_id,
-                'tenant_id' => $tenant->id
             ],
             [
                 'amount_due' => $fee->amount,
@@ -399,8 +382,6 @@ class DashboardController extends Controller
 
     public function storeFee(Request $request)
     {
-        $tenant = app('currentTenant');
-
         $request->validate([
             'name' => 'required|string|max:255',
             'fee_type' => 'required|string|in:tuition,departmental,acceptance,hostel,dues,registration,other',
@@ -417,7 +398,6 @@ class DashboardController extends Controller
         $levelsStr = $request->level ? implode(',', $request->level) : null;
 
         Fee::create([
-            'tenant_id' => $tenant->id,
             'name' => $request->name,
             'fee_type' => $request->fee_type,
             'amount' => $request->amount,
@@ -484,8 +464,6 @@ class DashboardController extends Controller
 
     public function storeAnnouncement(Request $request)
     {
-        $tenantId = app('currentTenant')->id;
-
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'body' => 'required|string',
@@ -493,7 +471,6 @@ class DashboardController extends Controller
         ]);
 
         \App\Models\Announcement::create([
-            'tenant_id' => $tenantId,
             'created_by' => auth()->id(),
             'title' => $validated['title'],
             'body' => $validated['body'],
@@ -508,9 +485,8 @@ class DashboardController extends Controller
 
     public function exportPayments($format)
     {
-        $tenant = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
         $payments = Payment::with(['student.user', 'student.department'])
-            ->where('tenant_id', $tenant->id)
             ->whereNotIn('id', function($query) {
                 $query->select('parent_id')->from('payments')->whereNotNull('parent_id');
             })
@@ -520,17 +496,18 @@ class DashboardController extends Controller
         if ($format === 'pdf') {
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.payments', [
                 'payments' => $payments,
-                'tenant' => $tenant
+                'tenant' => $institution,
+                'institution' => $institution,
             ]);
             return $pdf->download('payments_' . now()->format('Ymd') . '.pdf');
         }
 
         if ($format === 'csv') {
-            return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\PaymentsExport($tenant->id), 'payments_' . now()->format('Ymd') . '.csv', \Maatwebsite\Excel\Excel::CSV);
+            return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\PaymentsExport(), 'payments_' . now()->format('Ymd') . '.csv', \Maatwebsite\Excel\Excel::CSV);
         }
 
         if ($format === 'excel' || $format === 'xlsx') {
-            return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\PaymentsExport($tenant->id), 'payments_' . now()->format('Ymd') . '.xlsx', \Maatwebsite\Excel\Excel::XLSX);
+            return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\PaymentsExport(), 'payments_' . now()->format('Ymd') . '.xlsx', \Maatwebsite\Excel\Excel::XLSX);
         }
 
         abort(400, 'Invalid format');

@@ -14,19 +14,9 @@ use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
-    private function getTenantId(): int
-    {
-        if (app()->bound('currentTenant')) {
-            return app('currentTenant')->id;
-        }
-        return \App\Models\Tenant::first()?->id ?? 1;
-    }
-
     public function index()
     {
-        $tenantId = $this->getTenantId();
-
-        $stats = Cache::remember('provost:dashboard:stats:' . $tenantId, 300, function () {
+        $stats = Cache::remember('provost:dashboard:stats', 300, function () {
             $currentSemester = Semester::where('is_current', true)->first();
 
             $pendingRelease = 0;
@@ -282,7 +272,7 @@ class DashboardController extends Controller
             }
         }
 
-        Cache::forget('provost:dashboard:stats:' . $this->getTenantId());
+        Cache::forget('provost:dashboard:stats');
 
         return back()->with('success', "Successfully authorized and released {$count} student result records to the student portal for {$semester->name}.");
     }
@@ -351,7 +341,7 @@ class DashboardController extends Controller
             }
         }
 
-        Cache::forget('provost:dashboard:stats:' . $this->getTenantId());
+        Cache::forget('provost:dashboard:stats');
 
         $sessionLabel = $semester->academicSession?->name
             ? "{$semester->academicSession->name} - {$semester->name}"
@@ -408,7 +398,7 @@ class DashboardController extends Controller
             }
         }
 
-        Cache::forget('provost:dashboard:stats:' . $this->getTenantId());
+        Cache::forget('provost:dashboard:stats');
 
         return back()->with('success', "Results Blocked: {$releasedCount} records for {$department->name} ({$semester->name}) have been withheld from student view.");
     }
@@ -476,7 +466,7 @@ class DashboardController extends Controller
             }
         }
 
-        Cache::forget('provost:dashboard:stats:' . $this->getTenantId());
+        Cache::forget('provost:dashboard:stats');
 
         $courseTitle = $course->name ?? $course->title;
         return back()->with('success', "Results for {$course->code} — {$courseTitle} ({$count} students) have been released to students.");
@@ -517,7 +507,7 @@ class DashboardController extends Controller
             Cache::forget('student_results_' . $studentId);
         }
 
-        Cache::forget('provost:dashboard:stats:' . $this->getTenantId());
+        Cache::forget('provost:dashboard:stats');
 
         return back()->with('success', "Results for {$course->code} ({$updated} records) sent back to the department for revision.");
     }
@@ -542,7 +532,6 @@ class DashboardController extends Controller
         ]);
 
         Announcement::create([
-            'tenant_id'    => $this->getTenantId(),
             'created_by'   => auth()->id(),
             'title'        => $validated['title'],
             'body'         => $validated['body'],

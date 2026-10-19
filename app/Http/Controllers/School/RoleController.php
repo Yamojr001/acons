@@ -14,7 +14,7 @@ class RoleController extends Controller
 {
     public function index(Request $request): Response
     {
-        // Don't let tenant modify super_admin. Show standard roles and custom ones.
+        // Don't let users modify super_admin. Show standard roles and custom ones.
         $roles = Role::whereNotIn('name', ['super_admin'])
                      ->with('permissions')
                      ->get();

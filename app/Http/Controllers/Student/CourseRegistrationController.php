@@ -15,11 +15,9 @@ class CourseRegistrationController extends Controller
 {
     public function index(Request $request)
     {
-        $tenant = app('currentTenant');
         $student = $request->user()->student;
         
         $currentSemester = Semester::with('academicSession')
-                                    ->where('tenant_id', $tenant->id)
                                     ->where('is_current', true)
                                     ->firstOrFail();
         $academicSession = $currentSemester->academicSession;
@@ -67,7 +65,6 @@ class CourseRegistrationController extends Controller
 
             foreach ($coursesToRegister as $course) {
                 CourseRegistration::create([
-                    'tenant_id' => $tenant->id,
                     'student_id' => $student->id,
                     'semester_id' => $currentSemester->id,
                     'course_id' => $course->id,
@@ -97,12 +94,14 @@ class CourseRegistrationController extends Controller
             ->join('courses', 'course_registrations.course_id', '=', 'courses.id')
             ->sum('courses.credit_units');
 
+        $institution = \App\Models\InstitutionSetting::current();
+
         return Inertia::render('Student/CourseRegistration/Index', [
             'availableCourses' => $availableCourses,
             'registeredCourses' => $registeredCourses,
             'currentSemester' => $currentSemester,
-            'maxCreditUnitsPerYear' => $tenant->settings['max_credit_units_per_year'] ?? 48,
-            'minCreditUnitsPerYear' => $tenant->settings['min_credit_units_per_year'] ?? 30,
+            'maxCreditUnitsPerYear' => $institution->settings['max_credit_units_per_year'] ?? 48,
+            'minCreditUnitsPerYear' => $institution->settings['min_credit_units_per_year'] ?? 30,
             'unitsRegisteredThisYear' => $unitsRegisteredThisYear,
             'eligibleLevels' => $eligibleLevels,
             'selectedLevel' => $selectedLevel,
@@ -116,11 +115,10 @@ class CourseRegistrationController extends Controller
 
     public function store(Request $request)
     {
-        $tenant = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
         $student = $request->user()->student;
         
         $currentSemester = Semester::with('academicSession')
-                                    ->where('tenant_id', $tenant->id)
                                     ->where('is_current', true)
                                     ->firstOrFail();
         $academicSession = $currentSemester->academicSession;
@@ -133,7 +131,7 @@ class CourseRegistrationController extends Controller
         $courses = Course::whereIn('id', $request->course_ids)->get();
         $selectedUnits = $courses->sum('credit_units');
         
-        $maxUnitsPerYear = $tenant->settings['max_credit_units_per_year'] ?? 48;
+        $maxUnitsPerYear = $institution->max_credit_units_per_year ?? 48;
 
         // Fetch units already registered in this ENTIRE academic session (year), excluding this semester
         $unitsRegisteredThisYear = CourseRegistration::where('student_id', $student->id)
@@ -164,7 +162,7 @@ class CourseRegistrationController extends Controller
             $eligibleLevels[] = 'Basic Nursing Level 3';
         }
 
-        DB::transaction(function () use ($courses, $student, $currentSemester, $tenant, $eligibleLevels) {
+        DB::transaction(function () use ($courses, $student, $currentSemester, $eligibleLevels) {
             // Delete pending registrations for this semester
             CourseRegistration::where('student_id', $student->id)
                 ->where('semester_id', $currentSemester->id)
@@ -173,7 +171,6 @@ class CourseRegistrationController extends Controller
 
             foreach ($courses as $course) {
                 CourseRegistration::create([
-                    'tenant_id' => $tenant->id,
                     'student_id' => $student->id,
                     'semester_id' => $currentSemester->id,
                     'course_id' => $course->id,

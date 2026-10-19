@@ -12,7 +12,6 @@ use App\Models\{
     Program,
     Semester,
     Student,
-    Tenant,
     User
 };
 use Illuminate\Http\Request;
@@ -65,8 +64,6 @@ class ResultImportController extends Controller
      */
     public function index()
     {
-        $tenantId = app()->has('currentTenant') ? app('currentTenant')->id : (Tenant::first()?->id ?? 1);
-
         $sessions = AcademicSession::orderBy('id', 'desc')->get();
         $semesters = Semester::with('academicSession')->orderBy('id', 'desc')->get();
         $programs = Program::all();
@@ -281,8 +278,6 @@ class ResultImportController extends Controller
             'current_level' => 'nullable|string',
         ]);
 
-        $tenantId = app()->has('currentTenant') ? app('currentTenant')->id : (Tenant::first()?->id ?? 1);
-
         // Resolve Session & Semester
         $session = $request->academic_session_id
             ? AcademicSession::find($request->academic_session_id)
@@ -464,7 +459,6 @@ class ResultImportController extends Controller
 
                     if (!$targetCourse) {
                         $targetCourse = Course::create([
-                            'tenant_id' => $tenantId,
                             'department_id' => $department?->id,
                             'name' => $courseTitle,
                             'code' => $courseCode,
@@ -525,7 +519,6 @@ class ResultImportController extends Controller
                         $user = User::where('email', $userEmail)->first();
                         if (!$user) {
                             $user = User::create([
-                                'tenant_id' => $tenantId,
                                 'name' => !empty($name) ? $name : $regNo,
                                 'email' => $userEmail,
                                 'password' => Hash::make($regNo),
@@ -537,7 +530,6 @@ class ResultImportController extends Controller
                         }
 
                         $student = Student::create([
-                            'tenant_id' => $tenantId,
                             'user_id' => $user->id,
                             'department_id' => $department?->id,
                             'program_id' => $program?->id,
@@ -608,7 +600,6 @@ class ResultImportController extends Controller
                     }
 
                     $registration = CourseRegistration::firstOrCreate([
-                        'tenant_id' => $tenantId,
                         'student_id' => $student->id,
                         'course_id' => $targetCourse->id,
                         'semester_id' => $semester->id,
@@ -618,7 +609,6 @@ class ResultImportController extends Controller
                     ]);
 
                     $grade = Grade::firstOrNew([
-                        'tenant_id' => $tenantId,
                         'course_registration_id' => $registration->id,
                     ]);
 
@@ -701,7 +691,6 @@ class ResultImportController extends Controller
 
                 if (!$course) {
                     $course = Course::create([
-                        'tenant_id' => $tenantId,
                         'department_id' => $department?->id,
                         'name' => $courseName,
                         'code' => $cleanCode,
@@ -753,7 +742,6 @@ class ResultImportController extends Controller
                     $user = User::where('email', $userEmail)->first();
                     if (!$user) {
                         $user = User::create([
-                            'tenant_id' => $tenantId,
                             'name' => !empty($name) ? $name : $regNo,
                             'email' => $userEmail,
                             'password' => Hash::make($regNo),
@@ -765,7 +753,6 @@ class ResultImportController extends Controller
                     }
 
                     $student = Student::create([
-                        'tenant_id' => $tenantId,
                         'user_id' => $user->id,
                         'department_id' => $department?->id,
                         'program_id' => $program?->id,
@@ -817,7 +804,6 @@ class ResultImportController extends Controller
                     }
 
                     $registration = CourseRegistration::firstOrCreate([
-                        'tenant_id' => $tenantId,
                         'student_id' => $student->id,
                         'course_id' => $course->id,
                         'semester_id' => $semester->id,
@@ -827,7 +813,6 @@ class ResultImportController extends Controller
                     ]);
 
                     $grade = Grade::firstOrNew([
-                        'tenant_id' => $tenantId,
                         'course_registration_id' => $registration->id,
                     ]);
 

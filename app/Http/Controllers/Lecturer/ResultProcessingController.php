@@ -139,7 +139,6 @@ class ResultProcessingController extends Controller
 
             Grade::updateOrCreate(
                 [
-                    'tenant_id' => app('currentTenant')->id,
                     'course_registration_id' => $res['registration_id']
                 ],
                 [

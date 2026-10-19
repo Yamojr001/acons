@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Fee, StudentInvoice, Semester};
+use App\Models\{Fee, StudentInvoice, Semester, InstitutionSetting};
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -11,11 +11,10 @@ class RegistrationController extends Controller
 {
     public function index(Request $request)
     {
-        $tenant  = app('currentTenant');
+        $institution = InstitutionSetting::current();
         $student = $request->user()->student;
 
         $currentSemester = Semester::with('academicSession')
-            ->where('tenant_id', $tenant->id)
             ->where('is_current', true)
             ->first();
 
@@ -25,8 +24,7 @@ class RegistrationController extends Controller
 
         if ($currentSemester) {
             // Find tuition / school fees (N540,000)
-            $fee = Fee::where('tenant_id', $tenant->id)
-                ->where('academic_session_id', $currentSemester->academic_session_id)
+            $fee = Fee::where('academic_session_id', $currentSemester->academic_session_id)
                 ->whereIn('fee_type', ['tuition', 'registration'])
                 ->where(function ($q) use ($student) {
                     $q->whereNull('department_id')->orWhere('department_id', $student->department_id);
@@ -39,9 +37,7 @@ class RegistrationController extends Controller
 
             // Fallback if specific not found
             if (!$fee) {
-                $fee = Fee::where('tenant_id', $tenant->id)
-                    ->whereIn('fee_type', ['tuition', 'registration'])
-                    ->first();
+                $fee = Fee::whereIn('fee_type', ['tuition', 'registration'])->first();
             }
 
             if ($fee) {
@@ -49,7 +45,6 @@ class RegistrationController extends Controller
                     [
                         'student_id' => $student->id,
                         'fee_id'     => $fee->id,
-                        'tenant_id'  => $tenant->id,
                     ],
                     [
                         'amount_due'  => $fee->amount,
@@ -61,8 +56,7 @@ class RegistrationController extends Controller
             }
 
             // Find optional hostel accommodation fee (N105,000)
-            $hostelFee = Fee::where('tenant_id', $tenant->id)
-                ->where('fee_type', 'hostel')
+            $hostelFee = Fee::where('fee_type', 'hostel')
                 ->where(function ($q) use ($currentSemester) {
                     $q->where('academic_session_id', $currentSemester->academic_session_id)
                       ->orWhereNull('academic_session_id');
@@ -73,7 +67,6 @@ class RegistrationController extends Controller
                 $hostelInvoice = StudentInvoice::where([
                     'student_id' => $student->id,
                     'fee_id'     => $hostelFee->id,
-                    'tenant_id'  => $tenant->id,
                 ])->first();
             }
         }
@@ -85,7 +78,7 @@ class RegistrationController extends Controller
             'gatewayChargeCap'    => 2000,
             'currentSession'      => $currentSemester?->academicSession?->name ?? '2026/2027',
             'currentSemesterName' => $currentSemester?->name ?? 'First Semester',
-            'activeGateway'       => $tenant->settings['payment_gateway'] ?? 'zainpay',
+            'activeGateway'       => $institution->payment_gateway ?? 'zainpay',
         ]);
     }
 }

@@ -4,11 +4,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use App\Traits\BelongsToTenant;
 
 class CourseRegistration extends Model {
-    use SoftDeletes, BelongsToTenant;
-    protected $fillable = ["tenant_id", "student_id", "semester_id", "course_id", "status", "is_carryover"];
+    use SoftDeletes;
+    protected $fillable = ["student_id", "semester_id", "course_id", "status", "is_carryover"];
     public function student(): BelongsTo { return $this->belongsTo(Student::class); }
     public function course(): BelongsTo { return $this->belongsTo(Course::class); }
     public function semester(): BelongsTo { return $this->belongsTo(Semester::class); }

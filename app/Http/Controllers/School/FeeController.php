@@ -34,10 +34,9 @@ class FeeController extends Controller
 
     public function store(StoreFeeRequest $request)
     {
-        $tenant = app('currentTenant');
         $data   = $request->validated();
 
-        DB::transaction(function () use ($data, $tenant) {
+        DB::transaction(function () use ($data) {
             $students = match($data['assignment_type']) {
                 'all'        => Student::where('status','active')->get(),
                 'class'      => Student::where('class_room_id', $data['class_room_id'])->where('status','active')->get(),
@@ -46,7 +45,6 @@ class FeeController extends Controller
 
             foreach ($students as $student) {
                 Fee::create([
-                    'tenant_id'  => $tenant->id,
                     'student_id' => $student->id,
                     'title'      => $data['title'],
                     'term'       => $data['term'],
@@ -69,17 +67,13 @@ class FeeController extends Controller
 
     public function bulkAssignPortalFee(Request $request)
     {
-        $tenant = app('currentTenant');
-        if ($tenant->billing_payer !== 'student') {
-            return back()->with('error', 'Portal fees are paid by the school. Students are not billed directly.');
-        }
-
-        $feeAmount = $tenant->billing_amount;
+        $institution = \App\Models\InstitutionSetting::current();
+        $feeAmount = 14700.00;
 
         $students = Student::where('status', 'active')->get();
         $count = 0;
 
-        DB::transaction(function () use ($students, $tenant, $feeAmount, &$count) {
+        DB::transaction(function () use ($students, $feeAmount, &$count) {
             foreach ($students as $student) {
                 // Check if already assigned
                 $exists = Fee::where('student_id', $student->id)
@@ -89,7 +83,6 @@ class FeeController extends Controller
 
                 if (!$exists) {
                     Fee::create([
-                        'tenant_id'  => $tenant->id,
                         'student_id' => $student->id,
                         'title'      => 'Platform Access Fee',
                         'term'       => now()->format('Y-m'),

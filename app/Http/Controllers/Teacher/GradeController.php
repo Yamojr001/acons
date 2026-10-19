@@ -13,9 +13,9 @@ class GradeController extends Controller
     public function index(Request $request): Response
     {
         $teacher = Auth::user()->teacher;
-        $tenant  = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
 
-        if ($tenant->teacher_mode === 'per_subject') {
+        if (($institution->teacher_mode ?? 'per_class') === 'per_subject') {
             $assignments = \App\Models\ClassSubjectLecturer::where('teacher_id', $teacher->id)->get();
             if ($assignments->isEmpty()) {
                 $exams = collect();
@@ -66,15 +66,14 @@ class GradeController extends Controller
             'remarks'      => 'nullable|string|max:300',
         ]);
 
-        $tenant = app('currentTenant');
         $exam   = Exam::findOrFail($request->exam_id);
         abort_unless($this->canGradeExam($exam), 403, 'You are not authorized to grade this subject.');
 
         abort_if($request->score > $exam->total_marks, 422, 'Score cannot exceed total marks.');
 
         Grade::updateOrCreate(
-            ['tenant_id' => $tenant->id, 'student_id' => $request->student_id, 'exam_id' => $request->exam_id],
-            array_merge($request->only('score', 'grade_letter', 'remarks'), ['tenant_id' => $tenant->id])
+            ['student_id' => $request->student_id, 'exam_id' => $request->exam_id],
+            $request->only('score', 'grade_letter', 'remarks')
         );
 
         return back()->with('success', 'Grade saved.');
@@ -87,14 +86,13 @@ class GradeController extends Controller
             'entries' => 'required|array',
         ]);
 
-        $tenant = app('currentTenant');
         $exam   = Exam::findOrFail($request->exam_id);
         abort_unless($this->canGradeExam($exam), 403, 'You are not authorized to grade this subject.');
 
         foreach ($request->entries as $entry) {
             Grade::updateOrCreate(
-                ['tenant_id' => $tenant->id, 'student_id' => $entry['student_id'], 'exam_id' => $request->exam_id],
-                array_merge($entry, ['tenant_id' => $tenant->id])
+                ['student_id' => $entry['student_id'], 'exam_id' => $request->exam_id],
+                $entry
             );
         }
 
@@ -104,9 +102,9 @@ class GradeController extends Controller
     private function canGradeExam($exam)
     {
         $teacher = Auth::user()->teacher;
-        $tenant  = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
 
-        if ($tenant->teacher_mode === 'per_subject') {
+        if (($institution->teacher_mode ?? 'per_class') === 'per_subject') {
             return \App\Models\ClassSubjectLecturer::where('class_room_id', $exam->class_room_id)
                 ->where('subject_id', $exam->subject_id)
                 ->where('teacher_id', $teacher->id)

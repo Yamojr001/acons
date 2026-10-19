@@ -35,7 +35,6 @@ class AnnouncementController extends Controller
         ]);
 
         Announcement::create([
-            'tenant_id' => app('currentTenant')->id,
             'created_by' => Auth::id(),
             'course_id' => $request->course_id,
             'title' => $request->title,

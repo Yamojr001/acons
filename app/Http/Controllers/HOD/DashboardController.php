@@ -88,16 +88,13 @@ class DashboardController extends Controller
             return back()->withErrors(['message' => 'This application is not pending clearance.']);
         }
 
-        $tenant = app('currentTenant');
-        
         $jambEmail = $application->email ?: ($application->jamb_number . '@acons.edu.ng');
         $phone = $application->phone_number ?: '08000000000';
 
         // Check if user already exists
-        $user = User::where('email', $jambEmail)->where('tenant_id', $tenant->id)->first();
+        $user = User::where('email', $jambEmail)->first();
         if (!$user) {
             $user = User::create([
-                'tenant_id' => $tenant->id,
                 'name' => $application->full_name,
                 'email' => $jambEmail,
                 'password' => Hash::make($phone), // password is phone number
@@ -140,7 +137,6 @@ class DashboardController extends Controller
             }
 
             Student::create([
-                'tenant_id' => $tenant->id,
                 'user_id' => $user->id,
                 'department_id' => $deptId,
                 'program_id' => $program?->id,
@@ -234,12 +230,11 @@ class DashboardController extends Controller
     public function storeLecturer(Request $request)
     {
         $deptId = $this->getHodDepartmentId();
-        $tenant = app('currentTenant');
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,NULL,id,tenant_id,' . $tenant->id,
-            'employee_id' => 'required|string|max:100|unique:lecturers,employee_id,NULL,id,tenant_id,' . $tenant->id,
+            'email' => 'required|email|unique:users,email',
+            'employee_id' => 'required|string|max:100|unique:lecturers,employee_id',
             'qualification' => 'nullable|string|max:255',
             'gender' => 'required|in:male,female,other',
             'phone_number' => 'nullable|string|max:50',
@@ -247,7 +242,6 @@ class DashboardController extends Controller
         ]);
 
         $user = User::create([
-            'tenant_id' => $tenant->id,
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make('password123'), // Default temporary password
@@ -258,7 +252,6 @@ class DashboardController extends Controller
         $user->assignRole(User::ROLE_LECTURER);
 
         \App\Models\Lecturer::create([
-            'tenant_id' => $tenant->id,
             'user_id' => $user->id,
             'department_id' => $deptId,
             'employee_id' => strtoupper($request->employee_id),
@@ -279,12 +272,10 @@ class DashboardController extends Controller
             abort(403, 'Unauthorized access to department lecturer profile.');
         }
 
-        $tenant = app('currentTenant');
-
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $lecturer->user_id . ',id,tenant_id,' . $tenant->id,
-            'employee_id' => 'required|string|max:100|unique:lecturers,employee_id,' . $lecturer->id . ',id,tenant_id,' . $tenant->id,
+            'email' => 'required|email|unique:users,email,' . $lecturer->user_id,
+            'employee_id' => 'required|string|max:100|unique:lecturers,employee_id,' . $lecturer->id,
             'qualification' => 'nullable|string|max:255',
             'gender' => 'required|in:male,female,other',
             'phone_number' => 'nullable|string|max:50',

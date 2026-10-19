@@ -4,10 +4,9 @@ namespace App\Http\Controllers\School;
 
 use App\Http\Controllers\Controller;
 use App\Models\{
-    Tenant, User, Teacher, Student, ClassRoom, Subject,
+    User, Teacher, Student, ClassRoom, Subject,
     Fee, Payment, Exam, Grade, Attendance, Announcement, Guardian
 };
-use App\Services\TenantResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Auth, DB, Storage, Cache};
 use Illuminate\Support\Str;
@@ -17,8 +16,8 @@ class ClassRoomController extends Controller
 {
     public function index(): Response
     {
-        $tenant = app('currentTenant');
-        $sections = $tenant->settings['sections'] ?? [
+        $institution = \App\Models\InstitutionSetting::current();
+        $sections = $institution->settings['sections'] ?? [
             ['name' => 'Primary', 'level_limit' => 6],
             ['name' => 'Junior Secondary', 'level_limit' => 3],
             ['name' => 'Senior Secondary', 'level_limit' => 3],
@@ -42,7 +41,6 @@ class ClassRoomController extends Controller
         ]);
 
         ClassRoom::create(array_merge($request->only('section','level','capacity','academic_year','teacher_id'), [
-            'tenant_id' => app('currentTenant')->id,
             'name'      => $request->section . ' ' . $request->level // Fallback for old code
         ]));
         return back()->with('success', 'Class created.');

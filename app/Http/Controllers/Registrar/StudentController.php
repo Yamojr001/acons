@@ -15,11 +15,9 @@ class StudentController extends Controller
 {
     public function index(Request $request)
     {
-        $tenant = app('currentTenant');
-        $departments = Department::where('tenant_id', $tenant->id)->get(['id', 'name']);
+        $departments = Department::get(['id', 'name']);
         
         $students = Student::with(['user', 'department'])
-            ->where('tenant_id', $tenant->id)
             ->when($request->search, function ($query, $search) {
                 $query->where(function($q) use ($search) {
                     $q->whereHas('user', function ($u) use ($search) {
@@ -52,9 +50,7 @@ class StudentController extends Controller
 
     public function show($id)
     {
-        $tenant = app('currentTenant');
         $student = Student::with(['user', 'department', 'registrations.course', 'registrations.semester', 'payments'])
-            ->where('tenant_id', $tenant->id)
             ->findOrFail($id);
 
         return Inertia::render('Registrar/Students/Show', [
@@ -74,26 +70,26 @@ class StudentController extends Controller
 
     public function export($format)
     {
-        $tenant = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
         $students = Student::with(['user', 'department'])
-            ->where('tenant_id', $tenant->id)
             ->latest()
             ->get();
 
         if ($format === 'pdf') {
             $pdf = Pdf::loadView('exports.students', [
                 'students' => $students,
-                'tenant' => $tenant
+                'tenant' => $institution,
+                'institution' => $institution,
             ]);
             return $pdf->download('students_' . now()->format('Ymd') . '.pdf');
         }
 
         if ($format === 'csv') {
-            return Excel::download(new StudentsExport($tenant->id), 'students_' . now()->format('Ymd') . '.csv', \Maatwebsite\Excel\Excel::CSV);
+            return Excel::download(new StudentsExport(), 'students_' . now()->format('Ymd') . '.csv', \Maatwebsite\Excel\Excel::CSV);
         }
 
         if ($format === 'excel' || $format === 'xlsx') {
-            return Excel::download(new StudentsExport($tenant->id), 'students_' . now()->format('Ymd') . '.xlsx', \Maatwebsite\Excel\Excel::XLSX);
+            return Excel::download(new StudentsExport(), 'students_' . now()->format('Ymd') . '.xlsx', \Maatwebsite\Excel\Excel::XLSX);
         }
 
         abort(400, 'Invalid format');
@@ -106,8 +102,7 @@ class StudentController extends Controller
 
     public function update(Request $request, $id)
     {
-        $tenant = app('currentTenant');
-        $student = Student::where('tenant_id', $tenant->id)->findOrFail($id);
+        $student = Student::findOrFail($id);
 
         $validated = $request->validate([
             'phone_number'  => 'nullable|string|max:20',
@@ -132,8 +127,7 @@ class StudentController extends Controller
 
     public function destroy($id)
     {
-        $tenant = app('currentTenant');
-        $student = Student::where('tenant_id', $tenant->id)->findOrFail($id);
+        $student = Student::findOrFail($id);
         $student->update(['status' => 'withdrawn']);
         $student->delete();
 

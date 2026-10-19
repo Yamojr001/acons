@@ -41,8 +41,6 @@ class StudentController extends Controller
 
     public function store(Request $request)
     {
-        $tenant = app('currentTenant');
-        
         $request->validate([
             'name'           => 'required|string|max:100',
             'email'          => 'required|email|max:150|unique:users,email',
@@ -60,10 +58,10 @@ class StudentController extends Controller
             'guardian_occupation' => 'nullable|string',
         ]);
 
-        DB::transaction(function () use ($request, $tenant) {
+        DB::transaction(function () use ($request) {
             // Guardian
             $guardianUser = User::firstOrCreate(
-                ['email' => $request->guardian_email, 'tenant_id' => $tenant->id],
+                ['email' => $request->guardian_email],
                 [
                     'name'      => $request->guardian_name,
                     'phone'     => $request->guardian_phone,
@@ -76,7 +74,7 @@ class StudentController extends Controller
             }
 
             $guardian = Guardian::firstOrCreate(
-                ['user_id' => $guardianUser->id, 'tenant_id' => $tenant->id],
+                ['user_id' => $guardianUser->id],
                 [
                     'relationship' => $request->guardian_relationship,
                     'occupation'   => $request->guardian_occupation,
@@ -85,7 +83,6 @@ class StudentController extends Controller
 
             // Student User
             $studentUser = User::create([
-                'tenant_id' => $tenant->id,
                 'name'      => $request->name,
                 'email'     => $request->email,
                 'phone'     => $request->phone,
@@ -96,7 +93,6 @@ class StudentController extends Controller
 
             // Student Profile
             Student::create([
-                'tenant_id'        => $tenant->id,
                 'user_id'          => $studentUser->id,
                 'guardian_id'      => $guardian->id,
                 'class_room_id'    => $request->class_room_id,

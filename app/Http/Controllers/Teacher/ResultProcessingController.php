@@ -40,7 +40,7 @@ class ResultProcessingController extends Controller
 
     public function store(Request $request, Course $course)
     {
-        $tenant = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
         
         $request->validate([
             'grades' => 'required|array',
@@ -49,18 +49,17 @@ class ResultProcessingController extends Controller
             'grades.*.exam_score' => 'nullable|numeric|min:0|max:80',
         ]);
 
-        DB::transaction(function () use ($request, $tenant) {
+        DB::transaction(function () use ($request, $institution) {
             foreach ($request->grades as $gradeData) {
                 $ca = $gradeData['ca_score'] ?? 0;
                 $exam = $gradeData['exam_score'] ?? 0;
                 $total = $ca + $exam;
 
-                $calculated = $this->calculateGrade($total, $tenant->settings);
+                $calculated = $this->calculateGrade($total, $institution->settings ?? []);
 
                 Grade::updateOrCreate(
                     ['course_registration_id' => $gradeData['registration_id']],
                     [
-                        'tenant_id' => $tenant->id,
                         'ca_score' => $ca,
                         'exam_score' => $exam,
                         'total_score' => $total,

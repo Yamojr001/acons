@@ -10,11 +10,8 @@ use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 
 class PaymentsExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
 {
-    protected $tenantId;
-
-    public function __construct($tenantId)
+    public function __construct()
     {
-        $this->tenantId = $tenantId;
     }
 
     /**
@@ -23,7 +20,6 @@ class PaymentsExport implements FromCollection, WithHeadings, WithMapping, Shoul
     public function collection()
     {
         return Payment::with(['student.user', 'student.department'])
-            ->where('tenant_id', $this->tenantId)
             ->whereNotIn('id', function($query) {
                 $query->select('parent_id')->from('payments')->whereNotNull('parent_id');
             })

@@ -13,8 +13,7 @@ class AdmissionController extends Controller
 {
     public function index(): Response
     {
-        $tenant = app('currentTenant');
-        $forms = AdmissionForm::where('tenant_id', $tenant->id)->get();
+        $forms = AdmissionForm::all();
         return Inertia::render('SchoolAdmin/Admissions/Forms', ['forms' => $forms]);
     }
 
@@ -26,9 +25,7 @@ class AdmissionController extends Controller
             'fields' => 'required|array'
         ]);
 
-        $tenant = app('currentTenant');
         AdmissionForm::create([
-            'tenant_id' => $tenant->id,
             'title' => $request->title,
             'description' => $request->description,
             'fields' => $request->fields,
@@ -59,9 +56,7 @@ class AdmissionController extends Controller
 
     public function applications(): Response
     {
-        $tenant = app('currentTenant');
-        $applications = Applicant::where('tenant_id', $tenant->id)
-            ->with('form')->latest()->paginate(20);
+        $applications = Applicant::with('form')->latest()->paginate(20);
         return Inertia::render('SchoolAdmin/Admissions/Applications', ['applications' => $applications]);
     }
 

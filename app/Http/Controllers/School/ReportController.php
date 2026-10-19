@@ -11,7 +11,6 @@ class ReportController extends Controller
 {
     public function overview(): Response
     {
-        $tenant = app('currentTenant');
         return Inertia::render('SchoolAdmin/Reports/Overview', [
             'stats' => [
                 'students_by_class'  => ClassRoom::withCount('students')->get(['id','name']),

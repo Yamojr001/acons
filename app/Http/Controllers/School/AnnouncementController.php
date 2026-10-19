@@ -24,7 +24,6 @@ class AnnouncementController extends Controller
     public function store(StoreAnnouncementRequest $request)
     {
         Announcement::create(array_merge($request->validated(), [
-            'tenant_id'  => app('currentTenant')->id,
             'created_by' => Auth::id(),
             'published_at' => $request->published_at ?? now(),
         ]));

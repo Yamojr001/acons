@@ -8,10 +8,9 @@ use Inertia\{Inertia, Response};
 
 class DashboardController extends Controller {
     public function index(): Response {
-        $tenant = app('currentTenant');
         $role = Auth::user()->getRoleNames()->first();
 
-        $stats = Cache::remember('admin:dashboard:stats:'.$tenant->id, 300, function () use ($tenant) {
+        $stats = Cache::remember('admin:dashboard:stats', 300, function () {
             return [
                 'total_students' => Student::count(),
                 'active_students' => Student::where('status', 'active')->count(),

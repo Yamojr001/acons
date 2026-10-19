@@ -30,26 +30,26 @@ class LecturerController extends Controller
 
     public function export($format)
     {
-        $tenant = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
         $lecturers = Lecturer::with(['user.roles', 'department'])
-            ->where('tenant_id', $tenant->id)
             ->latest()
             ->get();
 
         if ($format === 'pdf') {
             $pdf = Pdf::loadView('exports.lecturers', [
                 'lecturers' => $lecturers,
-                'tenant' => $tenant
+                'tenant' => $institution,
+                'institution' => $institution,
             ]);
             return $pdf->download('staff_' . now()->format('Ymd') . '.pdf');
         }
 
         if ($format === 'csv') {
-            return Excel::download(new LecturersExport($tenant->id), 'staff_' . now()->format('Ymd') . '.csv', \Maatwebsite\Excel\Excel::CSV);
+            return Excel::download(new LecturersExport(), 'staff_' . now()->format('Ymd') . '.csv', \Maatwebsite\Excel\Excel::CSV);
         }
 
         if ($format === 'excel' || $format === 'xlsx') {
-            return Excel::download(new LecturersExport($tenant->id), 'staff_' . now()->format('Ymd') . '.xlsx', \Maatwebsite\Excel\Excel::XLSX);
+            return Excel::download(new LecturersExport(), 'staff_' . now()->format('Ymd') . '.xlsx', \Maatwebsite\Excel\Excel::XLSX);
         }
 
         abort(400, 'Invalid format');
@@ -57,22 +57,19 @@ class LecturerController extends Controller
 
     public function store(Request $request)
     {
-        $tenant = app('currentTenant');
-
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,NULL,id,tenant_id,' . $tenant->id,
-            'employee_id' => 'required|string|max:100|unique:lecturers,employee_id,NULL,id,tenant_id,' . $tenant->id,
-            'department_id' => 'required|exists:departments,id,tenant_id,' . $tenant->id,
+            'email' => 'required|email|unique:users,email',
+            'employee_id' => 'required|string|max:100|unique:lecturers,employee_id',
+            'department_id' => 'required|exists:departments,id',
             'qualification' => 'nullable|string|max:255',
             'gender' => 'required|in:male,female,other',
             'phone_number' => 'nullable|string|max:50',
             'address' => 'nullable|string',
         ]);
 
-        DB::transaction(function () use ($request, $tenant) {
+        DB::transaction(function () use ($request) {
             $user = User::create([
-                'tenant_id' => $tenant->id,
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make('password123'),
@@ -83,7 +80,6 @@ class LecturerController extends Controller
             $user->assignRole('lecturer');
 
             Lecturer::create([
-                'tenant_id' => $tenant->id,
                 'user_id' => $user->id,
                 'department_id' => $request->department_id,
                 'employee_id' => strtoupper($request->employee_id),
@@ -100,13 +96,11 @@ class LecturerController extends Controller
 
     public function update(Request $request, Lecturer $lecturer)
     {
-        $tenant = app('currentTenant');
-
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $lecturer->user_id . ',id,tenant_id,' . $tenant->id,
-            'employee_id' => 'required|string|max:100|unique:lecturers,employee_id,' . $lecturer->id . ',id,tenant_id,' . $tenant->id,
-            'department_id' => 'required|exists:departments,id,tenant_id,' . $tenant->id,
+            'email' => 'required|email|unique:users,email,' . $lecturer->user_id,
+            'employee_id' => 'required|string|max:100|unique:lecturers,employee_id,' . $lecturer->id,
+            'department_id' => 'required|exists:departments,id',
             'qualification' => 'nullable|string|max:255',
             'gender' => 'required|in:male,female,other',
             'phone_number' => 'nullable|string|max:50',

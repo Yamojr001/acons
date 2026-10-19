@@ -21,11 +21,12 @@ class PublicApplicantController extends Controller
      */
     public function showApplyForm(): Response
     {
-        $tenant = app('currentTenant');
-        $programs = Program::where('tenant_id', $tenant->id)->get();
+        $institution = \App\Models\InstitutionSetting::current();
+        $programs = Program::all();
 
         return Inertia::render('Public/Admissions/Apply', [
-            'tenant' => $tenant,
+            'tenant' => $institution,
+            'institution' => $institution,
             'programs' => $programs
         ]);
     }
@@ -35,8 +36,6 @@ class PublicApplicantController extends Controller
      */
     public function submitApplyForm(Request $request)
     {
-        $tenant = app('currentTenant');
-
         $request->validate([
             // Personal Info
             'full_name' => 'required|string|max:255',
@@ -88,7 +87,6 @@ class PublicApplicantController extends Controller
 
         // Create applicant record. Initial password is their phone number
         $applicant = Applicant::create([
-            'tenant_id' => $tenant->id,
             'jamb_number' => strtoupper($request->jamb_number),
             'password' => Hash::make($request->phone_number),
             
@@ -139,8 +137,8 @@ class PublicApplicantController extends Controller
             'sponsor_name_address' => $request->sponsor_name_address,
 
             // States
-            'admission_form_id' => \App\Models\AdmissionForm::where('tenant_id', $tenant->id)->where('is_active', true)->value('id'),
-            'applied_program_id' => $request->applied_program_id ?: (\App\Models\Program::where('tenant_id', $tenant->id)->first()?->id ?? 1),
+            'admission_form_id' => \App\Models\AdmissionForm::where('is_active', true)->value('id'),
+            'applied_program_id' => $request->applied_program_id ?: (\App\Models\Program::first()?->id ?? 1),
             'payment_status' => 'pending',
             'admission_status' => 'pending',
             'status' => 'pending',
@@ -164,12 +162,13 @@ class PublicApplicantController extends Controller
                 ->with('success', 'Your fee is already cleared. Here is your official e-Receipt.');
         }
 
-        $tenant = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
 
         return Inertia::render('Public/Admissions/PaymentGateway', [
-            'tenant'     => $tenant,
-            'applicant'  => $applicant,
-            'fee_amount' => 14700.00,
+            'tenant'      => $institution,
+            'institution' => $institution,
+            'applicant'   => $applicant,
+            'fee_amount'  => 14700.00,
         ]);
     }
 
@@ -367,11 +366,12 @@ class PublicApplicantController extends Controller
             } catch (\Throwable) {}
         }
 
-        $tenant = app('currentTenant');
-        $academicSession = \App\Models\AcademicSession::where('tenant_id', $tenant->id ?? 1)->where('is_current', true)->first();
+        $institution = \App\Models\InstitutionSetting::current();
+        $academicSession = \App\Models\AcademicSession::where('is_current', true)->first();
 
         return Inertia::render('Public/Admissions/Receipt', [
-            'tenant'          => $tenant,
+            'tenant'          => $institution,
+            'institution'     => $institution,
             'applicant'       => $applicant,
             'academicSession' => $academicSession,
             'fee_amount'      => (float) ($applicant->amount_paid ?: 14700.00),
@@ -418,10 +418,11 @@ class PublicApplicantController extends Controller
      */
     public function showLoginForm(): Response
     {
-        $tenant = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
 
         return Inertia::render('Public/Admissions/Login', [
-            'tenant' => $tenant
+            'tenant'      => $institution,
+            'institution' => $institution,
         ]);
     }
 
@@ -469,7 +470,7 @@ class PublicApplicantController extends Controller
     public function dashboard(): Response
     {
         $applicant = Auth::guard('applicant')->user();
-        $tenant = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
         
         // Auto-assign sequential registration number starting from 001 and provision student account if acceptance fee is paid
         if ($applicant->acceptance_fee_paid) {
@@ -483,9 +484,9 @@ class PublicApplicantController extends Controller
         }
 
         $applicantWithProgram = Applicant::with(['admittedProgram', 'appliedProgram'])->find($applicant->id);
-        $academicSession = \App\Models\AcademicSession::where('tenant_id', $tenant->id ?? 1)->where('is_current', true)->first();
-        $admissionForm = \App\Models\AdmissionForm::where('tenant_id', $tenant->id ?? 1)->where('is_active', true)->first();
-        $programs = \App\Models\Program::where('tenant_id', $tenant->id ?? 1)->get(['id', 'name', 'degree_type', 'duration_years']);
+        $academicSession = \App\Models\AcademicSession::where('is_current', true)->first();
+        $admissionForm = \App\Models\AdmissionForm::where('is_active', true)->first();
+        $programs = \App\Models\Program::all(['id', 'name', 'degree_type', 'duration_years']);
 
         // Default or configured exam details
         $examDate = $applicantWithProgram->exam_date 
@@ -521,7 +522,8 @@ class PublicApplicantController extends Controller
         ];
 
         return Inertia::render('Public/Admissions/Dashboard', [
-            'tenant'          => $tenant,
+            'tenant'          => $institution,
+            'institution'     => $institution,
             'applicant'       => $applicantWithProgram,
             'academicSession' => $academicSession,
             'admissionForm'   => $admissionForm,
@@ -617,9 +619,9 @@ class PublicApplicantController extends Controller
                 ->with('error', 'You must upload your passport photograph before downloading your CBT Examination Photocard.');
         }
 
-        $tenant = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
         $applicantWithProgram = Applicant::with(['admittedProgram', 'appliedProgram'])->find($applicant->id);
-        $academicSession = \App\Models\AcademicSession::where('tenant_id', $tenant->id ?? 1)->where('is_current', true)->first();
+        $academicSession = \App\Models\AcademicSession::where('is_current', true)->first();
 
         // Default or configured exam details
         $examDate = $applicantWithProgram->exam_date 
@@ -678,7 +680,8 @@ class PublicApplicantController extends Controller
         }
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.exam_card_pdf', [
-            'tenant'          => $tenant,
+            'institution'     => $institution,
+            'tenant'          => $institution,
             'applicant'       => $applicantWithProgram,
             'academicSession' => $academicSession,
             'examDetails'     => $examDetails,
@@ -928,7 +931,7 @@ class PublicApplicantController extends Controller
                 ->with('error', 'You must complete the N10,000 Acceptance Fee payment before downloading your official Admission Letter.');
         }
 
-        $tenant = app('currentTenant');
+        $institution = \App\Models\InstitutionSetting::current();
         $applicantWithProgram = Applicant::with(['admittedProgram', 'appliedProgram'])->find($applicant->id);
         
         // Ensure registration number is generated if missing
@@ -938,7 +941,7 @@ class PublicApplicantController extends Controller
             $applicantWithProgram->registration_number = $regNum;
         }
 
-        $academicSession = \App\Models\AcademicSession::where('tenant_id', $tenant->id ?? 1)->where('is_current', true)->first();
+        $academicSession = \App\Models\AcademicSession::where('is_current', true)->first();
 
         // Prepare Base64 letterhead and provost signature
         $bgPath = public_path('assets/images/acons_letterhead.jpg');
@@ -947,7 +950,8 @@ class PublicApplicantController extends Controller
         $signatureBase64 = file_exists($sigPath) ? 'data:image/jpeg;base64,' . base64_encode(file_get_contents($sigPath)) : null;
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.admission_letter_pdf', [
-            'tenant'          => $tenant,
+            'tenant'          => $institution,
+            'institution'     => $institution,
             'applicant'       => $applicantWithProgram,
             'academicSession' => $academicSession,
             'letterheadBase64' => $letterheadBase64,

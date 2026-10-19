@@ -81,7 +81,6 @@ class FeeController extends Controller
             $result = $this->paymentService->initiate($fee, $request->gateway, $callbackUrl);
 
             Payment::create([
-                'tenant_id'      => $fee->tenant_id,
                 'fee_id'         => $fee->id,
                 'student_id'     => $fee->student_id,
                 'amount'         => $fee->amount,

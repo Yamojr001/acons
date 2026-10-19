@@ -8,16 +8,14 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Hash;
-use App\Traits\BelongsToTenant;
 
 class Applicant extends Authenticatable
 {
-    use HasFactory, Notifiable, SoftDeletes, BelongsToTenant;
+    use HasFactory, Notifiable, SoftDeletes;
 
     protected $guard = 'applicant';
 
     protected $fillable = [
-        'tenant_id',
         'admission_form_id',
         'jamb_number',
         'password',
@@ -113,11 +111,6 @@ class Applicant extends Authenticatable
         'acceptance_fee_paid_at' => 'datetime',
         'data' => 'array',
     ];
-
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(Tenant::class);
-    }
 
     public function form(): BelongsTo
     {
@@ -247,7 +240,6 @@ class Applicant extends Authenticatable
      */
     public function provisionStudentAccount(): ?Student
     {
-        $tenantId = $this->tenant_id ?: 1;
         $rawPhone = trim((string)$this->phone_number);
         $phoneDigits = preg_replace('/[^0-9]/', '', $rawPhone);
         $phone = !empty($phoneDigits) ? $phoneDigits : ($rawPhone ?: '08000000000');
@@ -266,15 +258,13 @@ class Applicant extends Authenticatable
             : ($phone . '@acons.edu.ng');
 
         // Find or create User record
-        $user = User::where('tenant_id', $tenantId)
-            ->where(function ($q) use ($phone, $userEmail) {
+        $user = User::where(function ($q) use ($phone, $userEmail) {
                 $q->where('phone', $phone)
                   ->orWhere('email', $userEmail);
             })->first();
 
         if (!$user) {
             $user = User::create([
-                'tenant_id'             => $tenantId,
                 'name'                  => $this->full_name,
                 'email'                 => $userEmail,
                 'phone'                 => $phone,
@@ -323,7 +313,6 @@ class Applicant extends Authenticatable
         $student = Student::where('user_id', $user->id)->first();
         if (!$student) {
             $student = Student::create([
-                'tenant_id'                => $tenantId,
                 'user_id'                  => $user->id,
                 'department_id'            => $deptId,
                 'program_id'               => $program?->id,

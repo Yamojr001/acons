@@ -2,10 +2,7 @@
 
 use App\Http\Middleware\{
     HandleInertiaRequests,
-    IdentifyTenant,
     SecurityHeaders,
-    EnsureTenantAccess,
-    ThrottleByTenant,
 };
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\{Exceptions, Middleware};
@@ -23,13 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'identify.tenant'    => IdentifyTenant::class,
             'role'               => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission'         => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
-            'tenant.access'      => EnsureTenantAccess::class,
             'security.headers'   => SecurityHeaders::class,
-            'throttle.tenant'    => ThrottleByTenant::class,
             'force.password.change' => \App\Http\Middleware\ForcePasswordChange::class,
         ]);
 

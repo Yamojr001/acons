@@ -2,13 +2,10 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Tenant;
-use App\Services\TenantResolver;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\{Auth, RateLimiter};
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class RoleMiddleware {
     public function handle(Request $request, Closure $next, string ...$roles): Response

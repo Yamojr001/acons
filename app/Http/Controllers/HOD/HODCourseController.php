@@ -53,7 +53,7 @@ class HODCourseController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:courses,code,NULL,id,tenant_id,' . app('currentTenant')->id,
+            'code' => 'required|string|max:50|unique:courses,code',
             'credit_units' => 'required|integer|min:1|max:10',
             'level' => 'required|string|max:20',
             'semester_type' => 'required|in:first,second,both',
@@ -62,7 +62,6 @@ class HODCourseController extends Controller
         ]);
 
         Course::create([
-            'tenant_id' => app('currentTenant')->id,
             'department_id' => $deptId,
             'name' => $request->name,
             'code' => strtoupper($request->code),
@@ -85,7 +84,7 @@ class HODCourseController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:courses,code,' . $course->id . ',id,tenant_id,' . app('currentTenant')->id,
+            'code' => 'required|string|max:50|unique:courses,code,' . $course->id,
             'credit_units' => 'required|integer|min:1|max:10',
             'level' => 'required|string|max:20',
             'semester_type' => 'required|in:first,second,both',

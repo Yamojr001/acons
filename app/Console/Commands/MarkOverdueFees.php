@@ -12,12 +12,11 @@ use Illuminate\Support\Facades\Log;
 class MarkOverdueFees extends Command
 {
     protected $signature   = 'fees:mark-overdue';
-    protected $description = 'Mark all past-due fees as overdue across all tenants';
+    protected $description = 'Mark all past-due fees as overdue';
 
     public function handle(): int
     {
-        $updated = Fee::withoutGlobalScopes()
-            ->where('status', 'pending')
+        $updated = Fee::where('status', 'pending')
             ->whereDate('due_date', '<', now())
             ->update(['status' => 'overdue']);
 

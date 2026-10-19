@@ -11,9 +11,7 @@ class ExpenseController extends Controller
 {
     public function index()
     {
-        $tenant = app('currentTenant');
         $expenses = Transaction::with('user')
-            ->where('tenant_id', $tenant->id)
             ->where('type', 'expense')
             ->latest()
             ->paginate(20);
@@ -25,8 +23,6 @@ class ExpenseController extends Controller
 
     public function store(Request $request)
     {
-        $tenant = app('currentTenant');
-        
         $request->validate([
             'title' => 'required|string|max:255',
             'category' => 'required|string|max:255',
@@ -38,7 +34,6 @@ class ExpenseController extends Controller
         ]);
 
         Transaction::create([
-            'tenant_id' => $tenant->id,
             'user_id' => auth()->id(),
             'type' => 'expense',
             'amount' => $request->amount,

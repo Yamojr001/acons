@@ -2,7 +2,7 @@
 namespace App\Http\Controllers\School;
 
 use App\Http\Controllers\Controller;
-use App\Models\{ClassRoom, Student, Tenant};
+use App\Models\{ClassRoom, Student};
 use Illuminate\Http\Request;
 use Inertia\{Inertia, Response};
 

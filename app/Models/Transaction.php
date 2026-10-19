@@ -1,17 +1,15 @@
 <?php
 namespace App\Models;
 
-use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, MorphTo};
 
 class Transaction extends Model
 {
-    use SoftDeletes, BelongsToTenant;
+    use SoftDeletes;
 
     protected $fillable = [
-        'tenant_id',
         'user_id',
         'payable_type',
         'payable_id',

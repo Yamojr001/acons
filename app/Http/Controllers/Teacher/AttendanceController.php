@@ -52,12 +52,11 @@ class AttendanceController extends Controller
         $teacher = Auth::user()->teacher;
         $class   = ClassRoom::where('id', $request->class_room_id)
             ->where('teacher_id', $teacher->id)->firstOrFail();
-        $tenant  = app('currentTenant');
 
         foreach ($request->attendance as $studentId => $status) {
             Attendance::updateOrCreate(
-                ['tenant_id' => $tenant->id, 'student_id' => (int) $studentId, 'date' => $request->date],
-                ['class_room_id' => $class->id, 'status' => $status, 'tenant_id' => $tenant->id]
+                ['student_id' => (int) $studentId, 'date' => $request->date],
+                ['class_room_id' => $class->id, 'status' => $status]
             );
         }
 

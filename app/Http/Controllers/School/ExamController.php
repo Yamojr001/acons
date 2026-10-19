@@ -33,7 +33,7 @@ class ExamController extends Controller
 
     public function store(StoreExamRequest $request)
     {
-        Exam::create(array_merge($request->validated(), ['tenant_id' => app('currentTenant')->id]));
+        Exam::create($request->validated());
         return redirect()->route('admin.exams.index')->with('success', 'Exam scheduled.');
     }
 

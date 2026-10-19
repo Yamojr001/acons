@@ -3,8 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Traits\BelongsToTenant;
-use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasOne};
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
@@ -12,10 +11,9 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     use SoftDeletes;
-    use Notifiable, BelongsToTenant, HasRoles;
+    use Notifiable, HasRoles;
 
     protected $fillable = [
-        'tenant_id',
         'name',
         'email',
         'password',
@@ -56,7 +54,6 @@ class User extends Authenticatable
     public const ROLE_DEAN              = 'dean';
     public const ROLE_PROVOST           = 'provost';
 
-    public function tenant(): BelongsTo { return $this->belongsTo(Tenant::class); }
     public function student(): HasOne   { return $this->hasOne(Student::class); }
     public function lecturer(): HasOne  { return $this->hasOne(Lecturer::class); }
 

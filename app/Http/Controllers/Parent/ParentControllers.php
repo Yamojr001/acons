@@ -117,7 +117,7 @@ class FeeController extends Controller
         abort_if($fee->isPaid(), 422, 'Fee already paid.');
 
         $fee->load('student.user');
-        $result = app(PaymentService::class)->initiate($fee, $request->gateway, app('currentTenant'));
+        $result = app(PaymentService::class)->initiate($fee, $request->gateway, url('/parent/fees'));
 
         if (isset($result['authorization_url'])) return redirect($result['authorization_url']);
         if (isset($result['checkout_url']))      return redirect($result['checkout_url']);

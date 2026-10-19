@@ -36,9 +36,7 @@ class DashboardController extends Controller
 
     public function lecturers(Request $request)
     {
-        $tenant = app('currentTenant');
         $lecturers = Lecturer::with(['user.roles', 'department'])
-            ->where('tenant_id', $tenant->id)
             ->when($request->search, function ($query, $search) {
                 $query->where(function($q) use ($search) {
                     $q->whereHas('user', function ($u) use ($search) {
@@ -52,7 +50,7 @@ class DashboardController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $departments = Department::where('tenant_id', $tenant->id)->get(['id', 'name']);
+        $departments = Department::get(['id', 'name']);
 
         return Inertia::render('Registrar/Lecturers/Index', [
             'lecturers' => $lecturers,
@@ -69,20 +67,16 @@ class DashboardController extends Controller
 
     public function faculties()
     {
-        $tenant = app('currentTenant');
-
-        // Ensure at least one Faculty exists for this tenant
-        $facultiesCount = \App\Models\Faculty::where('tenant_id', $tenant->id)->count();
+        // Ensure at least one Faculty exists
+        $facultiesCount = \App\Models\Faculty::count();
         if ($facultiesCount === 0) {
             \App\Models\Faculty::create([
-                'tenant_id' => $tenant->id,
                 'name' => 'Faculty of Nursing Sciences',
                 'code' => 'FNS',
             ]);
         }
 
-        $faculties = \App\Models\Faculty::where('tenant_id', $tenant->id)
-            ->with(['departments' => function ($q) {
+        $faculties = \App\Models\Faculty::with(['departments' => function ($q) {
                 $q->withCount(['students', 'lecturers']);
             }])->get();
 
@@ -108,16 +102,13 @@ class DashboardController extends Controller
 
     public function storeDepartment(Request $request)
     {
-        $tenant = app('currentTenant');
-
         $request->validate([
-            'name' => 'required|string|max:255|unique:departments,name,NULL,id,tenant_id,' . $tenant->id,
-            'code' => 'required|string|max:50|unique:departments,code,NULL,id,tenant_id,' . $tenant->id,
-            'faculty_id' => 'required|exists:faculties,id,tenant_id,' . $tenant->id,
+            'name' => 'required|string|max:255|unique:departments,name',
+            'code' => 'required|string|max:50|unique:departments,code',
+            'faculty_id' => 'required|exists:faculties,id',
         ]);
 
         \App\Models\Department::create([
-            'tenant_id' => $tenant->id,
             'faculty_id' => $request->faculty_id,
             'name' => $request->name,
             'code' => strtoupper($request->code),
@@ -128,13 +119,12 @@ class DashboardController extends Controller
 
     public function admissions(\Illuminate\Http\Request $request)
     {
-        $tenantId = app('currentTenant')->id;
         $year = $request->input('year');
         $paymentStatus = $request->input('payment_status');
         $status = $request->input('status');
         $search = $request->input('search');
         
-        $query = \App\Models\Applicant::where('tenant_id', $tenantId);
+        $query = \App\Models\Applicant::query();
         
         if ($year) {
             $query->whereYear('created_at', $year);
@@ -170,7 +160,7 @@ class DashboardController extends Controller
             });
         }
         
-        $baseQuery = \App\Models\Applicant::where('tenant_id', $tenantId);
+        $baseQuery = \App\Models\Applicant::query();
         if ($year) {
             $baseQuery->whereYear('created_at', $year);
         }
@@ -198,7 +188,7 @@ class DashboardController extends Controller
 
         $applications = (clone $query)->with(['form', 'admittedDepartment', 'appliedProgram', 'admittedProgram'])->latest()->paginate($perPage)->withQueryString();
         
-        $availableYears = \App\Models\Applicant::where('tenant_id', $tenantId)
+        $availableYears = \App\Models\Applicant::query()
             ->pluck('created_at')
             ->map(fn($date) => $date ? $date->format('Y') : date('Y'))
             ->unique()
@@ -209,7 +199,7 @@ class DashboardController extends Controller
             $availableYears = collect([date('Y')]);
         }
         
-        $activeForm = \App\Models\AdmissionForm::where('tenant_id', $tenantId)->where('is_active', true)->first();
+        $activeForm = \App\Models\AdmissionForm::where('is_active', true)->first();
         $defaultClearanceSchedule = $activeForm ? ($activeForm->default_clearance_schedule ?? '') : '';
         
         return Inertia::render('Registrar/Admissions/Index', [
@@ -235,8 +225,6 @@ class DashboardController extends Controller
 
     public function storeAnnouncement(\Illuminate\Http\Request $request)
     {
-        $tenantId = app('currentTenant')->id;
-
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'body' => 'required|string',
@@ -244,7 +232,6 @@ class DashboardController extends Controller
         ]);
 
         \App\Models\Announcement::create([
-            'tenant_id' => $tenantId,
             'created_by' => auth()->id(),
             'title' => $validated['title'],
             'body' => $validated['body'],
@@ -259,8 +246,6 @@ class DashboardController extends Controller
 
     public function storeSession(\Illuminate\Http\Request $request)
     {
-        $tenantId = app('currentTenant')->id;
-
         $validated = $request->validate([
             'name' => 'required|string',
             'start_date' => 'required|date',
@@ -272,11 +257,10 @@ class DashboardController extends Controller
         ]);
 
         if ($request->is_current) {
-            AcademicSession::where('tenant_id', $tenantId)->update(['is_current' => false]);
+            AcademicSession::where('is_current', true)->update(['is_current' => false]);
         }
 
         $session = AcademicSession::create([
-            'tenant_id' => $tenantId,
             'name' => $validated['name'],
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
@@ -290,11 +274,10 @@ class DashboardController extends Controller
         if (!empty($validated['semesters'])) {
             foreach ($validated['semesters'] as $semData) {
                 if ($semData['is_current'] ?? false) {
-                    Semester::where('tenant_id', $tenantId)->update(['is_current' => false]);
+                    Semester::where('is_current', true)->update(['is_current' => false]);
                 }
                 
                 Semester::create([
-                    'tenant_id' => $tenantId,
                     'academic_session_id' => $session->id,
                     'name' => $semData['name'],
                     'type' => $semData['type'] ?? ($semData['name'] === 'First Semester' ? 'first' : 'second'),
@@ -309,7 +292,6 @@ class DashboardController extends Controller
             }
         } else {
             Semester::create([
-                'tenant_id' => $tenantId,
                 'academic_session_id' => $session->id,
                 'name' => 'First Semester',
                 'type' => 'first',
@@ -318,7 +300,6 @@ class DashboardController extends Controller
                 'is_current' => true,
             ]);
             Semester::create([
-                'tenant_id' => $tenantId,
                 'academic_session_id' => $session->id,
                 'name' => 'Second Semester',
                 'type' => 'second',
@@ -333,11 +314,6 @@ class DashboardController extends Controller
 
     public function updateSession(\Illuminate\Http\Request $request, AcademicSession $session)
     {
-        $tenantId = app('currentTenant')->id;
-        if ($session->tenant_id !== $tenantId) {
-            abort(403);
-        }
-
         $validated = $request->validate([
             'name' => 'required|string',
             'start_date' => 'required|date',
@@ -349,7 +325,7 @@ class DashboardController extends Controller
         ]);
 
         if ($request->is_current && !$session->is_current) {
-            AcademicSession::where('tenant_id', $tenantId)->update(['is_current' => false]);
+            AcademicSession::where('is_current', true)->update(['is_current' => false]);
         }
 
         $session->update([
@@ -370,7 +346,7 @@ class DashboardController extends Controller
                     ->first();
 
                 if ($semData['is_current'] ?? false) {
-                    Semester::where('tenant_id', $tenantId)->update(['is_current' => false]);
+                    Semester::where('is_current', true)->update(['is_current' => false]);
                 }
 
                 if ($semester) {
@@ -386,7 +362,6 @@ class DashboardController extends Controller
                     ]);
                 } else {
                     Semester::create([
-                        'tenant_id' => $tenantId,
                         'academic_session_id' => $session->id,
                         'name' => $semData['name'],
                         'type' => $semData['type'],
@@ -491,12 +466,10 @@ class DashboardController extends Controller
 
     public function results()
     {
-        $tenant = app('currentTenant');
         $currentSemester = Semester::where('is_current', true)->first();
 
-        // Get all courses inside this tenant
-        $courses = Course::where('tenant_id', $tenant->id)
-            ->with(['lecturer.user', 'department'])
+        // Get all courses
+        $courses = Course::with(['lecturer.user', 'department'])
             ->get()
             ->map(function ($course) use ($currentSemester) {
                 // Get registrations with grades
@@ -659,13 +632,12 @@ class DashboardController extends Controller
 
     public function exportAdmissions(Request $request)
     {
-        $tenantId = app('currentTenant')->id;
         $year = $request->input('year');
         $paymentStatus = $request->input('payment_status');
         $status = $request->input('status');
         $search = $request->input('search');
         
-        $query = \App\Models\Applicant::where('tenant_id', $tenantId);
+        $query = \App\Models\Applicant::query();
         
         if ($year) {
             $query->whereYear('created_at', $year);
@@ -765,8 +737,6 @@ class DashboardController extends Controller
 
     public function storeDirectAdmission(Request $request)
     {
-        $tenant = app('currentTenant');
-
         $request->validate([
             // Personal Info
             'full_name' => 'required|string|max:255',
@@ -815,7 +785,6 @@ class DashboardController extends Controller
 
         // Create applicant record. Initial password is their phone number
         $applicant = \App\Models\Applicant::create([
-            'tenant_id' => $tenant->id,
             'jamb_number' => strtoupper($request->jamb_number),
             'password' => \Illuminate\Support\Facades\Hash::make($request->phone_number),
             
@@ -866,7 +835,7 @@ class DashboardController extends Controller
             'sponsor_name_address' => $request->sponsor_name_address,
 
             // States
-            'admission_form_id' => \App\Models\AdmissionForm::where('tenant_id', $tenant->id)->where('is_active', true)->value('id'),
+            'admission_form_id' => \App\Models\AdmissionForm::where('is_active', true)->value('id'),
             'payment_status' => 'paid',
             'payment_reference' => 'DIRECT_ADM_' . strtoupper(\Illuminate\Support\Str::random(12)),
             'amount_paid' => 14700.00,

@@ -13,10 +13,8 @@ class CourseController extends Controller
     public function index()
     {
         $lecturer = Auth::user()->lecturer;
-        $tenant = app('currentTenant');
         
-        $currentSemester = Semester::where('tenant_id', $tenant->id)
-            ->where('is_current', true)
+        $currentSemester = Semester::where('is_current', true)
             ->first();
 
         $courses = Course::where('lecturer_id', $lecturer->id)

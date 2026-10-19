@@ -19,7 +19,26 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
-        $tenant = app()->has('currentTenant') ? app('currentTenant') : null;
+        $institution = \App\Models\InstitutionSetting::current();
+        $institutionData = $institution ? [
+            'id'                     => $institution->id,
+            'name'                   => $institution->name,
+            'short_name'             => $institution->short_name ?: 'ACONS',
+            'subdomain'              => 'acons',
+            'custom_domain'          => null,
+            'logo_path'              => $institution->logo_path ? (str_starts_with($institution->logo_path, 'http') || str_starts_with($institution->logo_path, '/') ? asset($institution->logo_path) : asset('storage/' . $institution->logo_path)) : null,
+            'favicon_path'           => $institution->favicon_path ? (str_starts_with($institution->favicon_path, 'http') || str_starts_with($institution->favicon_path, '/') ? asset($institution->favicon_path) : asset('storage/' . $institution->favicon_path)) : null,
+            'primary_color'          => $institution->primary_color ?: '#2e5fa9',
+            'secondary_color'        => $institution->secondary_color ?: '#a31d1d',
+            'tagline'                => $institution->tagline,
+            'phone'                  => $institution->phone,
+            'email'                  => $institution->email,
+            'address'                => $institution->address,
+            'grading_scale'          => $institution->grading_scale ?: '5.0',
+            'payment_gateway'        => $institution->payment_gateway ?: 'zainpay',
+            'is_active'              => true,
+            'settings'               => $institution->settings ?: [],
+        ] : null;
 
         return array_merge(parent::share($request), [
             'auth' => [
@@ -32,29 +51,8 @@ class HandleInertiaRequests extends Middleware
                     'is_active'         => $request->user()->is_active,
                     'email_verified_at' => $request->user()->email_verified_at,
                 ] : null,
-                'tenant' => $tenant ? [
-                    'id'                   => $tenant->id,
-                    'name'                 => $tenant->name,
-                    'subdomain'            => $tenant->subdomain,
-                    'custom_domain'        => $tenant->custom_domain,
-                    'custom_domain_verified' => $tenant->custom_domain_verified,
-                    'domain_verification_token' => $tenant->domain_verification_token,
-                    'logo_path'            => $tenant->logo_path ? (str_starts_with($tenant->logo_path, 'http') || str_starts_with($tenant->logo_path, '/') ? asset($tenant->logo_path) : asset('storage/' . $tenant->logo_path)) : null,
-                    'favicon_path'         => $tenant->favicon_path ? (str_starts_with($tenant->favicon_path, 'http') || str_starts_with($tenant->favicon_path, '/') ? asset($tenant->favicon_path) : asset('storage/' . $tenant->favicon_path)) : null,
-                    'primary_color'        => $tenant->primary_color,
-                    'secondary_color'      => $tenant->secondary_color,
-                    'tagline'              => $tenant->tagline,
-                    'phone'                => $tenant->phone,
-                    'email'                => $tenant->email,
-                    'address'              => $tenant->address,
-                    'subscription_plan'    => $tenant->subscription_plan,
-                    'charge_portal_fee'    => $tenant->charge_portal_fee,
-                    'portal_maintenance_fee' => $tenant->portal_maintenance_fee,
-                    'teacher_mode'         => $tenant->teacher_mode,
-                    'current_session'      => $tenant->current_session,
-                    'current_term'         => $tenant->current_term,
-                    'is_active'            => $tenant->is_active,
-                ] : null,
+                'institution' => $institutionData,
+                'tenant'      => $institutionData, // Backward-compatible alias for existing UI layouts
             ],
             'flash' => [
                 'success' => session('success'),

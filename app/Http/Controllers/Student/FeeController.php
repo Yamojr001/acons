@@ -16,7 +16,6 @@ class FeeController extends Controller
     public function index(): Response
     {
         $student = Auth::user()->student;
-        $tenant  = app('currentTenant');
 
         $fees = Fee::where('student_id', $student->id)
             ->orderBy('due_date')
@@ -72,7 +71,6 @@ class FeeController extends Controller
         abort_if($fee->status === 'paid', 422, 'This fee is already paid.');
 
         $fee->load('student.user');
-        $tenant      = app('currentTenant');
         $callbackUrl = route('student.fees.callback');
 
         try {
@@ -80,7 +78,6 @@ class FeeController extends Controller
 
             // Store pending payment record
             Payment::create([
-                'tenant_id'      => $fee->tenant_id,
                 'fee_id'         => $fee->id,
                 'student_id'     => $fee->student_id,
                 'amount'         => $fee->amount,

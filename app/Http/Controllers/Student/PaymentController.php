@@ -3,8 +3,7 @@
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
-use App\Models\StudentInvoice;
-use App\Models\Payment;
+use App\Models\{StudentInvoice, Payment, Fee, InstitutionSetting};
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
@@ -13,7 +12,7 @@ class PaymentController extends Controller
 {
     public function index(Request $request)
     {
-        $tenant = app('currentTenant');
+        $institution = InstitutionSetting::current();
         $student = $request->user()->student;
 
         $invoices = StudentInvoice::with(['fee.academicSession', 'fee.department'])
@@ -23,7 +22,7 @@ class PaymentController extends Controller
 
         return Inertia::render('Student/Fees/Index', [
             'invoices' => $invoices,
-            'activeGateway' => $tenant->settings['payment_gateway'] ?? 'zainpay'
+            'activeGateway' => $institution->payment_gateway ?? 'zainpay'
         ]);
     }
 
@@ -33,7 +32,7 @@ class PaymentController extends Controller
      */
     public function initialize(Request $request, StudentInvoice $invoice)
     {
-        $tenant = app('currentTenant');
+        $institution = InstitutionSetting::current();
         $student = $request->user()->student;
 
         if ($invoice->student_id !== $student->id) {
@@ -44,7 +43,7 @@ class PaymentController extends Controller
             return back()->withErrors(['message' => 'This invoice is already fully paid.']);
         }
 
-        $gateway = $tenant->settings['payment_gateway'] ?? 'zainpay';
+        $gateway = $institution->payment_gateway ?? 'zainpay';
         
         // Generate a unique reference
         $reference = 'ACON_FEE_' . strtoupper(Str::random(10));
@@ -67,8 +66,7 @@ class PaymentController extends Controller
         $hostelInvoice = null;
 
         if ($includeHostel && $isTuitionFee) {
-            $hostelFee = \App\Models\Fee::where('tenant_id', $tenant->id)
-                ->where('fee_type', 'hostel')
+            $hostelFee = Fee::where('fee_type', 'hostel')
                 ->where(function($q) use ($invoice) {
                     $q->where('academic_session_id', $invoice->fee?->academic_session_id)
                       ->orWhereNull('academic_session_id');
@@ -80,7 +78,6 @@ class PaymentController extends Controller
                     [
                         'student_id' => $student->id,
                         'fee_id'     => $hostelFee->id,
-                        'tenant_id'  => $tenant->id,
                     ],
                     [
                         'amount_due'  => $hostelFee->amount ?: 105000.00,
@@ -104,7 +101,6 @@ class PaymentController extends Controller
 
         // Create a pending payment record
         $payment = Payment::create([
-            'tenant_id'          => $tenant->id,
             'student_invoice_id' => $invoice->id,
             'amount'             => $totalAmount,
             'reference'          => $reference,
@@ -133,8 +129,8 @@ class PaymentController extends Controller
                 'reference' => $reference,
                 'rrr' => $rrr,
                 'amount' => $payment->amount,
-                'merchantId' => $tenant->settings['remita_merchant_id'] ?? 'DEMO',
-                'apiKey' => $tenant->settings['remita_api_key'] ?? 'DEMO_KEY'
+                'merchantId' => $institution->settings['remita_merchant_id'] ?? 'DEMO',
+                'apiKey' => $institution->settings['remita_api_key'] ?? 'DEMO_KEY'
             ]);
         }
 
@@ -192,7 +188,7 @@ class PaymentController extends Controller
             'reference' => $reference,
             'amount' => $payment->amount * 100, // Paystack uses kobo
             'email' => $request->user()->email,
-            'publicKey' => $tenant->settings['paystack_public_key'] ?? config('services.paystack.public_key')
+            'publicKey' => $institution->settings['paystack_public_key'] ?? config('services.paystack.public_key')
         ]);
     }
 
@@ -300,7 +296,6 @@ class PaymentController extends Controller
             }
 
             $currentSemester = \App\Models\Semester::with('academicSession')
-                                        ->where('tenant_id', $student->tenant_id)
                                         ->where('is_current', true)
                                         ->first();
             $yearYY = $currentSemester?->academicSession?->name ? substr(explode('/', $currentSemester->academicSession->name)[0], -2) : now()->format('y');

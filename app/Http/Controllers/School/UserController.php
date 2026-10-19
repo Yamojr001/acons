@@ -3,11 +3,7 @@
 namespace App\Http\Controllers\School;
 
 use App\Http\Controllers\Controller;
-use App\Models\{
-    Tenant, User, Teacher, Student, ClassRoom, Subject,
-    Fee, Payment, Exam, Grade, Attendance, Announcement, Guardian
-};
-use App\Services\TenantResolver;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Auth, DB, Storage, Cache};
 use Illuminate\Support\Str;

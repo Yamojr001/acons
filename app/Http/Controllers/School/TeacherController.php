@@ -4,10 +4,9 @@ namespace App\Http\Controllers\School;
 
 use App\Http\Controllers\Controller;
 use App\Models\{
-    Tenant, User, Teacher, Student, ClassRoom, Subject,
+    User, Teacher, Student, ClassRoom, Subject,
     Fee, Payment, Exam, Grade, Attendance, Announcement, Guardian
 };
-use App\Services\TenantResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Auth, DB, Storage, Cache};
 use Illuminate\Support\Str;
@@ -53,7 +52,6 @@ class TeacherController extends Controller
 
     public function store(Request $request)
     {
-        $tenant = app('currentTenant');
         $request->validate([
             'name'          => 'required|string|max:100',
             'email'         => 'required|email|max:150',
@@ -63,11 +61,10 @@ class TeacherController extends Controller
             'phone'         => 'nullable|string|max:20',
         ]);
 
-        abort_if(User::where('tenant_id',$tenant->id)->where('email',$request->email)->exists(), 422, 'Email already exists.');
+        abort_if(User::where('email',$request->email)->exists(), 422, 'Email already exists.');
 
-        DB::transaction(function () use ($request, $tenant) {
+        DB::transaction(function () use ($request) {
             $user = User::create([
-                'tenant_id' => $tenant->id,
                 'name'      => $request->name,
                 'email'     => $request->email,
                 'password'  => bcrypt(Str::random(12)),
@@ -77,7 +74,6 @@ class TeacherController extends Controller
             ]);
 
             Lecturer::create([
-                'tenant_id'     => $tenant->id,
                 'user_id'       => $user->id,
                 'employee_id'   => $request->employee_id,
                 'hire_date'     => $request->hire_date,
