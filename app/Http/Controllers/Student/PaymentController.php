@@ -23,7 +23,7 @@ class PaymentController extends Controller
 
         return Inertia::render('Student/Fees/Index', [
             'invoices' => $invoices,
-            'activeGateway' => $tenant->settings['payment_gateway'] ?? 'monnify' // Default to monnify if not set
+            'activeGateway' => $tenant->settings['payment_gateway'] ?? 'zainpay'
         ]);
     }
 
@@ -44,19 +44,81 @@ class PaymentController extends Controller
             return back()->withErrors(['message' => 'This invoice is already fully paid.']);
         }
 
-        $gateway = $tenant->settings['payment_gateway'] ?? 'monnify';
+        $gateway = $tenant->settings['payment_gateway'] ?? 'zainpay';
         
         // Generate a unique reference
-        $reference = 'REF-' . strtoupper(Str::random(10));
+        $reference = 'ACON_FEE_' . strtoupper(Str::random(10));
+
+        $isTuitionFee = in_array($invoice->fee?->fee_type, ['tuition', 'registration']);
+        $tuitionBalance = (float) ($invoice->amount_due - $invoice->amount_paid);
+        $installmentPercent = (int) ($request->input('installment_percent', 100));
+
+        if ($isTuitionFee && $invoice->amount_paid == 0 && $installmentPercent === 70) {
+            $tuitionPortion = round((float)$invoice->amount_due * 0.70, 2); // ₦378,000
+            $effectivePercent = 70;
+        } else {
+            $tuitionPortion = $tuitionBalance; // ₦540,000 (or remaining balance if 70% already paid)
+            $effectivePercent = ($invoice->amount_paid > 0) ? 30 : 100;
+        }
+
+        // Optional Hostel Accommodation Fee (₦105,000)
+        $includeHostel = $request->boolean('include_hostel');
+        $hostelPortion = 0.00;
+        $hostelInvoice = null;
+
+        if ($includeHostel && $isTuitionFee) {
+            $hostelFee = \App\Models\Fee::where('tenant_id', $tenant->id)
+                ->where('fee_type', 'hostel')
+                ->where(function($q) use ($invoice) {
+                    $q->where('academic_session_id', $invoice->fee?->academic_session_id)
+                      ->orWhereNull('academic_session_id');
+                })
+                ->first();
+
+            if ($hostelFee) {
+                $hostelInvoice = StudentInvoice::firstOrCreate(
+                    [
+                        'student_id' => $student->id,
+                        'fee_id'     => $hostelFee->id,
+                        'tenant_id'  => $tenant->id,
+                    ],
+                    [
+                        'amount_due'  => $hostelFee->amount ?: 105000.00,
+                        'amount_paid' => 0,
+                        'status'      => 'pending',
+                    ]
+                );
+
+                if ($hostelInvoice->status !== 'paid') {
+                    $hostelPortion = (float) ($hostelInvoice->amount_due - $hostelInvoice->amount_paid);
+                }
+            } else {
+                $hostelPortion = 105000.00;
+            }
+        }
+
+        // Payment Gateway Processing Fee (Capped at ₦2,000)
+        $gatewayCharge = 2000.00;
+
+        $totalAmount = $tuitionPortion + $hostelPortion + $gatewayCharge;
 
         // Create a pending payment record
         $payment = Payment::create([
-            'tenant_id' => $tenant->id,
+            'tenant_id'          => $tenant->id,
             'student_invoice_id' => $invoice->id,
-            'amount' => $invoice->amount_due - $invoice->amount_paid,
-            'reference' => $reference,
-            'payment_gateway' => $gateway,
-            'status' => 'pending',
+            'amount'             => $totalAmount,
+            'reference'          => $reference,
+            'payment_gateway'    => $gateway,
+            'status'             => 'pending',
+            'metadata'           => [
+                'tuition_invoice_id'  => $isTuitionFee ? $invoice->id : null,
+                'tuition_amount'      => $isTuitionFee ? $tuitionPortion : 0.00,
+                'installment_percent' => $effectivePercent,
+                'include_hostel'      => ($includeHostel && $hostelPortion > 0) || ($invoice->fee?->fee_type === 'hostel'),
+                'hostel_invoice_id'   => $isTuitionFee ? $hostelInvoice?->id : $invoice->id,
+                'hostel_amount'       => $isTuitionFee ? $hostelPortion : $tuitionBalance,
+                'gateway_charge'      => $gatewayCharge,
+            ],
         ]);
 
         if ($gateway === 'remita') {
@@ -170,22 +232,54 @@ class PaymentController extends Controller
 
         $payment->update(['status' => 'successful']);
 
-        $invoice = $payment->invoice; // Assuming relation exists
-        if (!$invoice) {
-            $invoice = StudentInvoice::find($payment->student_invoice_id);
+        $meta = $payment->metadata ?? [];
+        if (is_string($meta)) {
+            $meta = json_decode($meta, true) ?: [];
         }
 
-        $newPaidAmount = $invoice->amount_paid + $payment->amount;
-        $status = $newPaidAmount >= $invoice->amount_due ? 'paid' : 'partial';
+        $tuitionAmount = isset($meta['tuition_amount']) ? (float)$meta['tuition_amount'] : (float)$payment->amount;
+        $hostelAmount = isset($meta['hostel_amount']) ? (float)$meta['hostel_amount'] : 0.00;
+        $hostelInvoiceId = $meta['hostel_invoice_id'] ?? null;
 
-        $invoice->update([
-            'amount_paid' => $newPaidAmount,
-            'status' => $status
-        ]);
+        $invoice = $payment->studentInvoice ?: StudentInvoice::find($payment->student_invoice_id);
+        $isTuition = $invoice && in_array($invoice->fee?->fee_type, ['tuition', 'registration']);
+        $status = $invoice?->status ?? 'pending';
 
-        // Auto Generate Matriculation Number upon school fees / tuition clearance
+        if ($invoice && $isTuition && $tuitionAmount > 0) {
+            $newPaidAmount = (float)$invoice->amount_paid + $tuitionAmount;
+            $status = $newPaidAmount >= (float)$invoice->amount_due ? 'paid' : 'partial';
+
+            $invoice->update([
+                'amount_paid' => $newPaidAmount,
+                'status'      => $status,
+            ]);
+        } elseif ($invoice && !$isTuition && empty($meta['include_hostel'])) {
+            $effectiveAmount = max(0, (float)$payment->amount - 2000.00);
+            $newPaidAmount = (float)$invoice->amount_paid + $effectiveAmount;
+            $status = $newPaidAmount >= (float)$invoice->amount_due ? 'paid' : 'partial';
+
+            $invoice->update([
+                'amount_paid' => $newPaidAmount,
+                'status'      => $status,
+            ]);
+        }
+
+        // Credit Hostel Invoice if selected
+        if (!empty($meta['include_hostel']) && $hostelAmount > 0) {
+            $hostelInvoice = $hostelInvoiceId ? StudentInvoice::find($hostelInvoiceId) : null;
+            if ($hostelInvoice) {
+                $newHostelPaid = (float)$hostelInvoice->amount_paid + $hostelAmount;
+                $hostelStatus = $newHostelPaid >= (float)$hostelInvoice->amount_due ? 'paid' : 'partial';
+                $hostelInvoice->update([
+                    'amount_paid' => $newHostelPaid,
+                    'status'      => $hostelStatus,
+                ]);
+            }
+        }
+
+        // Auto Generate Matriculation Number upon school fees / tuition payment
         $student = $invoice->student;
-        if ($status === 'paid' && $student && !$student->matriculation_number) {
+        if (($status === 'paid' || $status === 'partial') && $student && !$student->matriculation_number) {
             $program = $student->program;
             $programName = $program?->name ?? '';
 
@@ -210,7 +304,7 @@ class PaymentController extends Controller
                                         ->where('is_current', true)
                                         ->first();
             $yearYY = $currentSemester?->academicSession?->name ? substr(explode('/', $currentSemester->academicSession->name)[0], -2) : now()->format('y');
-            $prefix = "ACONS/{$section}/{$deptAbbr}/{$yearYY}/";
+            $prefix = "ACONS/{$deptAbbr}/{$section}/{$yearYY}/";
 
             $lastMatric = \App\Models\Student::where('matriculation_number', 'like', $prefix . '%')
                 ->orderBy('matriculation_number', 'desc')
@@ -228,6 +322,6 @@ class PaymentController extends Controller
             $student->update(['matriculation_number' => $matriculationNumber]);
         }
 
-        return redirect()->route('student.fees')->with('success', 'Payment verified and invoice cleared successfully.');
+        return redirect()->route('student.registration')->with('success', 'Payment verified and credited successfully! You can now proceed with course registration.');
     }
 }

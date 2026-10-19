@@ -20,21 +20,29 @@ class RegistrationController extends Controller
             ->first();
 
         $invoice = null;
+        $hostelFee = null;
+        $hostelInvoice = null;
 
         if ($currentSemester) {
-            // A registration fee schedule may be set for the student's specific
-            // department+level, or apply institution-wide (department_id/level null).
+            // Find tuition / school fees (N540,000)
             $fee = Fee::where('tenant_id', $tenant->id)
                 ->where('academic_session_id', $currentSemester->academic_session_id)
-                ->where('fee_type', 'registration')
+                ->whereIn('fee_type', ['tuition', 'registration'])
                 ->where(function ($q) use ($student) {
                     $q->whereNull('department_id')->orWhere('department_id', $student->department_id);
                 })
                 ->where(function ($q) use ($student) {
                     $q->whereNull('level')->orWhere('level', $student->current_level);
                 })
-                ->orderByRaw('department_id IS NULL, level IS NULL') // prefer the most specific match
+                ->orderByRaw("fee_type = 'tuition' DESC, department_id IS NULL, level IS NULL")
                 ->first();
+
+            // Fallback if specific not found
+            if (!$fee) {
+                $fee = Fee::where('tenant_id', $tenant->id)
+                    ->whereIn('fee_type', ['tuition', 'registration'])
+                    ->first();
+            }
 
             if ($fee) {
                 $invoice = StudentInvoice::firstOrCreate(
@@ -49,15 +57,35 @@ class RegistrationController extends Controller
                         'status'      => 'pending',
                     ]
                 );
-                $invoice->load('fee.academicSession');
+                $invoice->load(['fee.academicSession', 'payments']);
+            }
+
+            // Find optional hostel accommodation fee (N105,000)
+            $hostelFee = Fee::where('tenant_id', $tenant->id)
+                ->where('fee_type', 'hostel')
+                ->where(function ($q) use ($currentSemester) {
+                    $q->where('academic_session_id', $currentSemester->academic_session_id)
+                      ->orWhereNull('academic_session_id');
+                })
+                ->first();
+
+            if ($hostelFee) {
+                $hostelInvoice = StudentInvoice::where([
+                    'student_id' => $student->id,
+                    'fee_id'     => $hostelFee->id,
+                    'tenant_id'  => $tenant->id,
+                ])->first();
             }
         }
 
         return Inertia::render('Student/Registration', [
-            'invoice' => $invoice,
-            'currentSession' => $currentSemester?->academicSession?->name,
-            'currentSemesterName' => $currentSemester?->name,
-            'activeGateway' => $tenant->settings['payment_gateway'] ?? 'monnify',
+            'invoice'             => $invoice,
+            'hostelFee'           => $hostelFee,
+            'hostelInvoice'       => $hostelInvoice,
+            'gatewayChargeCap'    => 2000,
+            'currentSession'      => $currentSemester?->academicSession?->name ?? '2026/2027',
+            'currentSemesterName' => $currentSemester?->name ?? 'First Semester',
+            'activeGateway'       => $tenant->settings['payment_gateway'] ?? 'zainpay',
         ]);
     }
 }

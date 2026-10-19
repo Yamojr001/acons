@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react'
+import { Head, Link, router } from '@inertiajs/react'
 import { motion } from 'framer-motion'
 import { CreditCard, CheckCircle, Clock, AlertTriangle, Download, ArrowRight } from 'lucide-react'
 import AppLayout from '@/Layouts/AppLayout'
@@ -186,6 +186,16 @@ export default function FeesIndex({ invoices, activeGateway }: FeesProps) {
                           <Button variant="outline" size="sm" iconLeft={<Download size={14} />}>
                             Receipt
                           </Button>
+                        ) : invoice.fee.fee_type === 'tuition' || invoice.fee.fee_type === 'registration' ? (
+                          <Link href="/student/registration">
+                            <Button
+                              variant="primary"
+                              className="w-full sm:w-auto"
+                              iconRight={<ArrowRight size={16} />}
+                            >
+                              Choose Plan & Pay
+                            </Button>
+                          </Link>
                         ) : (
                           <Button 
                             variant="primary" 

@@ -32,8 +32,8 @@ export default function Blocked({ message }: BlockedProps) {
               <Link href="/student/dashboard">
                 <Button variant="ghost">Return to Dashboard</Button>
               </Link>
-              <Link href="/student/fees">
-                <Button variant="danger" iconRight={<ArrowRight size={16} />}>Pay Tuition Fees</Button>
+              <Link href="/student/registration">
+                <Button variant="danger" iconRight={<ArrowRight size={16} />}>Pay School Fees</Button>
               </Link>
             </div>
           </Card>

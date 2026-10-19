@@ -24,17 +24,18 @@ class CourseRegistrationController extends Controller
                                     ->firstOrFail();
         $academicSession = $currentSemester->academicSession;
 
-        // 1. Check if Tuition is paid before allowing registration
+        // 1. Check if Tuition is paid before allowing registration (allow full or at least 70% 1st installment)
         $tuitionInvoice = StudentInvoice::where('student_id', $student->id)
             ->whereHas('fee', function($query) {
-                $query->where('fee_type', 'tuition');
+                $query->whereIn('fee_type', ['tuition', 'registration']);
             })
             ->where('status', '!=', 'paid')
             ->first();
 
-        if ($tuitionInvoice) {
+        if ($tuitionInvoice && (float)$tuitionInvoice->amount_paid < round((float)$tuitionInvoice->amount_due * 0.70, 2)) {
+            $requiredAmount = number_format($tuitionInvoice->amount_due * 0.70, 2);
             return Inertia::render('Student/CourseRegistration/Blocked', [
-                'message' => 'You must pay your tuition fee before registering for courses.'
+                'message' => "You must pay at least 70% of your School Fees (₦{$requiredAmount}) before registering for semester courses."
             ]);
         }
 
