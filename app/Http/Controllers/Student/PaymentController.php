@@ -53,10 +53,10 @@ class PaymentController extends Controller
         $installmentPercent = (int) ($request->input('installment_percent', 100));
 
         if ($isTuitionFee && $invoice->amount_paid == 0 && $installmentPercent === 70) {
-            $tuitionPortion = round((float)$invoice->amount_due * 0.70, 2); // ₦378,000
+            $tuitionPortion = round((float)$invoice->amount_due * 0.70, 2); // ₦374,500
             $effectivePercent = 70;
         } else {
-            $tuitionPortion = $tuitionBalance; // ₦540,000 (or remaining balance if 70% already paid)
+            $tuitionPortion = $tuitionBalance; // ₦535,000 (or remaining balance if 70% already paid)
             $effectivePercent = ($invoice->amount_paid > 0) ? 30 : 100;
         }
 
@@ -94,8 +94,8 @@ class PaymentController extends Controller
             }
         }
 
-        // Payment Gateway Processing Fee (Capped at ₦2,000)
-        $gatewayCharge = 2000.00;
+        // Payment Gateway Processing Fee (Waived / 0.00)
+        $gatewayCharge = 0.00;
 
         $totalAmount = $tuitionPortion + $hostelPortion + $gatewayCharge;
 
@@ -265,7 +265,8 @@ class PaymentController extends Controller
                 'status'      => $status,
             ]);
         } elseif ($invoice && !$isTuition && empty($meta['include_hostel'])) {
-            $effectiveAmount = max(0, (float)$payment->amount - 2000.00);
+            $gatewayFee = (float)($meta['gateway_charge'] ?? 0.00);
+            $effectiveAmount = max(0, (float)$payment->amount - $gatewayFee);
             $newPaidAmount = (float)$invoice->amount_paid + $effectiveAmount;
             $status = $newPaidAmount >= (float)$invoice->amount_due ? 'paid' : 'partial';
 

@@ -57,12 +57,12 @@ export default function Registration({
   invoice,
   hostelFee,
   hostelInvoice,
-  gatewayChargeCap = 2000,
+  gatewayChargeCap = 0,
   currentSession = '2026/2027',
   currentSemesterName = 'First Semester',
   activeGateway = 'zainpay',
 }: RegistrationProps) {
-  // Plan options: 100 (Full ₦540k) vs 70 (1st installment ₦378k)
+  // Plan options: 100 (Full ₦535k) vs 70 (1st installment ₦374.5k)
   const [installmentPercent, setInstallmentPercent] = useState<100 | 70>(100)
   const [includeHostel, setIncludeHostel] = useState<boolean>(false)
   const [processing, setProcessing] = useState(false)
@@ -71,7 +71,7 @@ export default function Registration({
   const isTuitionPartial = invoice?.status === 'partial' || (invoice && invoice.amount_paid > 0 && !isTuitionPaid)
   const isHostelPaid = hostelInvoice?.status === 'paid'
 
-  const fullTuitionAmount = invoice ? Number(invoice.amount_due) : 540000
+  const fullTuitionAmount = invoice ? Number(invoice.amount_due) : 535000
   const paidTuitionAmount = invoice ? Number(invoice.amount_paid) : 0
   const outstandingTuition = Math.max(0, fullTuitionAmount - paidTuitionAmount)
 
@@ -86,7 +86,7 @@ export default function Registration({
 
   const hostelPrice = hostelFee?.amount ? Number(hostelFee.amount) : 105000
   const hostelToPay = includeHostel && !isHostelPaid ? hostelPrice : 0
-  const gatewayCharge = gatewayChargeCap // ₦2,000 flat cap
+  const gatewayCharge = gatewayChargeCap // No gateway charge (0)
 
   // Total payable in this checkout
   const totalPayable = tuitionToPay + hostelToPay + gatewayCharge
@@ -284,7 +284,7 @@ export default function Registration({
                       </div>
 
                       <div className="text-2xl font-bold font-display text-surface-900 mb-1">
-                        {formatCurrency(540000)}
+                        {formatCurrency(fullTuitionAmount)}
                       </div>
                       <p className="text-xs text-surface-600 leading-relaxed">
                         Covers complete school fees and tuition for the entire 2026/2027 academic session.
@@ -321,10 +321,10 @@ export default function Registration({
                       </div>
 
                       <div className="text-2xl font-bold font-display text-surface-900 mb-1">
-                        {formatCurrency(378000)}
+                        {formatCurrency(Math.round(fullTuitionAmount * 0.7))}
                       </div>
                       <p className="text-xs text-surface-600 leading-relaxed">
-                        Unlocks <strong>First Semester Course Registration</strong> immediately. Balance of ₦162,000 due before Second Semester.
+                        Unlocks <strong>First Semester Course Registration</strong> immediately. Balance of {formatCurrency(fullTuitionAmount - Math.round(fullTuitionAmount * 0.7))} due before Second Semester.
                       </p>
 
                       <div className="mt-3 pt-3 border-t border-surface-100 flex items-center gap-1.5 text-xs text-brand-700 font-medium">
@@ -410,9 +410,8 @@ export default function Registration({
                   <div>
                     <strong className="text-surface-800 font-medium">Important Registration Guidelines:</strong>
                     <ul className="list-disc list-inside mt-1 space-y-0.5 text-surface-600">
-                      <li>Payment of at least <strong>70% (₦378,000)</strong> enables immediate course registration for the First Semester.</li>
+                      <li>Payment of at least <strong>70% ({formatCurrency(Math.round(fullTuitionAmount * 0.7))})</strong> enables immediate course registration for the First Semester.</li>
                       <li>Hostel fee is only required if you intend to reside in the college hostel premises.</li>
-                      <li>Payment gateway processing charge is strictly capped at <strong>₦2,000.00</strong>.</li>
                       <li>Official e-receipts are automatically generated and downloadable from your Bursary portal.</li>
                     </ul>
                   </div>
@@ -466,11 +465,11 @@ export default function Registration({
                   </div>
 
                   {/* Line 3: Gateway Processing Fee */}
-                  {(!isTuitionPaid || includeHostel) && (
+                  {gatewayCharge > 0 && (!isTuitionPaid || includeHostel) && (
                     <div className="flex justify-between items-start text-surface-700">
                       <div>
                         <p className="font-medium text-surface-900">Gateway Processing Fee</p>
-                        <p className="text-xs text-surface-500">Flat processing cap</p>
+                        <p className="text-xs text-surface-500">Processing fee</p>
                       </div>
                       <span className="font-medium text-surface-900">{formatCurrency(gatewayCharge)}</span>
                     </div>

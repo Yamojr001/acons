@@ -23,7 +23,7 @@ class RegistrationController extends Controller
         $hostelInvoice = null;
 
         if ($currentSemester) {
-            // Find tuition / school fees (N540,000)
+            // Find tuition / school fees (N535,000)
             $fee = Fee::where('academic_session_id', $currentSemester->academic_session_id)
                 ->whereIn('fee_type', ['tuition', 'registration'])
                 ->where(function ($q) use ($student) {
@@ -75,7 +75,7 @@ class RegistrationController extends Controller
             'invoice'             => $invoice,
             'hostelFee'           => $hostelFee,
             'hostelInvoice'       => $hostelInvoice,
-            'gatewayChargeCap'    => 2000,
+            'gatewayChargeCap'    => 0,
             'currentSession'      => $currentSemester?->academicSession?->name ?? '2026/2027',
             'currentSemesterName' => $currentSemester?->name ?? 'First Semester',
             'activeGateway'       => $institution->payment_gateway ?? 'zainpay',
