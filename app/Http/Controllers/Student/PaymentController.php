@@ -150,13 +150,17 @@ class PaymentController extends Controller
         if ($gateway === 'zainpay') {
             $callbackUrl = route('student.payments.verify', $reference);
             $userEmail = trim($request->user()->email ?? '');
+            if (empty($userEmail) || !filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
+                $userEmail = strtolower($student->matriculation_number) . '@acons.edu.ng';
+            }
 
-            $response = \Illuminate\Support\Facades\Http::withToken(config('services.zainpay.public_key'))
+            $response = \Illuminate\Support\Facades\Http::timeout(60)
+                ->withToken(config('services.zainpay.public_key'))
                 ->post(config('services.zainpay.base_url', 'https://api.zainpay.ng') . '/zainbox/card/initialize/payment', [
-                    'amount'       => (string) $payment->amount,
+                    'amount'       => (string) round((float) $payment->amount),
                     'emailAddress' => $userEmail,
                     'email'        => $userEmail,
-                    'mobileNumber' => $request->user()->phone ?? '08000000000',
+                    'mobileNumber' => $request->user()->phone ?: ($student->phone_number ?: '08000000000'),
                     'txnRef'       => $reference,
                     'zainboxCode'  => config('services.zainpay.zainbox_code'),
                     'callBackUrl'  => $callbackUrl,
@@ -164,9 +168,20 @@ class PaymentController extends Controller
 
             if (!isset($response['code']) || $response['code'] !== '00') {
                 $payment->update(['status' => 'failed']);
+                \Illuminate\Support\Facades\Log::error('Zainpay payment initialization failed in PaymentController', [
+                    'payment_id' => $payment->id,
+                    'amount'     => $payment->amount,
+                    'response'   => $response,
+                ]);
+
+                $errorMessage = $response['description'] ?? null;
+                if (!$errorMessage && isset($response['amount'][0]['code'])) {
+                    $errorMessage = 'Invalid amount format: ' . $response['amount'][0]['code'];
+                }
+
                 return response()->json([
                     'gateway' => 'zainpay',
-                    'error' => $response['description'] ?? 'Zainpay initialization failed. Please try again.',
+                    'error'   => $errorMessage ?? 'Zainpay initialization failed. Please try again.',
                 ], 422);
             }
 

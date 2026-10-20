@@ -177,9 +177,9 @@ class PaymentService
 
         $userEmail = trim($fee->student->user->email ?? '');
 
-        $response = Http::withToken(config('services.zainpay.public_key'))
+        $response = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
             ->post(config('services.zainpay.base_url', 'https://api.zainpay.ng') . '/zainbox/card/initialize/payment', [
-                'amount'       => (string) $fee->amount,
+                'amount'       => (string) round((float) $fee->amount),
                 'emailAddress' => $userEmail,
                 'email'        => $userEmail,
                 'mobileNumber' => $fee->student->user->phone ?? '08000000000',
