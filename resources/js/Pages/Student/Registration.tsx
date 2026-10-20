@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react'
+import axios from 'axios'
 import {
   CreditCard,
   CheckCircle,
@@ -96,19 +97,12 @@ export default function Registration({
     setProcessing(true)
 
     try {
-      const response = await fetch(`/student/payments/initialize/${invoice.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-        },
-        body: JSON.stringify({
-          installment_percent: installmentPercent,
-          include_hostel: includeHostel && !isHostelPaid,
-        }),
+      const response = await axios.post(`/student/payments/initialize/${invoice.id}`, {
+        installment_percent: installmentPercent,
+        include_hostel: includeHostel && !isHostelPaid,
       })
 
-      const data = await response.json()
+      const data = response.data
 
       if (data.gateway === 'zainpay') {
         if (data.error || !data.redirect_url) {
@@ -154,8 +148,13 @@ export default function Registration({
         onSuccess: () => setProcessing(false),
         onError: () => setProcessing(false),
       })
-    } catch (e) {
-      alert('Network error while connecting to payment gateway. Please try again.')
+    } catch (err: any) {
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message ||
+        'Payment initialization failed. Please try again.'
+      alert(errorMsg)
       setProcessing(false)
     }
   }

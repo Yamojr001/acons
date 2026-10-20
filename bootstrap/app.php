@@ -33,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'webhooks/*',
             'admissions/pay/zainpay/verify/*',
             'student/payments/verify/*',
+            'student/payments/initialize/*',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
