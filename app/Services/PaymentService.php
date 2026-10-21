@@ -177,6 +177,11 @@ class PaymentService
 
         $userEmail = trim($fee->student->user->email ?? '');
 
+        $isFacilitation = ($fee->fee_type === 'facilitation');
+        $zainboxCode = ($isFacilitation && config('services.zainpay.facilitation_zainbox_code'))
+            ? config('services.zainpay.facilitation_zainbox_code')
+            : config('services.zainpay.zainbox_code');
+
         $response = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
             ->post(config('services.zainpay.base_url', 'https://api.zainpay.ng') . '/zainbox/card/initialize/payment', [
                 'amount'       => (string) round((float) $fee->amount),
@@ -184,7 +189,7 @@ class PaymentService
                 'email'        => $userEmail,
                 'mobileNumber' => $fee->student->user->phone ?? '08000000000',
                 'txnRef'       => $reference,
-                'zainboxCode'  => config('services.zainpay.zainbox_code'),
+                'zainboxCode'  => $zainboxCode,
                 'callBackUrl'  => $callbackUrl . '?gateway=zainpay&ref=' . $reference,
             ])->json();
 

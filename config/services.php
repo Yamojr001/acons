@@ -20,11 +20,12 @@ return [
         'currency'      => env('MONNIFY_CURRENCY', 'NGN'),
     ],
     'zainpay' => [
-        'public_key'   => env('ZAINPAY_PUBLIC_KEY'),
-        'secret_key'   => env('ZAINPAY_SECRET_KEY'),
-        'zainbox_code' => env('ZAINPAY_ZAINBOX_CODE'),
-        'mode'         => env('ZAINPAY_MODE', 'sandbox'),
-        'base_url'     => env('ZAINPAY_BASE_URL', env('ZAINPAY_MODE') === 'production' ? 'https://api.zainpay.ng' : 'https://sandbox.zainpay.ng'),
+        'public_key'                => env('ZAINPAY_PUBLIC_KEY'),
+        'secret_key'                => env('ZAINPAY_SECRET_KEY'),
+        'zainbox_code'              => env('ZAINPAY_ZAINBOX_CODE'),
+        'facilitation_zainbox_code' => env('ZAINPAY_FACILITATION_ZAINBOX_CODE'),
+        'mode'                      => env('ZAINPAY_MODE', 'sandbox'),
+        'base_url'                  => env('ZAINPAY_BASE_URL', env('ZAINPAY_MODE') === 'production' ? 'https://api.zainpay.ng' : 'https://sandbox.zainpay.ng'),
     ],
     'sendar' => [
         'api_key'     => env('SENDAR_API_KEY'),

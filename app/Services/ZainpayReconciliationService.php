@@ -18,6 +18,7 @@ class ZainpayReconciliationService
     protected string $baseUrl;
     protected ?string $publicKey;
     protected ?string $zainboxCode;
+    protected ?string $facilitationZainboxCode;
 
     public function __construct()
     {
@@ -27,6 +28,7 @@ class ZainpayReconciliationService
             : rtrim(config('services.zainpay.base_url', 'https://sandbox.zainpay.ng'), '/');
         $this->publicKey = config('services.zainpay.public_key');
         $this->zainboxCode = config('services.zainpay.zainbox_code');
+        $this->facilitationZainboxCode = config('services.zainpay.facilitation_zainbox_code');
     }
 
     /**
@@ -176,7 +178,8 @@ class ZainpayReconciliationService
      */
     public function reconcileCardTransactions(int $count = 50, ?string $email = null, ?string $txnRef = null): array
     {
-        if (empty($this->zainboxCode) || empty($this->publicKey)) {
+        $boxes = array_unique(array_filter([$this->zainboxCode, $this->facilitationZainboxCode]));
+        if (empty($boxes) || empty($this->publicKey)) {
             return [];
         }
 
@@ -188,35 +191,38 @@ class ZainpayReconciliationService
             $params['txnRef'] = trim($txnRef);
         }
 
-        try {
-            $response = Http::timeout(30)
-                ->withToken($this->publicKey)
-                ->get("{$this->baseUrl}/zainbox/card/transactions/{$this->zainboxCode}", $params)
-                ->json();
-        } catch (\Exception $e) {
-            return [];
-        }
-
-        if (($response['code'] ?? '') !== '00' || !isset($response['data']) || !is_array($response['data'])) {
-            return [];
-        }
-
         $reconciled = [];
-        foreach ($response['data'] as $item) {
-            $status = strtolower($item['txnStatus'] ?? $item['status'] ?? '');
-            if (!in_array($status, ['success', 'successful', 'completed'])) {
+
+        foreach ($boxes as $box) {
+            try {
+                $response = Http::timeout(30)
+                    ->withToken($this->publicKey)
+                    ->get("{$this->baseUrl}/zainbox/card/transactions/{$box}", $params)
+                    ->json();
+            } catch (\Exception $e) {
                 continue;
             }
 
-            $itemTxnRef  = $item['txnRef'] ?? $item['paymentRef'] ?? '';
-            $itemEmail   = $item['emailAddress'] ?? $item['email'] ?? null;
-            $rawAmount   = (float) ($item['amount'] ?? 0);
-            $amountNaira = $rawAmount > 100000 ? round($rawAmount / 100, 2) : $rawAmount;
-            $gatewayRef  = $item['paymentRef'] ?? null;
+            if (($response['code'] ?? '') !== '00' || !isset($response['data']) || !is_array($response['data'])) {
+                continue;
+            }
 
-            $matched = $this->handleSuccessfulPayment($itemTxnRef, $itemEmail, $amountNaira, $gatewayRef);
-            if ($matched) {
-                $reconciled[] = $matched;
+            foreach ($response['data'] as $item) {
+                $status = strtolower($item['txnStatus'] ?? $item['status'] ?? '');
+                if (!in_array($status, ['success', 'successful', 'completed'])) {
+                    continue;
+                }
+
+                $itemTxnRef  = $item['txnRef'] ?? $item['paymentRef'] ?? '';
+                $itemEmail   = $item['emailAddress'] ?? $item['email'] ?? null;
+                $rawAmount   = (float) ($item['amount'] ?? 0);
+                $amountNaira = $rawAmount > 100000 ? round($rawAmount / 100, 2) : $rawAmount;
+                $gatewayRef  = $item['paymentRef'] ?? null;
+
+                $matched = $this->handleSuccessfulPayment($itemTxnRef, $itemEmail, $amountNaira, $gatewayRef);
+                if ($matched) {
+                    $reconciled[] = $matched;
+                }
             }
         }
 

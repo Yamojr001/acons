@@ -49,6 +49,10 @@ class PaymentController extends Controller
         $reference = 'ACON_FEE_' . strtoupper(Str::random(10));
 
         $isTuitionFee = in_array($invoice->fee?->fee_type, ['tuition', 'registration']);
+        $isFacilitationFee = ($invoice->fee?->fee_type === 'facilitation');
+        $zainboxCode = ($isFacilitationFee && config('services.zainpay.facilitation_zainbox_code'))
+            ? config('services.zainpay.facilitation_zainbox_code')
+            : config('services.zainpay.zainbox_code');
 
         // Prerequisite check: Academic Facilitation Fee must be paid before School Fees
         if ($isTuitionFee) {
@@ -129,6 +133,8 @@ class PaymentController extends Controller
                 'hostel_invoice_id'   => $isTuitionFee ? $hostelInvoice?->id : $invoice->id,
                 'hostel_amount'       => $isTuitionFee ? $hostelPortion : $tuitionBalance,
                 'gateway_charge'      => $gatewayCharge,
+                'is_facilitation'     => $isFacilitationFee,
+                'zainbox_code'        => $zainboxCode,
             ],
         ]);
 
@@ -177,7 +183,7 @@ class PaymentController extends Controller
                     'email'        => $userEmail,
                     'mobileNumber' => $request->user()->phone ?: ($student->phone_number ?: '08000000000'),
                     'txnRef'       => $reference,
-                    'zainboxCode'  => config('services.zainpay.zainbox_code'),
+                    'zainboxCode'  => $zainboxCode,
                     'callBackUrl'  => $callbackUrl,
                 ])->json();
 
