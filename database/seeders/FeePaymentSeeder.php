@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
 use App\Models\AcademicSession;
 use App\Models\Semester;
 use App\Models\Fee;
@@ -16,6 +18,23 @@ class FeePaymentSeeder extends Seeder
     public function run(): void
     {
         $this->command->info('Seeding Academic Session, Semester, and Fee Schedules...');
+
+        // 0. Recreate `fees` table if missing
+        if (!Schema::hasTable('fees')) {
+            Schema::create('fees', function (Blueprint $t) {
+                $t->id();
+                $t->foreignId('academic_session_id')->nullable()->constrained()->cascadeOnDelete();
+                $t->foreignId('department_id')->nullable()->constrained()->cascadeOnDelete();
+                $t->string('level')->nullable();
+                $t->string('name');
+                $t->enum('fee_type', ['tuition', 'acceptance', 'dues', 'hostel', 'departmental', 'registration', 'facilitation', 'other'])->default('tuition');
+                $t->decimal('amount', 12, 2);
+                $t->json('metadata')->nullable();
+                $t->timestamps();
+                $t->softDeletes();
+            });
+            $this->command->info('✓ Created missing `fees` table schema.');
+        }
 
         // 1. Ensure `fees.fee_type` ENUM contains 'facilitation'
         try {
