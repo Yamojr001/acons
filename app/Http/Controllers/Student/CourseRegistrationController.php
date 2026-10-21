@@ -22,6 +22,18 @@ class CourseRegistrationController extends Controller
                                     ->firstOrFail();
         $academicSession = $currentSemester->academicSession;
 
+        // 0. Check if Academic Facilitation Fee (N3,850) is paid
+        $facilitationInvoice = StudentInvoice::where('student_id', $student->id)
+            ->whereHas('fee', fn($query) => $query->where('fee_type', 'facilitation'))
+            ->where('status', 'paid')
+            ->first();
+
+        if (!$facilitationInvoice) {
+            return Inertia::render('Student/CourseRegistration/Blocked', [
+                'message' => 'You must pay your Academic Facilitation Fee (₦3,850.00) and School Fees before registering for semester courses.'
+            ]);
+        }
+
         // 1. Check if Tuition is paid before allowing registration (allow full or at least 70% 1st installment)
         $tuitionInvoice = StudentInvoice::where('student_id', $student->id)
             ->whereHas('fee', function($query) {

@@ -21,8 +21,37 @@ class RegistrationController extends Controller
         $invoice = null;
         $hostelFee = null;
         $hostelInvoice = null;
+        $facilitationFee = null;
+        $facilitationInvoice = null;
 
         if ($currentSemester) {
+            // Find Academic Facilitation Fee (N3,850 - Mandatory prerequisite before school fees)
+            $facilitationFee = Fee::where('fee_type', 'facilitation')
+                ->where(function ($q) use ($currentSemester) {
+                    $q->where('academic_session_id', $currentSemester->academic_session_id)
+                      ->orWhereNull('academic_session_id');
+                })
+                ->first();
+
+            if (!$facilitationFee) {
+                $facilitationFee = Fee::where('fee_type', 'facilitation')->first();
+            }
+
+            if ($facilitationFee) {
+                $facilitationInvoice = StudentInvoice::firstOrCreate(
+                    [
+                        'student_id' => $student->id,
+                        'fee_id'     => $facilitationFee->id,
+                    ],
+                    [
+                        'amount_due'  => $facilitationFee->amount,
+                        'amount_paid' => 0,
+                        'status'      => 'pending',
+                    ]
+                );
+                $facilitationInvoice->load(['fee.academicSession', 'payments']);
+            }
+
             // Find tuition / school fees (N535,000)
             $fee = Fee::where('academic_session_id', $currentSemester->academic_session_id)
                 ->whereIn('fee_type', ['tuition', 'registration'])
@@ -71,7 +100,12 @@ class RegistrationController extends Controller
             }
         }
 
+        $isFacilitationPaid = ($facilitationInvoice && $facilitationInvoice->status === 'paid');
+
         return Inertia::render('Student/Registration', [
+            'facilitationFee'     => $facilitationFee,
+            'facilitationInvoice' => $facilitationInvoice,
+            'isFacilitationPaid'  => $isFacilitationPaid,
             'invoice'             => $invoice,
             'hostelFee'           => $hostelFee,
             'hostelInvoice'       => $hostelInvoice,

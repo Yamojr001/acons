@@ -49,6 +49,21 @@ class PaymentController extends Controller
         $reference = 'ACON_FEE_' . strtoupper(Str::random(10));
 
         $isTuitionFee = in_array($invoice->fee?->fee_type, ['tuition', 'registration']);
+
+        // Prerequisite check: Academic Facilitation Fee must be paid before School Fees
+        if ($isTuitionFee) {
+            $facilitationInvoice = StudentInvoice::where('student_id', $student->id)
+                ->whereHas('fee', fn($q) => $q->where('fee_type', 'facilitation'))
+                ->first();
+
+            if (!$facilitationInvoice || $facilitationInvoice->status !== 'paid') {
+                return response()->json([
+                    'gateway' => $gateway,
+                    'error'   => 'You must pay the Academic Facilitation Fee (₦3,850.00) before paying your Semester Registration & School Fees.',
+                ], 422);
+            }
+        }
+
         $tuitionBalance = (float) ($invoice->amount_due - $invoice->amount_paid);
         $installmentPercent = (int) ($request->input('installment_percent', 100));
 
@@ -218,7 +233,7 @@ class PaymentController extends Controller
         $payment = Payment::where('reference', $reference)->firstOrFail();
 
         if ($payment->status === 'successful') {
-            return redirect()->route('student.fees')->with('info', 'This payment has already been verified and credited.');
+            return redirect()->route('student.registration')->with('info', 'This payment has already been verified and credited.');
         }
 
         if ($payment->payment_gateway === 'zainpay') {
@@ -233,7 +248,7 @@ class PaymentController extends Controller
 
             if (!$verified) {
                 $payment->update(['status' => 'failed']);
-                return redirect()->route('student.fees')->with('error', 'Payment could not be verified. If you were charged, please contact the Bursary.');
+                return redirect()->route('student.registration')->with('error', 'Payment could not be verified. If you were charged, please contact the Bursary.');
             }
         }
         // NOTE: Remita/Paystack/Monnify/sandbox paths below remain a simulated
@@ -291,7 +306,7 @@ class PaymentController extends Controller
 
         // Auto Generate Matriculation Number upon school fees / tuition payment
         $student = $invoice->student;
-        if (($status === 'paid' || $status === 'partial') && $student && !$student->matriculation_number) {
+        if ($isTuition && ($status === 'paid' || $status === 'partial') && $student && !$student->matriculation_number) {
             $program = $student->program;
             $programName = $program?->name ?? '';
 
@@ -331,6 +346,10 @@ class PaymentController extends Controller
 
             $matriculationNumber = $prefix . $nextSerial;
             $student->update(['matriculation_number' => $matriculationNumber]);
+        }
+
+        if ($invoice->fee?->fee_type === 'facilitation') {
+            return redirect()->route('student.registration')->with('success', 'Academic Facilitation Fee (₦3,850.00) paid successfully! You may now proceed to pay your Semester Registration & School Fees.');
         }
 
         return redirect()->route('student.registration')->with('success', 'Payment verified and credited successfully! You can now proceed with course registration.');
