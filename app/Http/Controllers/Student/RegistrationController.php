@@ -16,7 +16,13 @@ class RegistrationController extends Controller
 
         $currentSemester = Semester::with('academicSession')
             ->where('is_current', true)
-            ->first();
+            ->first() ?? Semester::with('academicSession')->latest('id')->first();
+
+        $currentSession = $currentSemester?->academicSession
+            ?? \App\Models\AcademicSession::where('is_current', true)->first()
+            ?? \App\Models\AcademicSession::latest('id')->first();
+
+        $sessionId = $currentSemester?->academic_session_id ?? $currentSession?->id;
 
         $invoice = null;
         $hostelFee = null;
@@ -24,80 +30,73 @@ class RegistrationController extends Controller
         $facilitationFee = null;
         $facilitationInvoice = null;
 
-        if ($currentSemester) {
-            // Find Academic Facilitation Fee (N3,850 - Mandatory prerequisite before school fees)
-            $facilitationFee = Fee::where('fee_type', 'facilitation')
-                ->where(function ($q) use ($currentSemester) {
-                    $q->where('academic_session_id', $currentSemester->academic_session_id)
-                      ->orWhereNull('academic_session_id');
-                })
-                ->first();
+        // 1. Find Academic Facilitation Fee (N3,850 - Mandatory prerequisite before school fees)
+        $facilitationFee = Fee::where('fee_type', 'facilitation')
+            ->when($sessionId, fn($q) => $q->where(fn($sub) => $sub->where('academic_session_id', $sessionId)->orWhereNull('academic_session_id')))
+            ->first() ?? Fee::where('fee_type', 'facilitation')->first();
 
-            if (!$facilitationFee) {
-                $facilitationFee = Fee::where('fee_type', 'facilitation')->first();
-            }
+        if ($student && $facilitationFee) {
+            $facilitationInvoice = StudentInvoice::firstOrCreate(
+                [
+                    'student_id' => $student->id,
+                    'fee_id'     => $facilitationFee->id,
+                ],
+                [
+                    'amount_due'  => $facilitationFee->amount,
+                    'amount_paid' => 0,
+                    'status'      => 'pending',
+                ]
+            );
+            $facilitationInvoice->load(['fee.academicSession', 'payments']);
+        }
 
-            if ($facilitationFee) {
-                $facilitationInvoice = StudentInvoice::firstOrCreate(
-                    [
-                        'student_id' => $student->id,
-                        'fee_id'     => $facilitationFee->id,
-                    ],
-                    [
-                        'amount_due'  => $facilitationFee->amount,
-                        'amount_paid' => 0,
-                        'status'      => 'pending',
-                    ]
-                );
-                $facilitationInvoice->load(['fee.academicSession', 'payments']);
-            }
+        // 2. Find tuition / school fees (N535,000)
+        $feeQuery = Fee::whereIn('fee_type', ['tuition', 'registration']);
+        if ($sessionId) {
+            $feeQuery->where(fn($sub) => $sub->where('academic_session_id', $sessionId)->orWhereNull('academic_session_id'));
+        }
+        if ($student?->department_id) {
+            $feeQuery->where(fn($sub) => $sub->whereNull('department_id')->orWhere('department_id', $student->department_id));
+        }
+        if ($student?->current_level) {
+            $feeQuery->where(fn($sub) => $sub->whereNull('level')->orWhere('level', $student->current_level));
+        }
 
-            // Find tuition / school fees (N535,000)
-            $fee = Fee::where('academic_session_id', $currentSemester->academic_session_id)
-                ->whereIn('fee_type', ['tuition', 'registration'])
-                ->where(function ($q) use ($student) {
-                    $q->whereNull('department_id')->orWhere('department_id', $student->department_id);
-                })
-                ->where(function ($q) use ($student) {
-                    $q->whereNull('level')->orWhere('level', $student->current_level);
-                })
-                ->orderByRaw("fee_type = 'tuition' DESC, department_id IS NULL, level IS NULL")
-                ->first();
+        $fee = $feeQuery->orderByRaw("fee_type = 'tuition' DESC, department_id IS NULL, level IS NULL")->first()
+            ?? Fee::whereIn('fee_type', ['tuition', 'registration'])->first();
 
-            // Fallback if specific not found
-            if (!$fee) {
-                $fee = Fee::whereIn('fee_type', ['tuition', 'registration'])->first();
-            }
+        if ($student && $fee) {
+            $invoice = StudentInvoice::firstOrCreate(
+                [
+                    'student_id' => $student->id,
+                    'fee_id'     => $fee->id,
+                ],
+                [
+                    'amount_due'  => $fee->amount,
+                    'amount_paid' => 0,
+                    'status'      => 'pending',
+                ]
+            );
+            $invoice->load(['fee.academicSession', 'payments']);
+        }
 
-            if ($fee) {
-                $invoice = StudentInvoice::firstOrCreate(
-                    [
-                        'student_id' => $student->id,
-                        'fee_id'     => $fee->id,
-                    ],
-                    [
-                        'amount_due'  => $fee->amount,
-                        'amount_paid' => 0,
-                        'status'      => 'pending',
-                    ]
-                );
-                $invoice->load(['fee.academicSession', 'payments']);
-            }
+        // 3. Find optional hostel accommodation fee (N105,000)
+        $hostelFee = Fee::where('fee_type', 'hostel')
+            ->when($sessionId, fn($q) => $q->where(fn($sub) => $sub->where('academic_session_id', $sessionId)->orWhereNull('academic_session_id')))
+            ->first() ?? Fee::where('fee_type', 'hostel')->first();
 
-            // Find optional hostel accommodation fee (N105,000)
-            $hostelFee = Fee::where('fee_type', 'hostel')
-                ->where(function ($q) use ($currentSemester) {
-                    $q->where('academic_session_id', $currentSemester->academic_session_id)
-                      ->orWhereNull('academic_session_id');
-                })
-                ->first();
-
-            if ($hostelFee) {
-                $hostelInvoice = StudentInvoice::where([
+        if ($student && $hostelFee) {
+            $hostelInvoice = StudentInvoice::firstOrCreate(
+                [
                     'student_id' => $student->id,
                     'fee_id'     => $hostelFee->id,
-                ])->first();
-            }
+                ],
+                [
+                    'amount_due'  => $hostelFee->amount ?: 105000.00,
+                    'amount_paid' => 0,
+                    'status'      => 'pending',
+                ]
+            );
         }
 
         $isFacilitationPaid = ($facilitationInvoice && $facilitationInvoice->status === 'paid');
@@ -110,7 +109,7 @@ class RegistrationController extends Controller
             'hostelFee'           => $hostelFee,
             'hostelInvoice'       => $hostelInvoice,
             'gatewayChargeCap'    => 0,
-            'currentSession'      => $currentSemester?->academicSession?->name ?? '2026/2027',
+            'currentSession'      => $currentSession?->name ?? $currentSemester?->academicSession?->name ?? '2026/2027',
             'currentSemesterName' => $currentSemester?->name ?? 'First Semester',
             'activeGateway'       => $institution->payment_gateway ?? 'zainpay',
         ]);
