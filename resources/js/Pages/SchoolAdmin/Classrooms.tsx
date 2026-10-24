@@ -31,7 +31,7 @@ export default function ClassRooms({ classrooms, teachers, sections }: ClassRoom
     section: '',
     level: 1,
     capacity: 35,
-    academic_year: '2025/2026',
+    academic_year: '2026/2027',
     teacher_id: ''
   })
 

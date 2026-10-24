@@ -35,6 +35,10 @@ class DashboardController extends Controller
         $latestAnnouncements = Announcement::where('audience','all')
             ->orWhere('audience','students')->latest()->limit(3)->get();
 
+        $currentSession = \App\Models\Semester::where('is_current', true)->with('academicSession')->first()?->academicSession
+            ?? \App\Models\AcademicSession::where('is_current', true)->first()
+            ?? \App\Models\AcademicSession::latest('id')->first();
+
         return Inertia::render('Student/Dashboard', [
             'student'              => $student,
             'recent_grades'        => $recentGrades,
@@ -42,6 +46,7 @@ class DashboardController extends Controller
             'pending_fees'         => $pendingFees,
             'attendance_rate'      => $attendanceRate,
             'announcements'        => $latestAnnouncements,
+            'currentSessionName'   => $currentSession?->name ?? '2026/2027',
         ]);
     }
 }

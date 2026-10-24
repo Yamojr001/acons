@@ -116,9 +116,9 @@ class SchoolSeeder extends Seeder
 
         $session = AcademicSession::create([
             'tenant_id' => $tenant->id,
-            'name' => '2025/2026',
-            'start_date' => '2025-09-01',
-            'end_date' => '2026-08-31',
+            'name' => '2026/2027',
+            'start_date' => '2026-09-01',
+            'end_date' => '2027-08-31',
             'is_current' => true
         ]);
 

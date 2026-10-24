@@ -19,11 +19,13 @@ interface DashboardProps extends PageProps {
   recentResults: any[]
   outstandingFees: any[]
   announcements: any[]
+  currentSessionName?: string
 }
 
 export default function StudentDashboard({ 
   student, cgpa, creditsEarned, creditsRegistered, 
-  registrationStatus, recentResults, outstandingFees, announcements 
+  registrationStatus, recentResults, outstandingFees, announcements,
+  currentSessionName = '2026/2027'
 }: DashboardProps) {
   const totalOutstanding = outstandingFees.reduce((sum, f) => sum + f.amount, 0)
 
@@ -45,7 +47,7 @@ export default function StudentDashboard({
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 relative z-10">
             <Avatar name={student.user.name} src={student.user.avatar} size="xl" className="ring-4 ring-brand-50 shadow-xl" />
             <div className="text-center sm:text-left flex-1">
-              <p className="text-xs text-brand-600 font-bold uppercase tracking-widest mb-1">Academic Session 2025/2026</p>
+              <p className="text-xs text-brand-600 font-bold uppercase tracking-widest mb-1">Academic Session {currentSessionName}</p>
               <h1 className="text-3xl font-display font-bold text-surface-900 mb-2">{student.user.name}</h1>
               <div className="flex flex-wrap justify-center sm:justify-start gap-3">
                 <Badge variant="brand" className="px-3 py-1">{student.department?.name}</Badge>

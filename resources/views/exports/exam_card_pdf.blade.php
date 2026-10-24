@@ -238,7 +238,7 @@
             </td>
             <td style="width: 140px; text-align: right; vertical-align: middle;">
                 <div style="font-size: 8px; font-weight: bold; color: #64748b; text-transform: uppercase;">SESSION</div>
-                <div style="font-size: 10.5px; font-weight: 900; color: #0f172a; text-transform: uppercase;">{{ $academicSession->name ?? '2025/2026' }}</div>
+                <div style="font-size: 10.5px; font-weight: 900; color: #0f172a; text-transform: uppercase;">{{ $academicSession->name ?? '2026/2027' }}</div>
                 <div style="font-size: 8.5px; font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #7f1d1d; margin-top: 3px;">
                     SLIP NO: ACONS/{{ $applicant->id }}
                 </div>

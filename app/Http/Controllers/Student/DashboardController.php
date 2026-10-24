@@ -15,8 +15,11 @@ class DashboardController extends Controller
         $user    = Auth::user();
         $student = $user->student->load(['user', 'department', 'program']);
 
-        $currentSemester = Semester::where('is_current', true)
-            ->first();
+        $currentSemester = Semester::where('is_current', true)->with('academicSession')->first()
+            ?? Semester::latest('id')->with('academicSession')->first();
+        $currentSession = $currentSemester?->academicSession
+            ?? \App\Models\AcademicSession::where('is_current', true)->first()
+            ?? \App\Models\AcademicSession::latest('id')->first();
 
         // 1. Calculate CGPA (Mocking if no records exist, or calculate if they do)
         $records = $student->academicRecords;
@@ -89,6 +92,7 @@ class DashboardController extends Controller
             'announcements'    => $announcements,
             'academicStatus'   => $student->academic_status,
             'reseatCourseIds'  => $student->reseat_course_ids,
+            'currentSessionName' => $currentSession?->name ?? '2026/2027',
         ]);
     }
 }

@@ -12,7 +12,7 @@ import type { PageProps } from '@/types'
 
 interface LandingProps extends PageProps {
   tenant: any
-  stats: { students: number; lecturers: number; departments: number }
+  stats: { students: number | string; lecturers: number | string; departments: number | string }
   admission_form: { id: number; title: string } | null
 }
 
@@ -72,13 +72,13 @@ export default function Landing({ tenant, stats, auth, admission_form }: Landing
       title: 'ND Nursing Programme',
       duration: '4 Years',
       desc: 'A comprehensive modern curriculum fully aligned with National Diploma Nursing Council guidelines, combining classroom instruction with supervised clinical practice.',
-      features: ['Clinical Practicums', 'NMCN Accredited', 'Expert Mentoring', 'Community Health Rotations']
+      features: ['Clinical Practicums', 'NMCN & NBTE Accredited', 'Expert Mentoring', 'Community Health Rotations']
     },
     {
       title: 'HND Nursing Programme',
       duration: '2 Years (Post-ND)',
       desc: 'An advanced clinical track for ND graduates, emphasizing leadership, advanced clinical practice, and research-driven nursing care.',
-      features: ['Advanced Clinical Practice', 'Nursing Leadership', 'Research Project', 'NMCN Accredited']
+      features: ['Advanced Clinical Practice', 'Nursing Leadership', 'Research Project', 'NMCN & NBTE Accredited']
     }
   ]
 
@@ -86,7 +86,7 @@ export default function Landing({ tenant, stats, auth, admission_form }: Landing
     { icon: <Heart size={22} />, title: 'Clinical Simulation Labs', desc: 'Fully equipped simulation wards featuring high-fidelity clinical manikins for realistic hands-on skill training.' },
     { icon: <Users size={22} />, title: 'Distinguished Faculty', desc: 'Learn from highly qualified nursing educators, clinical scientists, and healthcare practice veterans.' },
     { icon: <BookOpen size={22} />, title: 'Modern E-Library & Research Hub', desc: 'Access to extensive databases of international nursing, medicine, and global health research journals.' },
-    { icon: <Landmark size={22} />, title: 'National Accreditation', desc: 'Programs carefully curated and fully aligned with the requirements of the Nursing and Midwifery Council of Nigeria (NMCN).' },
+    { icon: <Landmark size={22} />, title: 'National Accreditation', desc: 'Programs carefully curated and fully aligned with the requirements of the Nursing and Midwifery Council of Nigeria (NMCN) and National Board for Technical Education (NBTE).' },
     { icon: <Sparkles size={22} />, title: 'Excellent Career Pipeline', desc: 'Strong clinical partnerships with premier specialist hospitals ensuring seamless student placements.' },
   ]
 
@@ -235,9 +235,9 @@ export default function Landing({ tenant, stats, auth, admission_form }: Landing
               className="grid grid-cols-3 gap-4 max-w-md"
             >
               {[
-                { label: 'Enrolled Students', val: stats.students || 120 }, 
-                { label: 'Expert Lecturers', val: stats.lecturers || 18 }, 
-                { label: 'Departments', val: stats.departments || 3 }
+                { label: 'Enrolled Students', val: stats.students ?? 0 }, 
+                { label: 'Expert Lecturers', val: stats.lecturers ?? 0 }, 
+                { label: 'Departments', val: stats.departments ?? 0 }
               ].map((s, i) => (
                 <div 
                   key={s.label}
