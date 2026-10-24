@@ -75,6 +75,23 @@ class ZainpayReconciliationService
                 'payment_reference' => $txnRef ?: ($gatewayRef ?: $applicant->payment_reference),
             ]);
 
+            // Mirror into unified Transaction ledger
+            Transaction::updateOrCreate(
+                ['reference' => $txnRef ?: $applicant->payment_reference],
+                [
+                    'payable_type'   => \App\Models\Applicant::class,
+                    'payable_id'     => $applicant->id,
+                    'email'          => $applicant->email,
+                    'payer_name'     => $applicant->full_name,
+                    'type'           => 'admission_fee',
+                    'amount'         => $finalAmount,
+                    'currency'       => 'NGN',
+                    'status'         => 'successful',
+                    'payment_method' => 'zainpay',
+                    'metadata'       => ['applicant_name' => $applicant->full_name],
+                ]
+            );
+
             $this->ensureApplicantFormLinked($applicant);
 
             // Send transactional SMS notification via Sendar
@@ -127,14 +144,37 @@ class ZainpayReconciliationService
                 return null;
             }
 
+            $payerEmail = $payment->email ?: ($email ?: $payment->student?->user?->email);
+            $payerName  = $payment->payer_name ?: $payment->student?->user?->name;
+
             $payment->update([
-                'status' => 'successful',
-                'metadata' => array_merge($payment->metadata ?? [], [
-                    'zainpay_txn_ref' => $txnRef,
+                'status'     => 'successful',
+                'email'      => $payerEmail,
+                'payer_name' => $payerName,
+                'metadata'   => array_merge($payment->metadata ?? [], [
+                    'zainpay_txn_ref'     => $txnRef,
                     'zainpay_gateway_ref' => $gatewayRef,
-                    'reconciled_at' => now()->toIso8601String(),
+                    'reconciled_at'       => now()->toIso8601String(),
                 ]),
             ]);
+
+            // Mirror into unified Transaction ledger
+            Transaction::updateOrCreate(
+                ['reference' => $payment->reference],
+                [
+                    'user_id'        => $payment->student?->user_id,
+                    'email'          => $payerEmail,
+                    'payer_name'     => $payerName,
+                    'payable_type'   => StudentInvoice::class,
+                    'payable_id'     => $payment->student_invoice_id,
+                    'type'           => 'school_fees',
+                    'amount'         => $payment->amount,
+                    'currency'       => 'NGN',
+                    'status'         => 'successful',
+                    'payment_method' => $payment->payment_gateway ?? 'zainpay',
+                    'metadata'       => $payment->metadata,
+                ]
+            );
 
             // Update student invoice if attached
             if ($payment->student_invoice_id) {

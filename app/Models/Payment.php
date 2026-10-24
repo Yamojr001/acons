@@ -9,7 +9,7 @@ class Payment extends Model
 {
     use SoftDeletes;
 
-    protected $fillable = ['parent_id', 'student_invoice_id', 'amount', 'reference', 'payment_gateway', 'status', 'metadata'];
+    protected $fillable = ['parent_id', 'student_invoice_id', 'email', 'payer_name', 'amount', 'reference', 'payment_gateway', 'status', 'metadata'];
     protected $casts = ['amount' => 'decimal:2', 'metadata' => 'array'];
 
     public function studentInvoice(): BelongsTo { return $this->belongsTo(StudentInvoice::class); }

@@ -118,6 +118,9 @@ class PaymentController extends Controller
 
         $totalAmount = $tuitionPortion + $hostelPortion + $gatewayCharge;
 
+        $payerEmail = $request->user()->email ?: ($student->user?->email ?? null);
+        $payerName  = $request->user()->name ?: ($student->user?->name ?? null);
+
         // Create a pending payment record
         $payment = Payment::create([
             'student_invoice_id' => $invoice->id,
@@ -125,6 +128,8 @@ class PaymentController extends Controller
             'reference'          => $reference,
             'payment_gateway'    => $gateway,
             'status'             => 'pending',
+            'email'              => $payerEmail,
+            'payer_name'         => $payerName,
             'metadata'           => [
                 'tuition_invoice_id'  => $isTuitionFee ? $invoice->id : null,
                 'tuition_amount'      => $isTuitionFee ? $tuitionPortion : 0.00,
@@ -137,6 +142,24 @@ class PaymentController extends Controller
                 'zainbox_code'        => $zainboxCode,
             ],
         ]);
+
+        // Mirror in unified Transactions table
+        \App\Models\Transaction::updateOrCreate(
+            ['reference' => $reference],
+            [
+                'user_id'        => $request->user()->id,
+                'email'          => $payerEmail,
+                'payer_name'     => $payerName,
+                'payable_type'   => \App\Models\StudentInvoice::class,
+                'payable_id'     => $invoice->id,
+                'type'           => $invoice->fee?->fee_type ?? 'school_fees',
+                'amount'         => $totalAmount,
+                'currency'       => 'NGN',
+                'status'         => 'pending',
+                'payment_method' => $gateway,
+                'metadata'       => $payment->metadata,
+            ]
+        );
 
         if ($gateway === 'remita') {
             // Mock Remita RRR Generation
@@ -262,7 +285,20 @@ class PaymentController extends Controller
         // by this fix) — a real deployment should verify each of those against
         // its respective gateway API before marking an invoice paid.
 
-        $payment->update(['status' => 'successful']);
+        $verifiedEmail = $payment->email ?: ($payment->student?->user?->email ?? $request->user()?->email);
+        $verifiedName  = $payment->payer_name ?: ($payment->student?->user?->name ?? $request->user()?->name);
+
+        $payment->update([
+            'status'     => 'successful',
+            'email'      => $verifiedEmail,
+            'payer_name' => $verifiedName,
+        ]);
+
+        \App\Models\Transaction::where('reference', $reference)->update([
+            'status'     => 'successful',
+            'email'      => $verifiedEmail,
+            'payer_name' => $verifiedName,
+        ]);
 
         $meta = $payment->metadata ?? [];
         if (is_string($meta)) {
