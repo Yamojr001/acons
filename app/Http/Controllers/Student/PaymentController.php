@@ -396,4 +396,92 @@ class PaymentController extends Controller
 
         return redirect()->route('student.registration')->with('success', 'Payment verified and credited successfully! You can now proceed with course registration.');
     }
+
+    /**
+     * Download authentic PDF receipt for a paid student invoice.
+     */
+    public function downloadReceipt(Request $request, StudentInvoice $invoice)
+    {
+        $student = $invoice->student;
+        $user = $request->user();
+
+        if ($user->hasRole('student')) {
+            abort_if(!$user->student || $user->student->id !== $student?->id, 403, 'Unauthorized access to this receipt.');
+        } elseif (!$user->hasAnyRole(['admin', 'super_admin', 'bursar', 'school_admin', 'provost'])) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        if ($invoice->status !== 'paid' && (float)$invoice->amount_paid <= 0) {
+            return back()->with('error', 'Receipt not available. Invoice is unpaid.');
+        }
+
+        $payment = Payment::where('student_invoice_id', $invoice->id)
+            ->where('status', 'successful')
+            ->latest()
+            ->first();
+
+        $paymentRef = $payment?->reference ?: ('ACON_INV_' . $invoice->id);
+        $paidAt = $payment?->created_at ? $payment->created_at->format('d/m/Y h:i A') : $invoice->updated_at->format('d/m/Y h:i A');
+        $paymentGateway = $payment?->payment_gateway ?: 'zainpay';
+
+        $logoPath = public_path('assets/images/acons_logo.png');
+        if (!file_exists($logoPath)) {
+            $logoPath = public_path('logo.png');
+        }
+        $logoBase64 = file_exists($logoPath) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath)) : null;
+
+        $amountPaid = (float) $invoice->amount_paid;
+        $amountInWords = $this->numberToWords($amountPaid);
+
+        $academicSessionName = $invoice->fee?->academicSession?->name
+            ?? \App\Models\AcademicSession::where('is_current', true)->value('name')
+            ?? '2026/2027';
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.student_receipt_pdf', [
+            'paymentRef'          => $paymentRef,
+            'paidAt'              => $paidAt,
+            'paymentGateway'      => $paymentGateway,
+            'studentName'         => $student?->user?->name ?? 'Student',
+            'matricNumber'        => $student?->matriculation_number ?: 'Pending',
+            'jambNumber'          => $student?->jamb_registration_number,
+            'currentLevel'        => $student?->current_level ?? 'ND1',
+            'departmentName'      => $student?->department?->name ?? 'Nursing Sciences',
+            'programName'         => $student?->program?->name ?? 'General Nursing',
+            'phoneNumber'         => $student?->phone_number ?: ($student?->user?->phone ?? 'N/A'),
+            'email'               => $student?->user?->email ?? 'N/A',
+            'feeName'             => $invoice->fee?->name ?? 'School Fees',
+            'feeType'             => $invoice->fee?->fee_type ?? 'tuition',
+            'amountDue'           => (float) $invoice->amount_due,
+            'amountPaid'          => $amountPaid,
+            'amountInWords'       => $amountInWords,
+            'academicSessionName' => $academicSessionName,
+            'logoBase64'          => $logoBase64,
+        ])->setPaper('a4', 'portrait');
+
+        $safeMatric = preg_replace('/[^A-Za-z0-9_-]/', '_', $student?->matriculation_number ?: 'STUDENT_' . $student?->id);
+        $filename = "ACONS_Official_Receipt_{$safeMatric}_{$invoice->id}.pdf";
+
+        return $pdf->download($filename);
+    }
+
+    private function numberToWords(float $amount): string
+    {
+        $ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+            'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        $tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        
+        $num = (int)$amount;
+        if ($num === 0) return 'Zero Naira Only';
+        
+        $helper = function($n) use (&$helper, $ones, $tens) {
+            if ($n < 20) return $ones[$n];
+            if ($n < 100) return $tens[(int)($n / 10)] . ($n % 10 ? '-' . $ones[$n % 10] : '');
+            if ($n < 1000) return $ones[(int)($n / 100)] . ' Hundred' . ($n % 100 ? ' and ' . $helper($n % 100) : '');
+            if ($n < 1000000) return $helper((int)($n / 1000)) . ' Thousand' . ($n % 1000 ? ' ' . $helper($n % 1000) : '');
+            if ($n < 1000000000) return $helper((int)($n / 1000000)) . ' Million' . ($n % 1000000 ? ' ' . $helper($n % 1000000) : '');
+            return (string)$n;
+        };
+        
+        return trim($helper($num)) . ' Naira Only';
+    }
 }

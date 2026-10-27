@@ -71,13 +71,21 @@ export default function Receipt({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <a
+              href={route('admissions.receipt.download', applicant.id)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
+            >
+              <Download size={14} className="text-white" />
+              <span>Download PDF</span>
+            </a>
+
             <button
               onClick={handlePrint}
               type="button"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold border border-slate-700 transition-colors shadow-sm"
             >
               <Printer size={14} className="text-emerald-400" />
-              <span>Print Receipt</span>
+              <span>Print</span>
             </button>
 
             <Link
@@ -101,12 +109,22 @@ export default function Receipt({
               <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
               <span>Payment transaction confirmed successfully. Print or download this receipt for your records.</span>
             </div>
-            <button
-              onClick={handlePrint}
-              className="underline font-bold text-emerald-800 hover:text-emerald-900 shrink-0 ml-2"
-            >
-              Print / Save PDF
-            </button>
+            <div className="flex items-center gap-3 shrink-0 ml-2">
+              <a
+                href={route('admissions.receipt.download', applicant.id)}
+                className="inline-flex items-center gap-1 font-bold text-emerald-800 hover:text-emerald-900 underline"
+              >
+                <Download size={13} />
+                <span>Download PDF</span>
+              </a>
+              <span className="text-emerald-300">|</span>
+              <button
+                onClick={handlePrint}
+                className="underline font-bold text-emerald-800 hover:text-emerald-900"
+              >
+                Print
+              </button>
+            </div>
           </div>
 
           {/* ── Official Receipt Sheet ──────────────────────────────────── */}
@@ -395,6 +413,14 @@ export default function Receipt({
                 Need to complete your screening evaluation?
               </span>
               <div className="flex items-center gap-2 w-full sm:w-auto">
+                <a
+                  href={route('admissions.receipt.download', applicant.id)}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                >
+                  <Download size={14} />
+                  <span>Download PDF Receipt</span>
+                </a>
+
                 <button
                   onClick={handlePrint}
                   type="button"

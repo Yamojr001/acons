@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Wallet, Plus, DollarSign, Calendar, Tag, FileText,
   AlertCircle, X, CheckCircle, ChevronDown, Eye, User, CreditCard,
-  Edit2, Trash2, FileDown
+  Edit2, Trash2, FileDown, Download
 } from 'lucide-react'
 import AppLayout from '@/Layouts/AppLayout'
 import { Card, Button, Badge } from '@/Components/UI'
@@ -277,6 +277,21 @@ export default function PaymentsIndex({ payments, students, fees, stats, auth }:
                     </td>
                     <td className="px-6 py-4 text-right">
                        <div className="flex justify-end gap-2">
+                          {payment.student_invoice_id && (
+                            <a
+                              href={`/bursary/invoices/${payment.student_invoice_id}/receipt`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                iconLeft={<Download size={14} />}
+                              >
+                                Receipt
+                              </Button>
+                            </a>
+                          )}
                           <Button 
                             variant="ghost" 
                             size="sm" 

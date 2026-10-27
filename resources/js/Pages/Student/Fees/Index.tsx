@@ -183,9 +183,16 @@ export default function FeesIndex({ invoices, activeGateway }: FeesProps) {
                         </div>
 
                         {isPaid ? (
-                          <Button variant="outline" size="sm" iconLeft={<Download size={14} />}>
-                            Receipt
-                          </Button>
+                          <a
+                            href={`/student/invoices/${invoice.id}/receipt`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block"
+                          >
+                            <Button variant="outline" size="sm" iconLeft={<Download size={14} />}>
+                              Download Receipt
+                            </Button>
+                          </a>
                         ) : invoice.fee.fee_type === 'tuition' || invoice.fee.fee_type === 'registration' ? (
                           <Link href="/student/registration">
                             <Button

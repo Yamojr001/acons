@@ -380,6 +380,40 @@ class PublicApplicantController extends Controller
     }
 
     /**
+     * Download authentic PDF receipt for paid admission application fee.
+     */
+    public function downloadReceiptPdf(Applicant $applicant)
+    {
+        if ($applicant->payment_status !== 'paid') {
+            return redirect()->route('admissions.pay', $applicant->id)
+                ->with('error', 'Please complete the application fee payment first to view your receipt.');
+        }
+
+        $logoPath = public_path('assets/images/acons_logo.png');
+        if (!file_exists($logoPath)) {
+            $logoPath = public_path('logo.png');
+        }
+        $logoBase64 = file_exists($logoPath) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath)) : null;
+
+        $academicSession = \App\Models\AcademicSession::where('is_current', true)->first();
+        $feeAmount = (float) ($applicant->amount_paid ?: 14700.00);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.applicant_receipt_pdf', [
+            'applicant'           => $applicant,
+            'academicSessionName' => $academicSession?->name ?? '2026/2027',
+            'paymentRef'          => $applicant->payment_reference ?: ('ACON_APP_' . $applicant->id),
+            'paidAt'              => $applicant->updated_at ? $applicant->updated_at->format('d/m/Y h:i A') : now()->format('d/m/Y h:i A'),
+            'feeAmount'           => $feeAmount,
+            'amountInWords'       => 'Fourteen Thousand Seven Hundred Naira Only',
+            'logoBase64'          => $logoBase64,
+        ])->setPaper('a4', 'portrait');
+
+        $filename = 'ACONS_Application_Receipt_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $applicant->jamb_number) . '.pdf';
+
+        return $pdf->download($filename);
+    }
+
+    /**
      * Legacy authorize fallback (kept for any direct POST scenarios).
      */
     public function authorizePayment(Request $request, Applicant $applicant)
