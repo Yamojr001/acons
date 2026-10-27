@@ -45,7 +45,7 @@ class InstitutionSetting extends Model
                 'tagline'                   => 'Leading in Nursing Education, Leading in Health Care Delivery',
                 'phone'                     => '07065754443',
                 'email'                     => 'info@ameenatu.edu.ng',
-                'address'                   => 'Takur Site, Dutse, Jigawa State',
+                'address'                   => 'Takur Adua, P.M.B. 105, Dutse, Jigawa State, Nigeria',
                 'logo_path'                 => '/assets/images/acons_logo.png',
                 'primary_color'             => '#2e5fa9',
                 'secondary_color'           => '#a31d1d',

@@ -169,8 +169,8 @@
                 <h1 class="college-title">Ameenatu College of Nursing Sciences</h1>
                 <div class="college-sub">Admissions &amp; Bursary Directorate</div>
                 <div class="college-meta">
-                    Emirs Palace Road, Beside Emirs Palace, Katagum Division, Azare, Bauchi State, Nigeria<br/>
-                    Email: admissions@acons.edu.ng | Web: www.acons.edu.ng
+                    Takur Adua, P.M.B. 105, Dutse, Jigawa State, Nigeria<br/>
+                    Email: info@ameenatu.edu.ng | Web: www.acons.edu.ng
                 </div>
             </td>
             <td style="width: 140px; text-align: right; vertical-align: middle;">

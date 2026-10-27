@@ -145,7 +145,7 @@ export default function Receipt({
                       AMEENATU COLLEGE OF NURSING SCIENCES
                     </h1>
                     <p className="text-xs font-semibold text-slate-600 mt-0.5">
-                      P.M.B. 105, Dutse, Jigawa State, Nigeria
+                      Takur Adua, P.M.B. 105, Dutse, Jigawa State, Nigeria
                     </p>
                     <span className="inline-block mt-2 px-2.5 py-0.5 bg-slate-900 text-white text-[10px] font-bold tracking-wider uppercase rounded">
                       Official Electronic Payment Receipt (e-Receipt)
