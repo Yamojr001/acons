@@ -30,7 +30,7 @@ class GradeController extends Controller
         $report = $classId ? Student::with(['user','grades.exam.subject'])
             ->where('class_room_id', $classId)->get()
             ->map(fn ($s) => [
-                'name'    => $s->user->name,
+                'name'    => $s->user?->name ?? 'Student #' . $s->id,
                 'scores'  => $s->grades->groupBy('exam.subject.name')
                     ->map(fn ($grades) => $grades->avg('score')),
                 'average' => $s->grades->avg('score'),

@@ -21,7 +21,7 @@ class DashboardController extends Controller
         // Build per-child summary
         $childSummaries = $children->map(fn ($child) => [
             'id'              => $child->id,
-            'name'            => $child->user->name,
+            'name'            => $child->user?->name ?? 'Student #' . $child->id,
             'class'           => $child->classRoom->name ?? '—',
             'admission'       => $child->admission_number,
             'attendance_rate' => $child->attendance_rate,
@@ -90,10 +90,10 @@ class FeeController extends Controller
     {
         $guardian = Auth::user()->guardian;
         $children = $guardian->students()->with(['user','fees'])->get();
-        $allFees  = $children->flatMap(fn ($c) => $c->fees->map(fn ($f) => array_merge($f->toArray(), ['student_name' => $c->user->name])));
+        $allFees  = $children->flatMap(fn ($c) => $c->fees->map(fn ($f) => array_merge($f->toArray(), ['student_name' => $c->user?->name ?? 'Student #' . $c->id])));
 
         return Inertia::render('Parent/Fees', [
-            'children' => $children->map(fn ($c) => ['id' => $c->id, 'name' => $c->user->name]),
+            'children' => $children->map(fn ($c) => ['id' => $c->id, 'name' => $c->user?->name ?? 'Student #' . $c->id]),
             'fees'     => $allFees->sortByDesc('created_at')->values(),
             'summary'  => [
                 'total_pending' => $allFees->whereIn('status',['pending','partial','overdue'])->sum('amount'),

@@ -36,7 +36,7 @@ class HODCourseController extends Controller
             ->map(function ($lect) {
                 return [
                     'id' => $lect->id,
-                    'name' => $lect->user->name
+                    'name' => $lect->user?->name ?? 'Lecturer #' . $lect->id
                 ];
             });
 
@@ -133,7 +133,7 @@ class HODCourseController extends Controller
         ]);
 
         $lecturerName = $request->lecturer_id 
-            ? Lecturer::find($request->lecturer_id)->user->name 
+            ? (Lecturer::find($request->lecturer_id)?->user?->name ?? 'Lecturer') 
             : 'Unassigned';
 
         return redirect()->back()->with('success', "Course {$course->code} successfully assigned to {$lecturerName}.");

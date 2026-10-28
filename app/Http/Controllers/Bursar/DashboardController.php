@@ -77,7 +77,7 @@ class DashboardController extends Controller
         
         $students = \App\Models\Student::with('user')->get()->map(fn($s) => [
             'id' => $s->id,
-            'name' => $s->user->name . ' (' . $s->matriculation_number . ')'
+            'name' => ($s->user?->name ?: ($s->matriculation_number ? 'Student ' . $s->matriculation_number : 'Student #' . $s->id)) . ($s->matriculation_number ? ' (' . $s->matriculation_number . ')' : '')
         ]);
 
         $fees = Fee::all()->map(fn($f) => [

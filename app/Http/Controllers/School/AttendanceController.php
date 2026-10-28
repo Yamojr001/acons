@@ -41,7 +41,7 @@ class AttendanceController extends Controller
             ->withCount(['attendances as present_days' => fn ($q) => $q->whereBetween('date',[$from,$to])->whereIn('status',['present','late'])])
             ->get()
             ->map(fn ($s) => [
-                'name'       => $s->user->name,
+                'name'       => $s->user?->name ?? 'Student #' . $s->id,
                 'admission'  => $s->admission_number,
                 'total'      => $s->total_days,
                 'present'    => $s->present_days,

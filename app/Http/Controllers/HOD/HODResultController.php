@@ -76,7 +76,7 @@ class HODResultController extends Controller
                     'rejection_reason' => $rejectionReason,
                     'students' => $registrations->map(function($reg) {
                         return [
-                            'student_name' => $reg->student->user->name,
+                            'student_name' => $reg->student?->user?->name ?? 'Student ' . ($reg->student?->matriculation_number ?? 'N/A'),
                             'matric_number' => $reg->student->matriculation_number,
                             'ca_score' => $reg->grade->ca_score ?? null,
                             'exam_score' => $reg->grade->exam_score ?? null,
