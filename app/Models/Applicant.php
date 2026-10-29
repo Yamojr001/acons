@@ -211,25 +211,26 @@ class Applicant extends Authenticatable
     public static function generateNextRegistrationNumber(self $applicant): string
     {
         $year = '26';
-        $deptCode = 'NUR';
-        if ($applicant->admittedDepartment && str_contains(strtolower($applicant->admittedDepartment->name), 'midwifer')) {
-            $deptCode = 'MID';
-        }
+        $deptName = $applicant->admittedDepartment?->name 
+            ?? $applicant->admittedProgram?->name 
+            ?? $applicant->appliedProgram?->name 
+            ?? '';
+
+        $deptCode = stripos($deptName, 'midwifer') !== false ? 'MID' : 'NUR';
         $section = $applicant->admitted_section ?: 'ND';
         $prefix = "ACONS/{$deptCode}/{$section}/{$year}/";
 
-        // Find the highest serial among applicants who have paid acceptance fee and have a registration number
-        $lastReg = static::where('registration_number', 'like', $prefix . '%')
-            ->orderByRaw("CAST(SUBSTRING_INDEX(registration_number, '/', -1) AS UNSIGNED) DESC")
-            ->value('registration_number');
+        // Find the highest serial across BOTH applicants and students to guarantee zero collisions
+        $maxAppSerial = (int) (static::where('registration_number', 'like', $prefix . '%')
+            ->selectRaw("MAX(CAST(SUBSTRING_INDEX(registration_number, '/', -1) AS UNSIGNED)) as max_serial")
+            ->value('max_serial') ?? 0);
 
-        if ($lastReg) {
-            $parts = explode('/', $lastReg);
-            $lastSerial = (int) end($parts);
-            $nextSerial = str_pad($lastSerial + 1, 3, '0', STR_PAD_LEFT);
-        } else {
-            $nextSerial = '001';
-        }
+        $maxStudentSerial = (int) (\App\Models\Student::where('matriculation_number', 'like', $prefix . '%')
+            ->selectRaw("MAX(CAST(SUBSTRING_INDEX(matriculation_number, '/', -1) AS UNSIGNED)) as max_serial")
+            ->value('max_serial') ?? 0);
+
+        $maxSerial = max($maxAppSerial, $maxStudentSerial);
+        $nextSerial = str_pad($maxSerial + 1, 3, '0', STR_PAD_LEFT);
 
         return $prefix . $nextSerial;
     }
@@ -246,8 +247,18 @@ class Applicant extends Authenticatable
 
         // Assign/ensure sequential admission number: ACONS/NUR/ND/26/001
         $matricNumber = $this->registration_number;
-        if (empty($matricNumber)) {
-            $matricNumber = static::generateNextRegistrationNumber($this);
+        if (empty($matricNumber) || str_contains($matricNumber, '/25/')) {
+            if (!empty($matricNumber) && str_contains($matricNumber, '/25/')) {
+                $targetMatric = str_replace('/25/', '/26/', $matricNumber);
+                // Check if target matric already exists in students or applicants
+                $existsInStudents = Student::where('matriculation_number', $targetMatric)->exists();
+                $existsInApplicants = static::where('registration_number', $targetMatric)->where('id', '!=', $this->id)->exists();
+                $matricNumber = ($existsInStudents || $existsInApplicants)
+                    ? static::generateNextRegistrationNumber($this)
+                    : $targetMatric;
+            } else {
+                $matricNumber = static::generateNextRegistrationNumber($this);
+            }
             $this->update(['registration_number' => $matricNumber]);
             $this->registration_number = $matricNumber;
         }

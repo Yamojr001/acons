@@ -368,25 +368,29 @@ class PaymentController extends Controller
                 $deptAbbr = strtoupper(substr($deptCode ?: $deptName ?: 'GEN', 0, 3));
             }
 
-            $currentSemester = \App\Models\Semester::with('academicSession')
-                                        ->where('is_current', true)
-                                        ->first();
-            $yearYY = $currentSemester?->academicSession?->name ? substr(explode('/', $currentSemester->academicSession->name)[0], -2) : now()->format('y');
-            $prefix = "ACONS/{$deptAbbr}/{$section}/{$yearYY}/";
+            $matchingApplicant = \App\Models\Applicant::where(function ($q) use ($student) {
+                if (!empty($student->jamb_registration_number)) {
+                    $q->where('jamb_number', $student->jamb_registration_number);
+                }
+                if (!empty($student->phone_number)) {
+                    $q->orWhere('phone_number', $student->phone_number);
+                }
+            })->first();
 
-            $lastMatric = \App\Models\Student::where('matriculation_number', 'like', $prefix . '%')
-                ->orderBy('matriculation_number', 'desc')
-                ->first();
-
-            if ($lastMatric) {
-                $parts = explode('/', $lastMatric->matriculation_number);
-                $lastSerial = (int) end($parts);
-                $nextSerial = str_pad($lastSerial + 1, 3, '0', STR_PAD_LEFT);
+            if ($matchingApplicant && !empty($matchingApplicant->registration_number)) {
+                $matriculationNumber = str_replace('/25/', '/26/', $matchingApplicant->registration_number);
             } else {
-                $nextSerial = '001';
+                $yearYY = '26'; // New admissions year is 26
+                $prefix = "ACONS/{$deptAbbr}/{$section}/{$yearYY}/";
+
+                $maxSerial = (int) (\App\Models\Student::where('matriculation_number', 'like', $prefix . '%')
+                    ->selectRaw("MAX(CAST(SUBSTRING_INDEX(matriculation_number, '/', -1) AS UNSIGNED)) as max_serial")
+                    ->value('max_serial') ?? 0);
+
+                $nextSerial = str_pad($maxSerial + 1, 3, '0', STR_PAD_LEFT);
+                $matriculationNumber = $prefix . $nextSerial;
             }
 
-            $matriculationNumber = $prefix . $nextSerial;
             $student->update(['matriculation_number' => $matriculationNumber]);
         }
 

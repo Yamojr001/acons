@@ -217,17 +217,11 @@ class CourseRegistrationController extends Controller
                 $prefix = "ACONS/HND/{$deptAbbr}/{$yearYY}/";
 
                 // Query existing students with this new HND prefix to find the next serial
-                $lastMatric = \App\Models\Student::where('matriculation_number', 'like', $prefix . '%')
-                    ->orderBy('matriculation_number', 'desc')
-                    ->first();
+                $maxSerial = (int) (\App\Models\Student::where('matriculation_number', 'like', $prefix . '%')
+                    ->selectRaw("MAX(CAST(SUBSTRING_INDEX(matriculation_number, '/', -1) AS UNSIGNED)) as max_serial")
+                    ->value('max_serial') ?? 0);
 
-                if ($lastMatric) {
-                    $parts = explode('/', $lastMatric->matriculation_number);
-                    $lastSerial = (int) end($parts);
-                    $nextSerial = str_pad($lastSerial + 1, 3, '0', STR_PAD_LEFT);
-                } else {
-                    $nextSerial = '001';
-                }
+                $nextSerial = str_pad($maxSerial + 1, 3, '0', STR_PAD_LEFT);
 
                 $student->matriculation_number = $prefix . $nextSerial;
                 $student->save();
