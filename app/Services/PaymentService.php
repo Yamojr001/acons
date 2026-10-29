@@ -180,10 +180,15 @@ class PaymentService
         $isFacilitation = ($fee->fee_type === 'facilitation');
         $zainboxCode = ($isFacilitation && config('services.zainpay.facilitation_zainbox_code'))
             ? config('services.zainpay.facilitation_zainbox_code')
-            : config('services.zainpay.zainbox_code');
+            : config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
+
+        $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
+        if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
+            $baseUrl = 'https://api.zainpay.ng';
+        }
 
         $response = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
-            ->post(config('services.zainpay.base_url', 'https://api.zainpay.ng') . '/zainbox/card/initialize/payment', [
+            ->post($baseUrl . '/zainbox/card/initialize/payment', [
                 'amount'       => (string) round((float) $fee->amount),
                 'emailAddress' => $userEmail,
                 'email'        => $userEmail,
@@ -211,13 +216,20 @@ class PaymentService
     {
         try {
             $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
+            if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
+                $baseUrl = 'https://api.zainpay.ng';
+            }
             $response = Http::withToken(config('services.zainpay.public_key'))
                 ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$reference}")
                 ->json();
 
-            return ($response['code'] ?? '') === '00' &&
-                   isset($response['data']['status']) &&
-                   strtolower($response['data']['status']) === 'success';
+            return ($response['code'] ?? '') === '00' && (
+                strtolower($response['data']['status'] ?? '') === 'success' ||
+                strtolower($response['status'] ?? '') === '200 ok' ||
+                strtolower($response['description'] ?? '') === 'successful' ||
+                isset($response['data']['paymentRef']) ||
+                isset($response['data']['depositedAmount'])
+            );
         } catch (\Exception) {
             return false;
         }

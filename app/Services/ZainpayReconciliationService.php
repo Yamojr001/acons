@@ -22,13 +22,14 @@ class ZainpayReconciliationService
 
     public function __construct()
     {
-        $mode = config('services.zainpay.mode', 'sandbox');
-        $this->baseUrl = $mode === 'production' 
-            ? 'https://api.zainpay.ng' 
-            : rtrim(config('services.zainpay.base_url', 'https://sandbox.zainpay.ng'), '/');
+        $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
+        if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
+            $baseUrl = 'https://api.zainpay.ng';
+        }
+        $this->baseUrl = $baseUrl;
         $this->publicKey = config('services.zainpay.public_key');
-        $this->zainboxCode = config('services.zainpay.zainbox_code');
-        $this->facilitationZainboxCode = config('services.zainpay.facilitation_zainbox_code');
+        $this->zainboxCode = config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
+        $this->facilitationZainboxCode = config('services.zainpay.facilitation_zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
     }
 
     /**

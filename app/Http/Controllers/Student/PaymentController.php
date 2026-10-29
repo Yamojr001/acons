@@ -198,34 +198,44 @@ class PaymentController extends Controller
                 $userEmail = strtolower($student->matriculation_number) . '@acons.edu.ng';
             }
 
-            $response = \Illuminate\Support\Facades\Http::timeout(60)
+            $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
+            if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
+                $baseUrl = 'https://api.zainpay.ng';
+            }
+            $targetZainboxCode = $zainboxCode ?: config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
+
+            $httpResponse = \Illuminate\Support\Facades\Http::timeout(60)
                 ->withToken(config('services.zainpay.public_key'))
-                ->post(config('services.zainpay.base_url', 'https://api.zainpay.ng') . '/zainbox/card/initialize/payment', [
+                ->post($baseUrl . '/zainbox/card/initialize/payment', [
                     'amount'       => (string) round((float) $payment->amount),
                     'emailAddress' => $userEmail,
                     'email'        => $userEmail,
                     'mobileNumber' => $request->user()->phone ?: ($student->phone_number ?: '08000000000'),
                     'txnRef'       => $reference,
-                    'zainboxCode'  => $zainboxCode,
+                    'zainboxCode'  => $targetZainboxCode,
                     'callBackUrl'  => $callbackUrl,
-                ])->json();
+                ]);
 
-            if (!isset($response['code']) || $response['code'] !== '00') {
+            $response = $httpResponse->json();
+
+            if (!$httpResponse->successful() || !isset($response['code']) || $response['code'] !== '00') {
                 $payment->update(['status' => 'failed']);
                 \Illuminate\Support\Facades\Log::error('Zainpay payment initialization failed in PaymentController', [
                     'payment_id' => $payment->id,
                     'amount'     => $payment->amount,
+                    'status'     => $httpResponse->status(),
                     'response'   => $response,
+                    'body'       => $httpResponse->body(),
                 ]);
 
-                $errorMessage = $response['description'] ?? null;
+                $errorMessage = $response['description'] ?? ($response['message'] ?? null);
                 if (!$errorMessage && isset($response['amount'][0]['code'])) {
                     $errorMessage = 'Invalid amount format: ' . $response['amount'][0]['code'];
                 }
 
                 return response()->json([
                     'gateway' => 'zainpay',
-                    'error'   => $errorMessage ?? 'Zainpay initialization failed. Please try again.',
+                    'error'   => $errorMessage ?? ('Zainpay initialization failed (HTTP ' . $httpResponse->status() . '). Please try again.'),
                 ], 422);
             }
 
@@ -267,17 +277,31 @@ class PaymentController extends Controller
 
         if ($payment->payment_gateway === 'zainpay') {
             $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
-            $response = \Illuminate\Support\Facades\Http::withToken(config('services.zainpay.public_key'))
-                ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$reference}")
-                ->json();
+            if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
+                $baseUrl = 'https://api.zainpay.ng';
+            }
+            $httpResponse = \Illuminate\Support\Facades\Http::timeout(30)
+                ->withToken(config('services.zainpay.public_key'))
+                ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$reference}");
 
-            $verified = ($response['code'] ?? '') === '00' && 
-                        isset($response['data']['status']) && 
-                        strtolower($response['data']['status']) === 'success';
+            $response = $httpResponse->json();
+
+            $verified = ($response['code'] ?? '') === '00' && (
+                strtolower($response['data']['status'] ?? '') === 'success' || 
+                strtolower($response['status'] ?? '') === '200 ok' || 
+                strtolower($response['description'] ?? '') === 'successful' || 
+                isset($response['data']['paymentRef']) || 
+                isset($response['data']['depositedAmount'])
+            );
 
             if (!$verified) {
                 $payment->update(['status' => 'failed']);
-                return redirect()->route('student.registration')->with('error', 'Payment could not be verified. If you were charged, please contact the Bursary.');
+                \Illuminate\Support\Facades\Log::warning('Zainpay payment verification failed', [
+                    'reference' => $reference,
+                    'status'    => $httpResponse->status(),
+                    'response'  => $response,
+                ]);
+                return redirect()->route('student.registration')->with('error', 'Payment could not be verified (' . ($response['description'] ?? 'Transaction not confirmed') . '). If you were charged, please contact the Bursary.');
             }
         }
         // NOTE: Remita/Paystack/Monnify/sandbox paths below remain a simulated

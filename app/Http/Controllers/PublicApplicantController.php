@@ -183,32 +183,40 @@ class PublicApplicantController extends Controller
 
         $txnRef      = 'ACON_ADM_' . $applicant->id . '_' . time();
         $callbackUrl = route('admissions.pay.verify', $applicant->id);
-        $baseUrl     = rtrim(config('services.zainpay.base_url', 'https://sandbox.zainpay.ng'), '/');
+        $baseUrl     = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
+        if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
+            $baseUrl = 'https://api.zainpay.ng';
+        }
+        $zainboxCode = config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
 
         $applicantEmail = trim($applicant->email ?? '');
         if (empty($applicantEmail) || !filter_var($applicantEmail, FILTER_VALIDATE_EMAIL)) {
             $applicantEmail = strtolower($applicant->jamb_number) . '@acons.edu.ng';
         }
 
-        $response = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
+        $httpResponse = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
             ->post("{$baseUrl}/zainbox/card/initialize/payment", [
                 'amount'        => (string) 14700,
                 'txnRef'        => $txnRef,
                 'emailAddress'  => $applicantEmail,
                 'email'         => $applicantEmail,
                 'mobileNumber'  => $applicant->phone_number ?: '08000000000',
-                'zainboxCode'   => config('services.zainpay.zainbox_code'),
+                'zainboxCode'   => $zainboxCode,
                 'callBackUrl'   => $callbackUrl,
-            ])->json();
+            ]);
 
-        if (($response['code'] ?? '') !== '00') {
+        $response = $httpResponse->json();
+
+        if (!$httpResponse->successful() || ($response['code'] ?? '') !== '00') {
             Log::error('ZainPay initialization failed', [
                 'applicant_id' => $applicant->id,
+                'status'       => $httpResponse->status(),
                 'response'     => $response,
+                'body'         => $httpResponse->body(),
                 'baseUrl'      => $baseUrl,
-                'zainboxCode'  => config('services.zainpay.zainbox_code'),
+                'zainboxCode'  => $zainboxCode,
             ]);
-            return back()->withErrors(['payment' => 'ZainPay initialization failed: ' . ($response['description'] ?? 'Unknown error. Check your ZainPay credentials.')]);
+            return back()->withErrors(['payment' => 'ZainPay initialization failed: ' . ($response['description'] ?? 'Unable to connect to gateway. Please try again.')]);
         }
 
         // Stash ref in session and persist in DB for verification/reconciliation fallback
@@ -238,9 +246,12 @@ class PublicApplicantController extends Controller
         }
 
         $txnRef  = $request->query('txnRef', session('zainpay_txn_' . $applicant->id, $applicant->payment_reference));
-        $baseUrl = rtrim(config('services.zainpay.base_url', 'https://sandbox.zainpay.ng'), '/');
+        $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
+        if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
+            $baseUrl = 'https://api.zainpay.ng';
+        }
         $pubKey  = config('services.zainpay.public_key');
-        $zainboxCode = config('services.zainpay.zainbox_code');
+        $zainboxCode = config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
 
         if (!$txnRef) {
             return redirect()->route('admissions.pay', $applicant->id)
@@ -256,7 +267,13 @@ class PublicApplicantController extends Controller
                 ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$txnRef}")
                 ->json();
 
-            if (($verify['code'] ?? '') === '00' && strtolower($verify['data']['status'] ?? '') === 'success') {
+            if (($verify['code'] ?? '') === '00' && (
+                strtolower($verify['data']['status'] ?? '') === 'success' || 
+                strtolower($verify['status'] ?? '') === '200 ok' || 
+                strtolower($verify['description'] ?? '') === 'successful' ||
+                isset($verify['data']['paymentRef']) ||
+                isset($verify['data']['depositedAmount'])
+            )) {
                 $isVerified = true;
                 $rawAmount = (float) ($verify['data']['amount'] ?? $verify['data']['depositedAmount'] ?? 14700);
                 $amountPaid = $rawAmount > 100000 ? round($rawAmount / 100, 2) : $rawAmount;
@@ -740,30 +757,40 @@ class PublicApplicantController extends Controller
 
         $txnRef      = 'ACON_ACC_' . $applicant->id . '_' . time();
         $callbackUrl = route('admissions.acceptance_fee.verify', $applicant->id);
-        $baseUrl     = rtrim(config('services.zainpay.base_url', 'https://sandbox.zainpay.ng'), '/');
+        $baseUrl     = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
+        if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
+            $baseUrl = 'https://api.zainpay.ng';
+        }
+        $zainboxCode = config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
 
         $applicantEmail = trim($applicant->email ?? '');
         if (empty($applicantEmail) || !filter_var($applicantEmail, FILTER_VALIDATE_EMAIL)) {
             $applicantEmail = strtolower($applicant->jamb_number) . '@acons.edu.ng';
         }
 
-        $response = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
+        $httpResponse = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
             ->post("{$baseUrl}/zainbox/card/initialize/payment", [
                 'amount'        => (string) 10000,
                 'txnRef'        => $txnRef,
                 'emailAddress'  => $applicantEmail,
                 'email'         => $applicantEmail,
                 'mobileNumber'  => $applicant->phone_number ?: '08000000000',
-                'zainboxCode'   => config('services.zainpay.zainbox_code'),
+                'zainboxCode'   => $zainboxCode,
                 'callBackUrl'   => $callbackUrl,
-            ])->json();
+            ]);
 
-        if (($response['code'] ?? '') !== '00') {
+        $response = $httpResponse->json();
+
+        if (!$httpResponse->successful() || ($response['code'] ?? '') !== '00') {
             Log::error('ZainPay Acceptance Fee initialization failed', [
                 'applicant_id' => $applicant->id,
+                'status'       => $httpResponse->status(),
                 'response'     => $response,
+                'body'         => $httpResponse->body(),
+                'baseUrl'      => $baseUrl,
+                'zainboxCode'  => $zainboxCode,
             ]);
-            return back()->withErrors(['acceptance_payment' => 'ZainPay initialization failed: ' . ($response['description'] ?? 'Unable to start transaction. Check credentials.')]);
+            return back()->withErrors(['acceptance_payment' => 'ZainPay initialization failed: ' . ($response['description'] ?? 'Unable to connect to gateway. Please try again.')]);
         }
 
         session(['zainpay_acc_txn_' . $applicant->id => $txnRef]);
@@ -792,9 +819,12 @@ class PublicApplicantController extends Controller
         }
 
         $txnRef  = $request->query('txnRef', session('zainpay_acc_txn_' . $applicant->id, $applicant->acceptance_fee_reference));
-        $baseUrl = rtrim(config('services.zainpay.base_url', 'https://sandbox.zainpay.ng'), '/');
+        $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
+        if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
+            $baseUrl = 'https://api.zainpay.ng';
+        }
         $pubKey  = config('services.zainpay.public_key');
-        $zainboxCode = config('services.zainpay.zainbox_code');
+        $zainboxCode = config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
 
         if (!$txnRef) {
             return redirect()->route('admissions.dashboard')
@@ -810,7 +840,13 @@ class PublicApplicantController extends Controller
                 ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$txnRef}")
                 ->json();
 
-            if (($verify['code'] ?? '') === '00' && strtolower($verify['data']['status'] ?? '') === 'success') {
+            if (($verify['code'] ?? '') === '00' && (
+                strtolower($verify['data']['status'] ?? '') === 'success' ||
+                strtolower($verify['status'] ?? '') === '200 ok' ||
+                strtolower($verify['description'] ?? '') === 'successful' ||
+                isset($verify['data']['paymentRef']) ||
+                isset($verify['data']['depositedAmount'])
+            )) {
                 $isVerified = true;
                 $rawAmount = (float) ($verify['data']['amount'] ?? $verify['data']['depositedAmount'] ?? 10000);
                 $amountPaid = $rawAmount > 100000 ? round($rawAmount / 100, 2) : $rawAmount;
