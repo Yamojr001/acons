@@ -180,7 +180,11 @@ class PaymentService
         $isFacilitation = ($fee->fee_type === 'facilitation');
         $zainboxCode = ($isFacilitation && config('services.zainpay.facilitation_zainbox_code'))
             ? config('services.zainpay.facilitation_zainbox_code')
-            : config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
+            : config('services.zainpay.zainbox_code');
+
+        if (empty($zainboxCode) || $zainboxCode === 'ACONS_p1XhqAZqOT4n96geDYJI') {
+            $zainboxCode = 'ACONS_ijEt7i4diabtRVTqFdSh';
+        }
 
         $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
         if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {

@@ -28,8 +28,10 @@ class ZainpayReconciliationService
         }
         $this->baseUrl = $baseUrl;
         $this->publicKey = config('services.zainpay.public_key');
-        $this->zainboxCode = config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
-        $this->facilitationZainboxCode = config('services.zainpay.facilitation_zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
+        $code = config('services.zainpay.zainbox_code');
+        $facilCode = config('services.zainpay.facilitation_zainbox_code');
+        $this->zainboxCode = (empty($code) || $code === 'ACONS_p1XhqAZqOT4n96geDYJI') ? 'ACONS_ijEt7i4diabtRVTqFdSh' : $code;
+        $this->facilitationZainboxCode = (empty($facilCode) || $facilCode === 'ACONS_p1XhqAZqOT4n96geDYJI') ? 'ACONS_ijEt7i4diabtRVTqFdSh' : $facilCode;
     }
 
     /**

@@ -202,7 +202,10 @@ class PaymentController extends Controller
             if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
                 $baseUrl = 'https://api.zainpay.ng';
             }
-            $targetZainboxCode = $zainboxCode ?: config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
+            $targetZainboxCode = $zainboxCode ?: config('services.zainpay.zainbox_code');
+            if (empty($targetZainboxCode) || $targetZainboxCode === 'ACONS_p1XhqAZqOT4n96geDYJI') {
+                $targetZainboxCode = 'ACONS_ijEt7i4diabtRVTqFdSh';
+            }
 
             $httpResponse = \Illuminate\Support\Facades\Http::timeout(60)
                 ->withToken(config('services.zainpay.public_key'))

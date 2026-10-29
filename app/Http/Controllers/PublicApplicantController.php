@@ -187,7 +187,10 @@ class PublicApplicantController extends Controller
         if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
             $baseUrl = 'https://api.zainpay.ng';
         }
-        $zainboxCode = config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
+        $zainboxCode = config('services.zainpay.zainbox_code');
+        if (empty($zainboxCode) || $zainboxCode === 'ACONS_p1XhqAZqOT4n96geDYJI') {
+            $zainboxCode = 'ACONS_ijEt7i4diabtRVTqFdSh';
+        }
 
         $applicantEmail = trim($applicant->email ?? '');
         if (empty($applicantEmail) || !filter_var($applicantEmail, FILTER_VALIDATE_EMAIL)) {
@@ -251,7 +254,10 @@ class PublicApplicantController extends Controller
             $baseUrl = 'https://api.zainpay.ng';
         }
         $pubKey  = config('services.zainpay.public_key');
-        $zainboxCode = config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
+        $zainboxCode = config('services.zainpay.zainbox_code');
+        if (empty($zainboxCode) || $zainboxCode === 'ACONS_p1XhqAZqOT4n96geDYJI') {
+            $zainboxCode = 'ACONS_ijEt7i4diabtRVTqFdSh';
+        }
 
         if (!$txnRef) {
             return redirect()->route('admissions.pay', $applicant->id)
@@ -761,7 +767,10 @@ class PublicApplicantController extends Controller
         if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
             $baseUrl = 'https://api.zainpay.ng';
         }
-        $zainboxCode = config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
+        $zainboxCode = config('services.zainpay.zainbox_code');
+        if (empty($zainboxCode) || $zainboxCode === 'ACONS_p1XhqAZqOT4n96geDYJI') {
+            $zainboxCode = 'ACONS_ijEt7i4diabtRVTqFdSh';
+        }
 
         $applicantEmail = trim($applicant->email ?? '');
         if (empty($applicantEmail) || !filter_var($applicantEmail, FILTER_VALIDATE_EMAIL)) {
@@ -824,7 +833,10 @@ class PublicApplicantController extends Controller
             $baseUrl = 'https://api.zainpay.ng';
         }
         $pubKey  = config('services.zainpay.public_key');
-        $zainboxCode = config('services.zainpay.zainbox_code', 'ACONS_ijEt7i4diabtRVTqFdSh');
+        $zainboxCode = config('services.zainpay.zainbox_code');
+        if (empty($zainboxCode) || $zainboxCode === 'ACONS_p1XhqAZqOT4n96geDYJI') {
+            $zainboxCode = 'ACONS_ijEt7i4diabtRVTqFdSh';
+        }
 
         if (!$txnRef) {
             return redirect()->route('admissions.dashboard')
