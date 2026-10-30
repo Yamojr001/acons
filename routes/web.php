@@ -80,9 +80,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/dashboard',          [\App\Http\Controllers\Student\DashboardController::class, 'index'])->name('dashboard');
         Route::get('/course-registration',[\App\Http\Controllers\Student\CourseRegistrationController::class, 'index'])->name('course-registration');
         Route::post('/course-registration',[\App\Http\Controllers\Student\CourseRegistrationController::class, 'store'])->name('course-registration.store');
-        Route::get('/fees',               [\App\Http\Controllers\Student\PaymentController::class, 'index'])->name('fees');
-        Route::get('/invoices/{invoice}/receipt', [\App\Http\Controllers\Student\PaymentController::class, 'downloadReceipt'])->name('invoices.receipt');
-        Route::get('/registration',       [\App\Http\Controllers\Student\RegistrationController::class, 'index'])->name('registration');
+        Route::get('/fees',                         [\App\Http\Controllers\Student\PaymentController::class, 'index'])->name('fees');
+        Route::get('/invoices/{invoice}/receipt',   [\App\Http\Controllers\Student\PaymentController::class, 'showReceipt'])->name('invoices.receipt');
+        Route::get('/invoices/{invoice}/receipt/download', [\App\Http\Controllers\Student\PaymentController::class, 'downloadReceipt'])->name('invoices.receipt.download');
+        Route::get('/registration',                 [\App\Http\Controllers\Student\RegistrationController::class, 'index'])->name('registration');
         Route::post('/payments/initialize/{invoice}', [\App\Http\Controllers\Student\PaymentController::class, 'initialize'])->name('payments.initialize');
         Route::match(['get', 'post'], '/payments/verify/{reference}',   [\App\Http\Controllers\Student\PaymentController::class, 'verify'])->name('payments.verify');
         Route::get('/results',            [\App\Http\Controllers\Student\ResultController::class, 'index'])->name('results');
@@ -211,7 +212,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/fees/{fee}/update',           [\App\Http\Controllers\Bursar\DashboardController::class, 'updateFee'])->name('fees.update');
         Route::delete('/fees/{fee}',                [\App\Http\Controllers\Bursar\DashboardController::class, 'deleteFee'])->name('fees.delete');
         Route::get('/payments',                     [\App\Http\Controllers\Bursar\DashboardController::class, 'payments'])->name('payments');
-        Route::get('/invoices/{invoice}/receipt',   [\App\Http\Controllers\Student\PaymentController::class, 'downloadReceipt'])->name('invoices.receipt');
+        Route::get('/invoices/{invoice}/receipt',   [\App\Http\Controllers\Student\PaymentController::class, 'showReceipt'])->name('invoices.receipt');
+        Route::get('/invoices/{invoice}/receipt/download', [\App\Http\Controllers\Student\PaymentController::class, 'downloadReceipt'])->name('invoices.receipt.download');
         Route::post('/payments/manual',             [\App\Http\Controllers\Bursar\DashboardController::class, 'storePayment'])->name('payments.store');
         Route::post('/payments/{payment}/update',   [\App\Http\Controllers\Bursar\DashboardController::class, 'updatePayment'])->name('payments.update');
         Route::delete('/payments/{payment}',        [\App\Http\Controllers\Bursar\DashboardController::class, 'deletePayment'])->name('payments.delete');

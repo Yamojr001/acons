@@ -13,7 +13,8 @@ import {
   BookOpen,
   Lock,
   Sparkles,
-  Info
+  Info,
+  Eye
 } from 'lucide-react'
 import AppLayout from '@/Layouts/AppLayout'
 import { Card, Badge, Button, EmptyState } from '@/Components/UI'
@@ -431,8 +432,12 @@ export default function Registration({
                       <CheckCircle size={15} className="text-emerald-600" />
                       Academic Facilitation Fee cleared. Stage 2 unlocked!
                     </span>
-                    <Link href="/student/fees" className="text-brand-600 hover:text-brand-700 underline text-xs">
-                      View Bursary Receipt
+                    <Link
+                      href={facilitationInvoice?.id ? `/student/invoices/${facilitationInvoice.id}/receipt` : '/student/fees'}
+                      className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:text-brand-700 underline text-xs"
+                    >
+                      <Eye size={13} />
+                      <span>View Receipt</span>
                     </Link>
                   </div>
                 ) : (
@@ -801,9 +806,12 @@ export default function Registration({
                                 Proceed to Course Registration
                               </Button>
                             </Link>
-                            <Link href="/student/fees" className="block w-full text-center">
-                              <Button variant="ghost" size="sm" className="w-full">
-                                View Bursary Receipts
+                            <Link
+                              href={invoice?.id ? `/student/invoices/${invoice.id}/receipt` : '/student/fees'}
+                              className="block w-full text-center"
+                            >
+                              <Button variant="ghost" size="sm" className="w-full" iconLeft={<Eye size={14} />}>
+                                View Receipt
                               </Button>
                             </Link>
                           </div>

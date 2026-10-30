@@ -1,6 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react'
 import { motion } from 'framer-motion'
-import { CreditCard, CheckCircle, Clock, AlertTriangle, Download, ArrowRight } from 'lucide-react'
+import { CreditCard, CheckCircle, Clock, AlertTriangle, Download, ArrowRight, Eye } from 'lucide-react'
 import AppLayout from '@/Layouts/AppLayout'
 import { Card, Badge, Button } from '@/Components/UI'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -183,16 +183,21 @@ export default function FeesIndex({ invoices, activeGateway }: FeesProps) {
                         </div>
 
                         {isPaid ? (
-                          <a
-                            href={`/student/invoices/${invoice.id}/receipt`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block"
-                          >
-                            <Button variant="outline" size="sm" iconLeft={<Download size={14} />}>
-                              Download Receipt
-                            </Button>
-                          </a>
+                          <div className="flex items-center gap-2">
+                            <Link href={`/student/invoices/${invoice.id}/receipt`}>
+                              <Button variant="outline" size="sm" iconLeft={<Eye size={14} />}>
+                                View Receipt
+                              </Button>
+                            </Link>
+                            <a
+                              href={`/student/invoices/${invoice.id}/receipt/download?download=1`}
+                              className="inline-block"
+                            >
+                              <Button variant="ghost" size="sm" iconLeft={<Download size={14} />}>
+                                Download PDF
+                              </Button>
+                            </a>
+                          </div>
                         ) : (
                           <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                             {invoice.payments && invoice.payments.length > 0 && (

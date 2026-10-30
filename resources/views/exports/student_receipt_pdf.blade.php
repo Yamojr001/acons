@@ -9,7 +9,7 @@
             margin: 12mm 15mm 12mm 15mm;
         }
         body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-family: 'DejaVu Sans', sans-serif;
             color: #1e293b;
             font-size: 10px;
             line-height: 1.4;
@@ -25,8 +25,8 @@
             margin-bottom: 12px;
         }
         .college-title {
-            font-size: 16px;
-            font-weight: 900;
+            font-size: 15px;
+            font-weight: bold;
             color: #065f46;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -55,7 +55,7 @@
         }
         .banner-title {
             font-size: 11px;
-            font-weight: 900;
+            font-weight: bold;
             color: #065f46;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -69,7 +69,7 @@
         }
         .section-heading {
             font-size: 10px;
-            font-weight: 800;
+            font-weight: bold;
             color: #0f172a;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -106,7 +106,7 @@
         .data-table th {
             background-color: #f1f5f9;
             color: #1e293b;
-            font-weight: 800;
+            font-weight: bold;
             font-size: 9px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -137,7 +137,7 @@
             color: #059669;
             padding: 4px 10px;
             font-size: 11px;
-            font-weight: 900;
+            font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 1.5px;
             border-radius: 4px;
@@ -240,8 +240,8 @@
                 <th style="width: 5%;">#</th>
                 <th style="width: 50%;">Description / Purpose of Payment</th>
                 <th style="width: 15%;">Fee Category</th>
-                <th style="width: 15%; text-align: right;">Amount Due (₦)</th>
-                <th style="width: 15%; text-align: right;">Amount Paid (₦)</th>
+                <th style="width: 15%; text-align: right;">Amount Due (&#8358;)</th>
+                <th style="width: 15%; text-align: right;">Amount Paid (&#8358;)</th>
             </tr>
         </thead>
         <tbody>
@@ -264,11 +264,11 @@
             <tr>
                 <td style="vertical-align: middle;">
                     <div style="font-size: 8.5px; text-transform: uppercase; color: #64748b; font-weight: bold;">Total Amount in Words:</div>
-                    <div style="font-size: 10.5px; font-weight: 800; color: #065f46; font-style: italic;">{{ $amountInWords }}</div>
+                    <div style="font-size: 10.5px; font-weight: bold; color: #065f46; font-style: italic;">{{ $amountInWords }}</div>
                 </td>
                 <td style="width: 200px; text-align: right; vertical-align: middle;">
                     <div style="font-size: 8.5px; text-transform: uppercase; color: #64748b; font-weight: bold;">Total Amount Cleared:</div>
-                    <div style="font-size: 18px; font-weight: 900; color: #065f46;">₦{{ number_format($amountPaid, 2) }}</div>
+                    <div style="font-size: 18px; font-weight: bold; color: #065f46;">&#8358;{{ number_format($amountPaid, 2) }}</div>
                 </td>
             </tr>
         </table>

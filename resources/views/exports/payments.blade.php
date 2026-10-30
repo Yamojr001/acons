@@ -5,7 +5,7 @@
     <title>Transaction Ledger</title>
     <style>
         body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-family: 'DejaVu Sans', sans-serif;
             color: #333333;
             font-size: 11px;
             line-height: 1.4;
@@ -124,7 +124,7 @@
                     <td class="matric">{{ $payment->student->matriculation_number ?? 'N/A' }}</td>
                     <td style="font-family: Courier, monospace;">{{ $payment->reference }}</td>
                     <td style="text-transform: capitalize;">{{ str_replace('_', ' ', $payment->payment_gateway) }}</td>
-                    <td style="font-weight: bold;">₦{{ number_format($payment->amount, 2) }}</td>
+                    <td style="font-weight: bold;">&#8358;{{ number_format($payment->amount, 2) }}</td>
                     <td>
                         <span class="status status-{{ $payment->status }}">
                             {{ $payment->status }}

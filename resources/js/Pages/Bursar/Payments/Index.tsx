@@ -286,9 +286,9 @@ export default function PaymentsIndex({ payments, students, fees, stats, auth }:
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
-                                iconLeft={<Download size={14} />}
+                                iconLeft={<Eye size={14} />}
                               >
-                                Receipt
+                                View Receipt
                               </Button>
                             </a>
                           )}

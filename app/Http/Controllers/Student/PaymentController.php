@@ -498,7 +498,79 @@ class PaymentController extends Controller
     }
 
     /**
-     * Download authentic PDF receipt for a paid student invoice.
+     * Show official electronic payment receipt on-screen before downloading.
+     */
+    public function showReceipt(Request $request, StudentInvoice $invoice)
+    {
+        $student = $invoice->student;
+        $user = $request->user();
+
+        if ($user->hasRole('student')) {
+            abort_if(!$user->student || $user->student->id !== $student?->id, 403, 'Unauthorized access to this receipt.');
+        } elseif (!$user->hasAnyRole(['admin', 'super_admin', 'bursar', 'school_admin', 'provost'])) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        if ($invoice->status !== 'paid' && (float)$invoice->amount_paid <= 0) {
+            return back()->with('error', 'Receipt not available. Invoice is unpaid.');
+        }
+
+        $payment = Payment::where('student_invoice_id', $invoice->id)
+            ->where('status', 'successful')
+            ->latest()
+            ->first();
+
+        $paymentRef = $payment?->reference ?: ('ACON_INV_' . $invoice->id);
+        $paidAt = $payment?->created_at ? $payment->created_at->format('d/m/Y h:i A') : $invoice->updated_at->format('d/m/Y h:i A');
+        $paymentGateway = $payment?->payment_gateway ?: 'zainpay';
+
+        $amountPaid = (float) $invoice->amount_paid;
+        $amountInWords = $this->numberToWords($amountPaid);
+
+        $academicSessionName = $invoice->fee?->academicSession?->name
+            ?? \App\Models\AcademicSession::where('is_current', true)->value('name')
+            ?? '2026/2027';
+
+        $isStudent = $user->hasRole('student');
+        $downloadUrl = $isStudent
+            ? route('student.invoices.receipt.download', ['invoice' => $invoice->id, 'download' => 1])
+            : route('bursar.invoices.receipt.download', ['invoice' => $invoice->id, 'download' => 1]);
+
+        $streamUrl = $isStudent
+            ? route('student.invoices.receipt.download', ['invoice' => $invoice->id, 'view' => 1])
+            : route('bursar.invoices.receipt.download', ['invoice' => $invoice->id, 'view' => 1]);
+
+        return Inertia::render('Student/Receipt', [
+            'institution'         => InstitutionSetting::current(),
+            'invoice'             => $invoice->load(['fee.academicSession']),
+            'payment'             => $payment,
+            'paymentRef'          => $paymentRef,
+            'paidAt'              => $paidAt,
+            'paymentGateway'      => $paymentGateway,
+            'student'             => [
+                'name'         => $student?->user?->name ?? 'Student',
+                'matricNumber' => $student?->matriculation_number ?: 'Pending',
+                'jambNumber'   => $student?->jamb_registration_number ?: 'N/A',
+                'level'        => $student?->current_level ?? 'ND1',
+                'department'   => $student?->department?->name ?? 'Nursing Sciences',
+                'program'      => $student?->program?->name ?? 'General Nursing',
+                'phone'        => $student?->phone_number ?: ($student?->user?->phone ?? 'N/A'),
+                'email'        => $student?->user?->email ?? 'N/A',
+            ],
+            'feeName'             => $invoice->fee?->name ?? 'School Fees',
+            'feeType'             => $invoice->fee?->fee_type ?? 'tuition',
+            'amountDue'           => (float) $invoice->amount_due,
+            'amountPaid'          => $amountPaid,
+            'amountInWords'       => $amountInWords,
+            'academicSessionName' => $academicSessionName,
+            'downloadUrl'         => $downloadUrl,
+            'pdfStreamUrl'        => $streamUrl,
+            'verificationHash'    => hash('sha256', $paymentRef . ($student?->matriculation_number ?? '') . $amountPaid),
+        ]);
+    }
+
+    /**
+     * Download or stream authentic PDF receipt for a paid student invoice.
      */
     public function downloadReceipt(Request $request, StudentInvoice $invoice)
     {
@@ -560,6 +632,11 @@ class PaymentController extends Controller
 
         $safeMatric = preg_replace('/[^A-Za-z0-9_-]/', '_', $student?->matriculation_number ?: 'STUDENT_' . $student?->id);
         $filename = "ACONS_Official_Receipt_{$safeMatric}_{$invoice->id}.pdf";
+
+        // If explicitly requested to view/stream inline in browser PDF reader
+        if ($request->has('view') || $request->has('stream')) {
+            return $pdf->stream($filename);
+        }
 
         return $pdf->download($filename);
     }
