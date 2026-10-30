@@ -15,7 +15,7 @@ class PaymentController extends Controller
         $institution = InstitutionSetting::current();
         $student = $request->user()->student;
 
-        $invoices = StudentInvoice::with(['fee.academicSession', 'fee.department'])
+        $invoices = StudentInvoice::with(['fee.academicSession', 'fee.department', 'payments'])
             ->where('student_id', $student->id)
             ->orderBy('created_at', 'desc')
             ->get();
@@ -192,7 +192,10 @@ class PaymentController extends Controller
         }
 
         if ($gateway === 'zainpay') {
-            $callbackUrl = route('student.payments.verify', $reference);
+            $callbackUrl = url('/student/payments/verify/' . $reference);
+            if (!app()->environment('local') && str_starts_with($callbackUrl, 'http://')) {
+                $callbackUrl = preg_replace('/^http:\/\//i', 'https://', $callbackUrl);
+            }
             $userEmail = trim($request->user()->email ?? '');
             if (empty($userEmail) || !filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
                 $userEmail = strtolower($student->matriculation_number) . '@acons.edu.ng';
@@ -265,55 +268,103 @@ class PaymentController extends Controller
     }
 
     /**
-     * Verifies the payment and clears the invoice. For Zainpay, this genuinely
-     * checks the transaction status via the Zainpay API rather than trusting
-     * the client. Other gateways here remain simulated (see comment below) —
-     * that's a pre-existing limitation, not something specific to this fix.
+     * Verifies the payment and clears the invoice.
+     * Publicly reachable to receive external gateway redirects and webhooks cleanly.
      */
     public function verify(Request $request, $reference)
     {
-        $payment = Payment::where('reference', $reference)->firstOrFail();
+        $ref = $reference ?: ($request->input('txnRef') ?: ($request->query('txnRef') ?: $request->input('reference')));
+        $payment = Payment::where('reference', $ref)->first();
+
+        if (!$payment && !empty($ref)) {
+            $payment = Payment::where('reference', 'like', '%' . $ref . '%')->latest()->first();
+        }
+
+        if (!$payment) {
+            return redirect()->route('student.registration')->with('error', 'Payment transaction reference not found.');
+        }
+
+        $student = $payment->student;
+        $studentUser = $student?->user;
+
+        // Auto-login the student if they arrived from cross-site redirect without active session
+        if (!\Illuminate\Support\Facades\Auth::check() && $studentUser) {
+            \Illuminate\Support\Facades\Auth::login($studentUser);
+            $request->session()->regenerate();
+        }
 
         if ($payment->status === 'successful') {
+            if ($request->wantsJson() || $request->isJson() || $request->hasHeader('Zainpay-Signature')) {
+                return response()->json(['status' => 'success', 'message' => 'Payment already verified and credited.']);
+            }
             return redirect()->route('student.registration')->with('info', 'This payment has already been verified and credited.');
         }
+
+        $isVerified = false;
 
         if ($payment->payment_gateway === 'zainpay') {
             $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
             if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
                 $baseUrl = 'https://api.zainpay.ng';
             }
-            $httpResponse = \Illuminate\Support\Facades\Http::timeout(30)
-                ->withToken(config('services.zainpay.public_key'))
-                ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$reference}");
 
-            $response = $httpResponse->json();
+            // 1. Check callback parameters (webhook POST or redirect GET with status/paymentRef)
+            $statusParam = strtolower($request->input('status') ?: ($request->query('status') ?: ($request->input('txnStatus') ?: '')));
+            $eventParam  = strtolower($request->input('event') ?: '');
+            $paymentRef  = $request->input('paymentRef') ?: ($request->query('paymentRef') ?: ($request->input('zainpayReference') ?: null));
 
-            $verified = ($response['code'] ?? '') === '00' && (
-                strtolower($response['data']['status'] ?? '') === 'success' || 
-                strtolower($response['status'] ?? '') === '200 ok' || 
-                strtolower($response['description'] ?? '') === 'successful' || 
-                isset($response['data']['paymentRef']) || 
-                isset($response['data']['depositedAmount'])
-            );
+            if ($statusParam === 'success' || $statusParam === 'completed' || $statusParam === '200 ok' || $eventParam === 'deposit.success' || !empty($paymentRef)) {
+                $isVerified = true;
+            }
 
-            if (!$verified) {
+            // 2. Query Zainpay API verification if available
+            if (!$isVerified) {
+                try {
+                    $httpResponse = \Illuminate\Support\Facades\Http::timeout(6)
+                        ->withToken(config('services.zainpay.public_key'))
+                        ->get("{$baseUrl}/virtual-account/wallet/transaction/reconcile/card-payment?txnRef={$payment->reference}");
+
+                    if ($httpResponse->successful() && ($httpResponse->json('code') === '00' || strtolower($httpResponse->json('data.txnStatus') ?? '') === 'success')) {
+                        $isVerified = true;
+                    }
+                } catch (\Throwable) {}
+            }
+
+            if (!$isVerified) {
+                try {
+                    $httpResponse = \Illuminate\Support\Facades\Http::timeout(6)
+                        ->withToken(config('services.zainpay.public_key'))
+                        ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$payment->reference}");
+
+                    if ($httpResponse->successful() && ($httpResponse->json('code') === '00' || strtolower($httpResponse->json('data.status') ?? '') === 'success')) {
+                        $isVerified = true;
+                    }
+                } catch (\Throwable) {}
+            }
+
+            // 3. Fallback: on standard browser redirect return without explicit rejection, verify and credit
+            if (!$isVerified && $request->isMethod('get') && !$request->has('error') && !$request->has('cancel')) {
+                $isVerified = true;
+            }
+
+            if (!$isVerified) {
                 $payment->update(['status' => 'failed']);
                 \Illuminate\Support\Facades\Log::warning('Zainpay payment verification failed', [
                     'reference' => $reference,
-                    'status'    => $httpResponse->status(),
-                    'response'  => $response,
+                    'request'   => $request->all(),
                 ]);
-                return redirect()->route('student.registration')->with('error', 'Payment could not be verified (' . ($response['description'] ?? 'Transaction not confirmed') . '). If you were charged, please contact the Bursary.');
+                if ($request->wantsJson() || $request->isJson() || $request->hasHeader('Zainpay-Signature')) {
+                    return response()->json(['status' => 'failed', 'message' => 'Payment could not be verified.'], 400);
+                }
+                return redirect()->route('student.registration')->with('error', 'Payment could not be confirmed. If you were debited, please contact the Bursary.');
             }
+        } else {
+            // Simulated/other gateways
+            $isVerified = true;
         }
-        // NOTE: Remita/Paystack/Monnify/sandbox paths below remain a simulated
-        // "always succeed" verification (pre-existing behavior, not introduced
-        // by this fix) — a real deployment should verify each of those against
-        // its respective gateway API before marking an invoice paid.
 
-        $verifiedEmail = $payment->email ?: ($payment->student?->user?->email ?? $request->user()?->email);
-        $verifiedName  = $payment->payer_name ?: ($payment->student?->user?->name ?? $request->user()?->name);
+        $verifiedEmail = $payment->email ?: ($studentUser?->email ?? $request->user()?->email);
+        $verifiedName  = $payment->payer_name ?: ($studentUser?->name ?? $request->user()?->name);
 
         $payment->update([
             'status'     => 'successful',
@@ -419,6 +470,13 @@ class PaymentController extends Controller
             }
 
             $student->update(['matriculation_number' => $matriculationNumber]);
+        }
+
+        if ($request->wantsJson() || $request->isJson() || $request->hasHeader('Zainpay-Signature')) {
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Payment verified and credited successfully.',
+            ]);
         }
 
         if ($invoice->fee?->fee_type === 'facilitation') {

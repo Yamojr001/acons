@@ -193,26 +193,45 @@ export default function FeesIndex({ invoices, activeGateway }: FeesProps) {
                               Download Receipt
                             </Button>
                           </a>
-                        ) : invoice.fee.fee_type === 'tuition' || invoice.fee.fee_type === 'registration' ? (
-                          <Link href="/student/registration">
-                            <Button
-                              variant="primary"
-                              className="w-full sm:w-auto"
-                              iconRight={<ArrowRight size={16} />}
-                            >
-                              Choose Plan & Pay
-                            </Button>
-                          </Link>
                         ) : (
-                          <Button 
-                            variant="primary" 
-                            className="w-full sm:w-auto"
-                            iconRight={<ArrowRight size={16} />}
-                            disabled={processingId === invoice.id}
-                            onClick={() => handlePaymentInit(invoice.id)}
-                          >
-                            {processingId === invoice.id ? 'Processing...' : `Pay ${formatCurrency(balance)}`}
-                          </Button>
+                          <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                            {invoice.payments && invoice.payments.length > 0 && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full sm:w-auto text-xs"
+                                onClick={() => {
+                                  const lastRef = invoice.payments[0]?.reference
+                                  if (lastRef) {
+                                    window.location.href = `/student/payments/verify/${lastRef}`
+                                  }
+                                }}
+                              >
+                                Already Paid? Verify
+                              </Button>
+                            )}
+                            {invoice.fee.fee_type === 'tuition' || invoice.fee.fee_type === 'registration' ? (
+                              <Link href="/student/registration" className="w-full sm:w-auto">
+                                <Button
+                                  variant="primary"
+                                  className="w-full sm:w-auto"
+                                  iconRight={<ArrowRight size={16} />}
+                                >
+                                  Choose Plan & Pay
+                                </Button>
+                              </Link>
+                            ) : (
+                              <Button 
+                                variant="primary" 
+                                className="w-full sm:w-auto"
+                                iconRight={<ArrowRight size={16} />}
+                                disabled={processingId === invoice.id}
+                                onClick={() => handlePaymentInit(invoice.id)}
+                              >
+                                {processingId === invoice.id ? 'Processing...' : `Pay ${formatCurrency(balance)}`}
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>

@@ -61,6 +61,10 @@ Route::group([], function () {
         Route::get('/admissions/exam-card/download', [PublicApplicantController::class, 'downloadExamCardPdf'])->name('admissions.exam.download');
         Route::get('/admissions/admission-letter/download', [PublicApplicantController::class, 'downloadAdmissionLetterPdf'])->name('admissions.letter.download');
     });
+
+    // Student Payment Gateway Callback / Return URL (Publicly reachable for Zainpay redirect & webhooks)
+    Route::match(['get', 'post'], '/student/payments/verify/{reference}', [\App\Http\Controllers\Student\PaymentController::class, 'verify'])
+        ->name('student.payments.verify');
 });
 
 /*

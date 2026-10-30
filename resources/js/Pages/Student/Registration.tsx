@@ -440,15 +440,32 @@ export default function Registration({
                     <p className="text-xs text-surface-600">
                       Click below to proceed to encrypted checkout via <strong>{activeGateway.toUpperCase()}</strong>.
                     </p>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={processingFacilitation}
-                      onClick={handleFacilitationPayment}
-                      iconRight={<ArrowRight size={14} />}
-                    >
-                      {processingFacilitation ? 'Connecting to Gateway...' : `Pay Facilitation Fee (${formatCurrency(facilitationAmount)})`}
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {facilitationInvoice?.payments && facilitationInvoice.payments.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={processingFacilitation}
+                          onClick={() => {
+                            const lastRef = facilitationInvoice.payments[0]?.reference
+                            if (lastRef) {
+                              window.location.href = `/student/payments/verify/${lastRef}`
+                            }
+                          }}
+                        >
+                          Already Paid? Verify
+                        </Button>
+                      )}
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        disabled={processingFacilitation}
+                        onClick={handleFacilitationPayment}
+                        iconRight={<ArrowRight size={14} />}
+                      >
+                        {processingFacilitation ? 'Connecting to Gateway...' : `Pay Facilitation Fee (${formatCurrency(facilitationAmount)})`}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -791,17 +808,35 @@ export default function Registration({
                             </Link>
                           </div>
                         ) : (
-                          <Button
-                            variant="primary"
-                            className="w-full py-3"
-                            disabled={processingTuition || (!tuitionToPay && !hostelToPay)}
-                            onClick={handleTuitionPayment}
-                            iconRight={<ArrowRight size={16} />}
-                          >
-                            {processingTuition
-                              ? 'Connecting to Gateway...'
-                              : `Pay ${formatCurrency(totalTuitionPayable)} via ${activeGateway.toUpperCase()}`}
-                          </Button>
+                          <div className="space-y-2">
+                            {invoice?.payments && invoice.payments.length > 0 && !isTuitionPaid && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full text-xs font-semibold text-surface-700"
+                                disabled={processingTuition}
+                                onClick={() => {
+                                  const lastRef = invoice.payments[0]?.reference
+                                  if (lastRef) {
+                                    window.location.href = `/student/payments/verify/${lastRef}`
+                                  }
+                                }}
+                              >
+                                Already Paid on Zainpay? Click Here to Verify
+                              </Button>
+                            )}
+                            <Button
+                              variant="primary"
+                              className="w-full py-3"
+                              disabled={processingTuition || (!tuitionToPay && !hostelToPay)}
+                              onClick={handleTuitionPayment}
+                              iconRight={<ArrowRight size={16} />}
+                            >
+                              {processingTuition
+                                ? 'Connecting to Gateway...'
+                                : `Pay ${formatCurrency(totalTuitionPayable)} via ${activeGateway.toUpperCase()}`}
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </>
