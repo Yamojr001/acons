@@ -182,14 +182,7 @@ class PaymentService
             ? config('services.zainpay.facilitation_zainbox_code')
             : config('services.zainpay.zainbox_code');
 
-        if (empty($zainboxCode) || $zainboxCode === 'ACONS_p1XhqAZqOT4n96geDYJI') {
-            $zainboxCode = 'ACONS_ijEt7i4diabtRVTqFdSh';
-        }
-
         $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
-        if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
-            $baseUrl = 'https://api.zainpay.ng';
-        }
 
         $response = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
             ->post($baseUrl . '/zainbox/card/initialize/payment', [
@@ -220,9 +213,6 @@ class PaymentService
     {
         try {
             $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
-            if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
-                $baseUrl = 'https://api.zainpay.ng';
-            }
             $response = Http::withToken(config('services.zainpay.public_key'))
                 ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$reference}")
                 ->json();

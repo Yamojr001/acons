@@ -22,16 +22,10 @@ class ZainpayReconciliationService
 
     public function __construct()
     {
-        $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
-        if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
-            $baseUrl = 'https://api.zainpay.ng';
-        }
-        $this->baseUrl = $baseUrl;
+        $this->baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
         $this->publicKey = config('services.zainpay.public_key');
-        $code = config('services.zainpay.zainbox_code');
-        $facilCode = config('services.zainpay.facilitation_zainbox_code');
-        $this->zainboxCode = (empty($code) || $code === 'ACONS_p1XhqAZqOT4n96geDYJI') ? 'ACONS_ijEt7i4diabtRVTqFdSh' : $code;
-        $this->facilitationZainboxCode = (empty($facilCode) || $facilCode === 'ACONS_p1XhqAZqOT4n96geDYJI') ? 'ACONS_ijEt7i4diabtRVTqFdSh' : $facilCode;
+        $this->zainboxCode = config('services.zainpay.zainbox_code');
+        $this->facilitationZainboxCode = config('services.zainpay.facilitation_zainbox_code') ?: $this->zainboxCode;
     }
 
     /**

@@ -22,10 +22,10 @@ return [
     'zainpay' => [
         'public_key'                => env('ZAINPAY_PUBLIC_KEY'),
         'secret_key'                => env('ZAINPAY_SECRET_KEY'),
-        'zainbox_code'              => env('ZAINPAY_ZAINBOX_CODE', 'ACONS_ijEt7i4diabtRVTqFdSh'),
-        'facilitation_zainbox_code' => env('ZAINPAY_FACILITATION_ZAINBOX_CODE', env('ZAINPAY_ZAINBOX_CODE', 'ACONS_ijEt7i4diabtRVTqFdSh')),
-        'mode'                      => env('ZAINPAY_MODE', 'production'),
-        'base_url'                  => env('ZAINPAY_BASE_URL', 'https://api.zainpay.ng'),
+        'zainbox_code'              => env('ZAINPAY_ZAINBOX_CODE'),
+        'facilitation_zainbox_code' => env('ZAINPAY_FACILITATION_ZAINBOX_CODE', env('ZAINPAY_ZAINBOX_CODE')),
+        'mode'                      => env('ZAINPAY_MODE', 'sandbox'),
+        'base_url'                  => env('ZAINPAY_BASE_URL', env('ZAINPAY_MODE') === 'production' ? 'https://api.zainpay.ng' : 'https://sandbox.zainpay.ng'),
     ],
     'sendar' => [
         'api_key'     => env('SENDAR_API_KEY'),

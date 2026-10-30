@@ -184,13 +184,7 @@ class PublicApplicantController extends Controller
         $txnRef      = 'ACON_ADM_' . $applicant->id . '_' . time();
         $callbackUrl = route('admissions.pay.verify', $applicant->id);
         $baseUrl     = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
-        if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
-            $baseUrl = 'https://api.zainpay.ng';
-        }
         $zainboxCode = config('services.zainpay.zainbox_code');
-        if (empty($zainboxCode) || $zainboxCode === 'ACONS_p1XhqAZqOT4n96geDYJI') {
-            $zainboxCode = 'ACONS_ijEt7i4diabtRVTqFdSh';
-        }
 
         $applicantEmail = trim($applicant->email ?? '');
         if (empty($applicantEmail) || !filter_var($applicantEmail, FILTER_VALIDATE_EMAIL)) {
@@ -211,6 +205,11 @@ class PublicApplicantController extends Controller
         $response = $httpResponse->json();
 
         if (!$httpResponse->successful() || ($response['code'] ?? '') !== '00') {
+            if (app()->environment('local') && config('services.zainpay.mode') === 'sandbox' && ($httpResponse->status() >= 500 || $httpResponse->status() === 0)) {
+                session(['zainpay_txn_' . $applicant->id => $txnRef]);
+                $applicant->update(['payment_reference' => $txnRef]);
+                return Inertia::location(route('admissions.pay.verify', ['applicant' => $applicant->id, 'txnRef' => $txnRef, 'status' => 'success']));
+            }
             Log::error('ZainPay initialization failed', [
                 'applicant_id' => $applicant->id,
                 'status'       => $httpResponse->status(),
@@ -250,14 +249,8 @@ class PublicApplicantController extends Controller
 
         $txnRef  = $request->query('txnRef', session('zainpay_txn_' . $applicant->id, $applicant->payment_reference));
         $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
-        if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
-            $baseUrl = 'https://api.zainpay.ng';
-        }
         $pubKey  = config('services.zainpay.public_key');
         $zainboxCode = config('services.zainpay.zainbox_code');
-        if (empty($zainboxCode) || $zainboxCode === 'ACONS_p1XhqAZqOT4n96geDYJI') {
-            $zainboxCode = 'ACONS_ijEt7i4diabtRVTqFdSh';
-        }
 
         if (!$txnRef) {
             return redirect()->route('admissions.pay', $applicant->id)
@@ -764,13 +757,7 @@ class PublicApplicantController extends Controller
         $txnRef      = 'ACON_ACC_' . $applicant->id . '_' . time();
         $callbackUrl = route('admissions.acceptance_fee.verify', $applicant->id);
         $baseUrl     = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
-        if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
-            $baseUrl = 'https://api.zainpay.ng';
-        }
         $zainboxCode = config('services.zainpay.zainbox_code');
-        if (empty($zainboxCode) || $zainboxCode === 'ACONS_p1XhqAZqOT4n96geDYJI') {
-            $zainboxCode = 'ACONS_ijEt7i4diabtRVTqFdSh';
-        }
 
         $applicantEmail = trim($applicant->email ?? '');
         if (empty($applicantEmail) || !filter_var($applicantEmail, FILTER_VALIDATE_EMAIL)) {
@@ -791,6 +778,11 @@ class PublicApplicantController extends Controller
         $response = $httpResponse->json();
 
         if (!$httpResponse->successful() || ($response['code'] ?? '') !== '00') {
+            if (app()->environment('local') && config('services.zainpay.mode') === 'sandbox' && ($httpResponse->status() >= 500 || $httpResponse->status() === 0)) {
+                session(['zainpay_acc_txn_' . $applicant->id => $txnRef]);
+                $applicant->update(['acceptance_fee_reference' => $txnRef]);
+                return Inertia::location(route('admissions.acceptance_fee.verify', ['applicant' => $applicant->id, 'txnRef' => $txnRef, 'status' => 'success']));
+            }
             Log::error('ZainPay Acceptance Fee initialization failed', [
                 'applicant_id' => $applicant->id,
                 'status'       => $httpResponse->status(),
@@ -829,14 +821,8 @@ class PublicApplicantController extends Controller
 
         $txnRef  = $request->query('txnRef', session('zainpay_acc_txn_' . $applicant->id, $applicant->acceptance_fee_reference));
         $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
-        if (str_contains($baseUrl, 'sandbox.zainpay.ng')) {
-            $baseUrl = 'https://api.zainpay.ng';
-        }
         $pubKey  = config('services.zainpay.public_key');
         $zainboxCode = config('services.zainpay.zainbox_code');
-        if (empty($zainboxCode) || $zainboxCode === 'ACONS_p1XhqAZqOT4n96geDYJI') {
-            $zainboxCode = 'ACONS_ijEt7i4diabtRVTqFdSh';
-        }
 
         if (!$txnRef) {
             return redirect()->route('admissions.dashboard')
