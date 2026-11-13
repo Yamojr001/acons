@@ -205,11 +205,6 @@ class PublicApplicantController extends Controller
         $response = $httpResponse->json();
 
         if (!$httpResponse->successful() || ($response['code'] ?? '') !== '00') {
-            if (app()->environment('local') && config('services.zainpay.mode') === 'sandbox' && ($httpResponse->status() >= 500 || $httpResponse->status() === 0)) {
-                session(['zainpay_txn_' . $applicant->id => $txnRef]);
-                $applicant->update(['payment_reference' => $txnRef]);
-                return Inertia::location(route('admissions.pay.verify', ['applicant' => $applicant->id, 'txnRef' => $txnRef, 'status' => 'success']));
-            }
             Log::error('ZainPay initialization failed', [
                 'applicant_id' => $applicant->id,
                 'status'       => $httpResponse->status(),
@@ -778,11 +773,6 @@ class PublicApplicantController extends Controller
         $response = $httpResponse->json();
 
         if (!$httpResponse->successful() || ($response['code'] ?? '') !== '00') {
-            if (app()->environment('local') && config('services.zainpay.mode') === 'sandbox' && ($httpResponse->status() >= 500 || $httpResponse->status() === 0)) {
-                session(['zainpay_acc_txn_' . $applicant->id => $txnRef]);
-                $applicant->update(['acceptance_fee_reference' => $txnRef]);
-                return Inertia::location(route('admissions.acceptance_fee.verify', ['applicant' => $applicant->id, 'txnRef' => $txnRef, 'status' => 'success']));
-            }
             Log::error('ZainPay Acceptance Fee initialization failed', [
                 'applicant_id' => $applicant->id,
                 'status'       => $httpResponse->status(),

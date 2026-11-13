@@ -219,26 +219,6 @@ class PaymentController extends Controller
             $response = $httpResponse->json();
 
             if (!$httpResponse->successful() || !isset($response['code']) || $response['code'] !== '00') {
-                // In local development with sandbox mode, if Zainpay sandbox is unreachable or returning 502,
-                // seamlessly provide simulated sandbox redirect so developer testing is never blocked
-                if (app()->environment('local') && config('services.zainpay.mode') === 'sandbox' && ($httpResponse->status() >= 500 || $httpResponse->status() === 0)) {
-                    \Illuminate\Support\Facades\Log::info('Zainpay sandbox gateway returned HTTP ' . $httpResponse->status() . '; simulating sandbox redirect in local environment.', [
-                        'reference' => $reference,
-                        'zainbox'   => $targetZainboxCode,
-                    ]);
-                    $redirectUrl = route('student.payments.verify', [
-                        'reference'  => $reference,
-                        'status'     => 'success',
-                        'paymentRef' => 'SANDBOX_' . time(),
-                    ]);
-                    return response()->json([
-                        'gateway' => 'zainpay',
-                        'data'    => [
-                            'url' => $redirectUrl,
-                        ],
-                    ]);
-                }
-
                 $payment->update(['status' => 'failed']);
                 \Illuminate\Support\Facades\Log::error('Zainpay payment initialization failed in PaymentController', [
                     'payment_id' => $payment->id,
@@ -318,59 +298,128 @@ class PaymentController extends Controller
 
         if ($payment->payment_gateway === 'zainpay') {
             $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
+            $pubKey  = config('services.zainpay.public_key');
+            $zainboxCode = $payment->metadata['zainbox_code'] ?? config('services.zainpay.zainbox_code');
 
-            // 1. Check callback parameters (webhook POST or redirect GET with status/paymentRef)
-            $statusParam = strtolower($request->input('status') ?: ($request->query('status') ?: ($request->input('txnStatus') ?: '')));
-            $eventParam  = strtolower($request->input('event') ?: '');
-            $paymentRef  = $request->input('paymentRef') ?: ($request->query('paymentRef') ?: ($request->input('zainpayReference') ?: null));
+            // 1. Mandatory server-to-server check: Virtual account wallet deposit verification v2
+            try {
+                $httpResponse = \Illuminate\Support\Facades\Http::timeout(15)
+                    ->withToken($pubKey)
+                    ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$payment->reference}");
 
-            if ($statusParam === 'success' || $statusParam === 'completed' || $statusParam === '200 ok' || $eventParam === 'deposit.success' || !empty($paymentRef)) {
-                $isVerified = true;
-            }
+                $data = $httpResponse->json();
+                if ($httpResponse->successful() && ($data['code'] ?? '') === '00' && (
+                    strtolower($data['data']['status'] ?? '') === 'success' ||
+                    strtolower($data['status'] ?? '') === '200 ok' ||
+                    strtolower($data['description'] ?? '') === 'successful' ||
+                    isset($data['data']['depositedAmount'])
+                )) {
+                    $isVerified = true;
+                }
+            } catch (\Throwable $e) {}
 
-            // 2. Query Zainpay API verification if available
+            // 2. Server-to-server check: Card transaction reconcile endpoint
             if (!$isVerified) {
                 try {
-                    $httpResponse = \Illuminate\Support\Facades\Http::timeout(6)
-                        ->withToken(config('services.zainpay.public_key'))
-                        ->get("{$baseUrl}/virtual-account/wallet/transaction/reconcile/card-payment?txnRef={$payment->reference}");
+                    $cardReconcile = \Illuminate\Support\Facades\Http::timeout(15)
+                        ->withToken($pubKey)
+                        ->get("{$baseUrl}/virtual-account/wallet/transaction/reconcile/card-payment", [
+                            'txnRef' => $payment->reference,
+                        ]);
 
-                    if ($httpResponse->successful() && ($httpResponse->json('code') === '00' || strtolower($httpResponse->json('data.txnStatus') ?? '') === 'success')) {
-                        $isVerified = true;
+                    $cardData = $cardReconcile->json();
+                    if ($cardReconcile->successful() && ($cardData['code'] ?? '') === '00') {
+                        $txnStatus = strtolower($cardData['data']['txnStatus'] ?? '');
+                        if (in_array($txnStatus, ['success', 'successful'])) {
+                            $isVerified = true;
+                        }
                     }
-                } catch (\Throwable) {}
+                } catch (\Throwable $e) {}
             }
 
+            // 3. Server-to-server check: Search Zainbox card transactions by reference
+            if (!$isVerified && !empty($zainboxCode)) {
+                try {
+                    $boxTxns = \Illuminate\Support\Facades\Http::timeout(15)
+                        ->withToken($pubKey)
+                        ->get("{$baseUrl}/zainbox/card/transactions/{$zainboxCode}", [
+                            'txnRef' => $payment->reference,
+                        ]);
+
+                    $boxData = $boxTxns->json();
+                    if ($boxTxns->successful() && ($boxData['code'] ?? '') === '00' && !empty($boxData['data'])) {
+                        foreach ($boxData['data'] as $tx) {
+                            if (($tx['txnRef'] ?? '') === $payment->reference && in_array(strtolower($tx['txnStatus'] ?? ''), ['success', 'successful'])) {
+                                $isVerified = true;
+                                break;
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {}
+            }
+
+            // 4. Server-to-server check: ZainpayReconciliationService fallback matching
             if (!$isVerified) {
                 try {
-                    $httpResponse = \Illuminate\Support\Facades\Http::timeout(6)
-                        ->withToken(config('services.zainpay.public_key'))
-                        ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$payment->reference}");
-
-                    if ($httpResponse->successful() && ($httpResponse->json('code') === '00' || strtolower($httpResponse->json('data.status') ?? '') === 'success')) {
+                    $reconcileService = app(\App\Services\ZainpayReconciliationService::class);
+                    $matchedTx = $reconcileService->findMatchingTransactionByAmountAndTimestamp(
+                        (float)$payment->amount,
+                        $payment->created_at ?: now(),
+                        40
+                    );
+                    if ($matchedTx) {
                         $isVerified = true;
                     }
-                } catch (\Throwable) {}
+                } catch (\Throwable $e) {}
             }
 
-            // 3. Fallback: on standard browser redirect return without explicit rejection, verify and credit
-            if (!$isVerified && $request->isMethod('get') && !$request->has('error') && !$request->has('cancel')) {
-                $isVerified = true;
+            // 5. Genuine Webhook verification: ONLY accept callback payload if signed by Zainpay
+            if (!$isVerified && ($request->hasHeader('Zainpay-Signature') || $request->hasHeader('X-Zainpay-Signature'))) {
+                $statusParam = strtolower($request->input('status') ?: ($request->input('txnStatus') ?: ''));
+                $eventParam  = strtolower($request->input('event') ?: '');
+                if ($statusParam === 'success' || $statusParam === 'completed' || $eventParam === 'deposit.success') {
+                    $isVerified = true;
+                }
             }
 
             if (!$isVerified) {
                 $payment->update(['status' => 'failed']);
-                \Illuminate\Support\Facades\Log::warning('Zainpay payment verification failed', [
+                \Illuminate\Support\Facades\Log::warning('Zainpay payment verification failed: transaction not confirmed by gateway', [
                     'reference' => $reference,
                     'request'   => $request->all(),
                 ]);
+
                 if ($request->wantsJson() || $request->isJson() || $request->hasHeader('Zainpay-Signature')) {
-                    return response()->json(['status' => 'failed', 'message' => 'Payment could not be verified.'], 400);
+                    return response()->json([
+                        'status'  => 'unverified',
+                        'message' => 'Payment has not been confirmed by Zainpay.',
+                    ], 400);
                 }
-                return redirect()->route('student.registration')->with('error', 'Payment could not be confirmed. If you were debited, please contact the Bursary.');
+
+                return redirect()->route('student.registration')->with('error', 'Payment was not completed or has not been confirmed by Zainpay. If you were debited, please allow a few minutes and click "Already Paid? Verify" to re-check.');
+            }
+        } elseif ($payment->payment_gateway === 'paystack') {
+            try {
+                $paystackSecret = config('services.paystack.secret_key');
+                if ($paystackSecret) {
+                    $res = \Illuminate\Support\Facades\Http::withToken($paystackSecret)
+                        ->get("https://api.paystack.co/transaction/verify/{$payment->reference}");
+                    if ($res->successful() && $res->json('data.status') === 'success') {
+                        $isVerified = true;
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            if (!$isVerified) {
+                $payment->update(['status' => 'failed']);
+                return redirect()->route('student.registration')->with('error', 'Paystack payment could not be verified.');
             }
         } else {
-            // Simulated/other gateways
+            // Simulated gateway for local development/testing only
+            if (!app()->environment('local')) {
+                $payment->update(['status' => 'failed']);
+                return redirect()->route('student.registration')->with('error', 'Unsupported payment gateway.');
+            }
             $isVerified = true;
         }
 
