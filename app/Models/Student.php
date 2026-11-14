@@ -74,31 +74,34 @@ class Student extends Model
             return;
         }
 
-        $programName = $this->program?->name ?? '';
-        $isBasicNursing = (
-            stripos($programName, 'Basic') !== false ||
-            stripos($programName, 'General') !== false ||
-            stripos($programName, 'RN') !== false ||
-            stripos($programName, 'RM') !== false ||
-            stripos($this->current_level, 'Basic') !== false
-        );
-
         $failedRegistrations = $gradedRegistrations->filter(function ($reg) {
             $grade = $reg->grade;
             if (!$grade) return false;
             if ($grade->is_absent) {
                 return true;
             }
-            return $grade->grade_letter === 'FAIL' || $grade->grade_letter === 'F' || $grade->total_score < 45;
+            return $grade->grade_letter === 'FAIL' || $grade->grade_letter === 'F' || (float)$grade->total_score < 45;
         });
 
         $failedCount = $failedRegistrations->count();
+
+        // Count distinct academic sessions student has registered for at this level
+        $sessionsCount = CourseRegistration::where('student_id', $this->id)
+            ->whereHas('course', fn($q) => $q->where('level', $this->current_level))
+            ->join('semesters', 'course_registrations.semester_id', '=', 'semesters.id')
+            ->distinct('semesters.academic_session_id')
+            ->count('semesters.academic_session_id');
+
+        $effectiveYearsInLevel = max(1, $sessionsCount);
 
         // 1. Success case: passed all courses!
         if ($failedCount === 0) {
             $this->academic_status = 'normal';
             $this->years_in_current_level = 1;
             $this->reseat_course_ids = null;
+            if ($this->status === 'withdrawn') {
+                $this->status = 'active';
+            }
 
             // Session level promotion rules
             $progressionMap = [
@@ -122,88 +125,34 @@ class Student extends Model
         }
 
         // 2. Failure Case: Student failed some courses
-        // A. If they were already in repeating status:
-        if ($this->academic_status === 'repeat') {
-            $failedMoreThanHalf = $failedCount > ($totalRegistered / 2);
-            
-            // Check if they failed any of their prior reseats
-            $priorReseats = $this->reseat_course_ids ?: [];
-            $failedPriorReseat = false;
-            foreach ($failedRegistrations as $reg) {
-                if (in_array($reg->course_id, $priorReseats)) {
-                    $failedPriorReseat = true;
-                    break;
-                }
-            }
+        $failedMoreThanHalf = $failedCount > ($totalRegistered / 2);
 
-            if ($failedMoreThanHalf || $failedPriorReseat) {
-                // Cannot repeat twice ➔ Withdraw!
-                $this->academic_status = 'withdrawn';
-                $this->status = 'withdrawn';
-            } else {
-                // Failed <= 50% during repeat ➔ Can reseat!
-                $this->academic_status = 'reseat';
-                $this->reseat_course_ids = $failedRegistrations->pluck('course_id')->toArray();
-            }
+        // If the student has spent 2 or more academic sessions in this level and still fails > 50%:
+        // Cannot spend more than 2 years in the same level ➔ WITHDRAWN
+        if ($effectiveYearsInLevel >= 2 && $failedMoreThanHalf) {
+            $this->academic_status = 'withdrawn';
+            $this->status = 'withdrawn';
+            $this->years_in_current_level = $effectiveYearsInLevel;
+            $this->reseat_course_ids = null;
             $this->save();
             return;
         }
 
-        // B. If they were in reseat status:
-        if ($this->academic_status === 'reseat') {
-            $priorReseats = $this->reseat_course_ids ?: [];
-            $failedPriorReseat = false;
-            foreach ($failedRegistrations as $reg) {
-                if (in_array($reg->course_id, $priorReseats)) {
-                    $failedPriorReseat = true;
-                    break;
-                }
-            }
-
-            if ($failedPriorReseat) {
-                // Failed a single reseat course ➔ repeat the level
-                $this->academic_status = 'repeat';
-                $this->years_in_current_level += 1;
-                if ($this->years_in_current_level > 2) {
-                    $this->academic_status = 'withdrawn';
-                    $this->status = 'withdrawn';
-                }
-            } else {
-                // Failed new/other courses
-                $failedMoreThanHalf = $failedCount > ($totalRegistered / 2);
-                if ($failedMoreThanHalf) {
-                    $this->academic_status = 'repeat';
-                    $this->years_in_current_level += 1;
-                    if ($this->years_in_current_level > 2) {
-                        $this->academic_status = 'withdrawn';
-                        $this->status = 'withdrawn';
-                    }
-                } else {
-                    $this->academic_status = 'reseat';
-                    $this->reseat_course_ids = $failedRegistrations->pluck('course_id')->toArray();
-                }
-            }
+        // Failed more than 50% of registered courses ➔ REPEAT the level
+        if ($failedMoreThanHalf) {
+            $this->academic_status = 'repeat';
+            $this->status = 'active';
+            $this->years_in_current_level = 1;
+            $this->reseat_course_ids = null;
             $this->save();
             return;
         }
 
-        // C. If they were in normal status:
-        if ($this->academic_status === 'normal') {
-            $failedMoreThanHalf = $failedCount > ($totalRegistered / 2);
-
-            if ($failedMoreThanHalf) {
-                $this->academic_status = 'repeat';
-                $this->years_in_current_level += 1;
-                if ($this->years_in_current_level > 2) {
-                    $this->academic_status = 'withdrawn';
-                    $this->status = 'withdrawn';
-                }
-            } else {
-                $this->academic_status = 'reseat';
-                $this->reseat_course_ids = $failedRegistrations->pluck('course_id')->toArray();
-            }
-            $this->save();
-            return;
-        }
+        // Failed 50% or fewer of registered courses (e.g. 1-5 out of 11) ➔ Eligible for RESIT
+        $this->academic_status = 'reseat';
+        $this->status = 'active';
+        $this->years_in_current_level = $effectiveYearsInLevel;
+        $this->reseat_course_ids = $failedRegistrations->pluck('course_id')->values()->toArray();
+        $this->save();
     }
 }
