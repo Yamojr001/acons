@@ -8,7 +8,7 @@ interface LoginProps {
 
 export default function Login({ tenant }: LoginProps) {
   const { data, setData, post, processing, errors } = useForm({
-    jamb_number: '',
+    identifier: '',
     phone_number: ''
   })
 
@@ -32,6 +32,13 @@ export default function Login({ tenant }: LoginProps) {
             <span className="text-[9px] uppercase font-bold tracking-widest text-blue-600 block mt-0.5">Online Admissions</span>
           </div>
         </div>
+
+        <Link
+          href="/admissions/edit"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+        >
+          Edit Application (₦2,000)
+        </Link>
       </nav>
 
       {/* ── Main Container ─────────────────────────────────────────────── */}
@@ -53,8 +60,8 @@ export default function Login({ tenant }: LoginProps) {
               <div className="space-y-0.5">
                 <span className="text-[10px] font-black text-blue-900 uppercase tracking-wider block">Credentials Help</span>
                 <span className="text-[10px] text-blue-700 leading-relaxed block">
-                  Your **Username** is your **JAMB Registration Number**.<br />
-                  Your **Password** is the **Phone Number** you submitted in the application form (e.g. `08036894451`).
+                  Your <strong>Username</strong> can be your <strong>JAMB Registration Number</strong>, registered <strong>Phone Number</strong>, or <strong>Email Address</strong>.<br />
+                  Your <strong>Password</strong> is the <strong>Phone Number</strong> you submitted in the application form (e.g. <code>08036894451</code>).
                 </span>
               </div>
             </div>
@@ -63,18 +70,19 @@ export default function Login({ tenant }: LoginProps) {
             <form onSubmit={handleSubmit} className="p-8 pt-6 space-y-5 text-left">
               
               <div className="space-y-1">
-                <label className="text-xs font-bold text-surface-700">JAMB Registration Number</label>
+                <label className="text-xs font-bold text-surface-700">JAMB Number, Phone Number, or Email</label>
                 <div className="relative">
                   <input 
                     type="text" 
-                    placeholder="e.g. 2510283168AH"
+                    placeholder="e.g. 2510283168AH or 08031234567 or email@domain.com"
                     required
-                    value={data.jamb_number}
-                    onChange={(e)=>setData('jamb_number', e.target.value)}
+                    value={data.identifier}
+                    onChange={(e)=>setData('identifier', e.target.value)}
                     className="w-full rounded-xl border-surface-300 text-sm pl-9 focus:border-blue-500" 
                   />
                   <User className="absolute left-3 top-3.5 text-surface-400" size={14} />
                 </div>
+                {(errors as any).identifier && <p className="text-xs font-semibold text-danger-600">{(errors as any).identifier}</p>}
                 {errors.jamb_number && <p className="text-xs font-semibold text-danger-600">{errors.jamb_number}</p>}
               </div>
 
@@ -103,6 +111,16 @@ export default function Login({ tenant }: LoginProps) {
               </button>
 
             </form>
+
+            {/* Need to edit application callout */}
+            <div className="px-8 pb-6 text-center">
+              <div className="p-3 bg-surface-50 border border-surface-200 rounded-xl text-xs text-surface-600">
+                <span>Need to make changes to your submitted application?</span>{' '}
+                <Link href="/admissions/edit" className="text-blue-700 hover:underline font-bold block sm:inline mt-1 sm:mt-0">
+                  Edit Application (₦2,000) →
+                </Link>
+              </div>
+            </div>
 
           </div>
 

@@ -640,6 +640,16 @@ export default function Dashboard({
               <span>Letters & Slips</span>
             </button>
 
+            {canEditQualifications && (
+              <Link
+                href="/admissions/edit"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-colors bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100"
+              >
+                <Edit3 size={14} />
+                <span>Modify Application (₦2,000)</span>
+              </Link>
+            )}
+
           </nav>
         </div>
       </header>
@@ -862,6 +872,22 @@ export default function Dashboard({
                         <span className="font-semibold text-surface-800">{applicant.phone_number}</span>
                       </div>
                     </div>
+
+                    {canEditQualifications && (
+                      <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-900">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle size={15} className="text-amber-700 shrink-0" />
+                          <span>Need to correct your bio-data, program choice, schools, or O'Level results?</span>
+                        </div>
+                        <Link
+                          href="/admissions/edit"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white font-bold rounded-lg shrink-0 transition-colors"
+                        >
+                          <Edit3 size={12} />
+                          <span>Modify Application (₦2,000) →</span>
+                        </Link>
+                      </div>
+                    )}
                   </div>
 
                   {/* Top Right: Biometric Picture opposite Name */}

@@ -474,22 +474,31 @@ class PublicApplicantController extends Controller
 
 
     /**
-     * Authenticate applicant credentials.
+     * Authenticate applicant credentials using JAMB Number, Phone Number, or Email.
      */
     public function login(Request $request)
     {
         $request->validate([
-            'jamb_number' => 'required|string',
+            'jamb_number'  => 'nullable|string',
+            'identifier'   => 'nullable|string',
             'phone_number' => 'required|string',
         ]);
 
-        $jamb = strtoupper($request->jamb_number);
+        $identifier = trim((string)($request->input('identifier') ?: ($request->input('jamb_number') ?: '')));
 
-        // Find applicant
-        $applicant = Applicant::where('jamb_number', $jamb)->first();
+        if (empty($identifier)) {
+            return back()->withErrors(['identifier' => 'Please enter your JAMB Registration Number, Phone Number, or Email Address.']);
+        }
+
+        // Find applicant by JAMB Number, Phone Number, or Email Address
+        $applicant = Applicant::where(function ($q) use ($identifier) {
+            $q->where('jamb_number', strtoupper($identifier))
+              ->orWhere('phone_number', $identifier)
+              ->orWhere('email', strtolower($identifier));
+        })->first();
 
         if (!$applicant) {
-            return back()->withErrors(['jamb_number' => 'No registration details found matching this JAMB Number.']);
+            return back()->withErrors(['identifier' => 'No registration details found matching this JAMB Number, Phone Number, or Email Address.']);
         }
 
         if ($applicant->payment_status !== 'paid') {
@@ -497,11 +506,11 @@ class PublicApplicantController extends Controller
                 ->with('error', 'Please complete the application form fee settlement of N14,700 to unlock your portal.');
         }
 
+        $password = (string) $request->input('phone_number');
+
         // Auth check: initial password is their phone number
-        if (Auth::guard('applicant')->attempt([
-            'jamb_number' => $jamb,
-            'password' => $request->phone_number
-        ], $request->filled('remember'))) {
+        if (Hash::check($password, $applicant->password) || $password === $applicant->phone_number) {
+            Auth::guard('applicant')->login($applicant, $request->filled('remember'));
             $request->session()->regenerate();
             return redirect()->route('admissions.dashboard');
         }
@@ -1019,6 +1028,362 @@ class PublicApplicantController extends Controller
         $filename = 'ACONS_Provisional_Admission_Letter_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $applicant->jamb_number) . '.pdf';
 
         return $pdf->download($filename);
+    }
+
+    /**
+     * Show the Application Edit lookup page (to find application by phone, JAMB, or email).
+     */
+    public function showEditLookupForm(Request $request)
+    {
+        if (Auth::guard('applicant')->check()) {
+            return redirect()->route('admissions.edit', Auth::guard('applicant')->id());
+        }
+
+        $institution = \App\Models\InstitutionSetting::current();
+
+        return Inertia::render('Public/Admissions/Edit', [
+            'tenant'      => $institution,
+            'institution' => $institution,
+            'mode'        => 'lookup',
+        ]);
+    }
+
+    /**
+     * Look up an application for editing using Phone Number, JAMB Number, or Email.
+     */
+    public function lookupForEdit(Request $request)
+    {
+        $request->validate([
+            'identifier' => 'required|string',
+        ]);
+
+        $identifier = trim($request->input('identifier'));
+
+        $applicant = Applicant::where(function ($q) use ($identifier) {
+            $q->where('jamb_number', strtoupper($identifier))
+              ->orWhere('phone_number', $identifier)
+              ->orWhere('email', strtolower($identifier));
+        })->first();
+
+        if (!$applicant) {
+            return back()->withErrors([
+                'identifier' => 'No application found matching this Phone Number, JAMB Number, or Email Address. Please check your details and try again.'
+            ]);
+        }
+
+        // Log applicant in so their session is active
+        try {
+            Auth::guard('applicant')->login($applicant);
+            $request->session()->regenerate();
+        } catch (\Throwable) {}
+
+        return redirect()->route('admissions.edit', $applicant->id);
+    }
+
+    /**
+     * Show the Application Edit form (or Fee payment prompt if 2,000 NGN fee is pending).
+     */
+    public function showEditForm(Applicant $applicant)
+    {
+        $currentApplicant = Auth::guard('applicant')->user();
+        if (!$currentApplicant || $currentApplicant->id !== $applicant->id) {
+            try {
+                Auth::guard('applicant')->login($applicant);
+                request()->session()->regenerate();
+            } catch (\Throwable) {}
+        }
+
+        $institution = \App\Models\InstitutionSetting::current();
+        $programs = \App\Models\Program::all(['id', 'name', 'degree_type', 'duration_years']);
+
+        $isAdmitted = in_array($applicant->admission_status, ['admitted', 'cleared']);
+
+        return Inertia::render('Public/Admissions/Edit', [
+            'tenant'        => $institution,
+            'institution'   => $institution,
+            'applicant'     => $applicant->load(['appliedProgram', 'admittedProgram']),
+            'programs'      => $programs,
+            'is_admitted'   => $isAdmitted,
+            'edit_fee_paid' => (bool) $applicant->edit_fee_paid,
+            'fee_amount'    => 2000.00,
+            'mode'          => 'edit',
+        ]);
+    }
+
+    /**
+     * Initialize ZainPay payment for Application Modification Fee (NGN 2,000).
+     */
+    public function initEditFeePayment(Applicant $applicant)
+    {
+        if (in_array($applicant->admission_status, ['admitted', 'cleared'])) {
+            return back()->with('error', 'Your admission screening has already been finalized and can no longer be modified.');
+        }
+
+        if ($applicant->edit_fee_paid) {
+            return redirect()->route('admissions.edit', $applicant->id)
+                ->with('info', 'Application modification fee already paid. You can edit your application.');
+        }
+
+        $txnRef      = 'ACON_MOD_' . $applicant->id . '_' . time();
+        $callbackUrl = route('admissions.edit.verify', $applicant->id);
+        $baseUrl     = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
+        $zainboxCode = config('services.zainpay.zainbox_code');
+
+        $applicantEmail = trim($applicant->email ?? '');
+        if (empty($applicantEmail) || !filter_var($applicantEmail, FILTER_VALIDATE_EMAIL)) {
+            $applicantEmail = strtolower($applicant->jamb_number) . '@acons.edu.ng';
+        }
+
+        $httpResponse = Http::timeout(60)->withToken(config('services.zainpay.public_key'))
+            ->post("{$baseUrl}/zainbox/card/initialize/payment", [
+                'amount'        => (string) 2000,
+                'txnRef'        => $txnRef,
+                'emailAddress'  => $applicantEmail,
+                'email'         => $applicantEmail,
+                'mobileNumber'  => $applicant->phone_number ?: '08000000000',
+                'zainboxCode'   => $zainboxCode,
+                'callBackUrl'   => $callbackUrl,
+            ]);
+
+        $response = $httpResponse->json();
+
+        if (!$httpResponse->successful() || ($response['code'] ?? '') !== '00') {
+            Log::error('ZainPay Application Modification Fee initialization failed', [
+                'applicant_id' => $applicant->id,
+                'status'       => $httpResponse->status(),
+                'response'     => $response,
+                'body'         => $httpResponse->body(),
+                'baseUrl'      => $baseUrl,
+                'zainboxCode'  => $zainboxCode,
+            ]);
+            return back()->withErrors(['edit_payment' => 'ZainPay initialization failed: ' . ($response['description'] ?? 'Unable to connect to gateway. Please try again.')]);
+        }
+
+        session(['zainpay_mod_txn_' . $applicant->id => $txnRef]);
+        $applicant->update(['edit_fee_reference' => $txnRef]);
+
+        $redirectUrl = is_array($response['data'] ?? null)
+            ? ($response['data']['url'] ?? $response['data']['paymentUrl'] ?? '')
+            : ($response['data'] ?? '');
+
+        return Inertia::location($redirectUrl);
+    }
+
+    /**
+     * Verify ZainPay payment callback for application modification fee (NGN 2,000).
+     */
+    public function verifyEditFeePayment(Request $request, Applicant $applicant)
+    {
+        if ($applicant->edit_fee_paid) {
+            try {
+                Auth::guard('applicant')->login($applicant);
+                $request->session()->regenerate();
+            } catch (\Throwable) {}
+
+            return redirect()->route('admissions.edit', $applicant->id)
+                ->with('success', 'Your modification fee of N2,000 has already been confirmed.');
+        }
+
+        $txnRef  = $request->query('txnRef', session('zainpay_mod_txn_' . $applicant->id, $applicant->edit_fee_reference));
+        $baseUrl = rtrim(config('services.zainpay.base_url', 'https://api.zainpay.ng'), '/');
+        $pubKey  = config('services.zainpay.public_key');
+        $zainboxCode = config('services.zainpay.zainbox_code');
+
+        if (!$txnRef) {
+            return redirect()->route('admissions.edit', $applicant->id)
+                ->with('error', 'Modification fee payment reference missing.');
+        }
+
+        $isVerified = false;
+        $amountPaid = 2000.00;
+
+        // 1. Verify via virtual-account wallet deposit verification v2
+        try {
+            $verify = Http::timeout(30)->withToken($pubKey)
+                ->get("{$baseUrl}/virtual-account/wallet/deposit/verify/v2/{$txnRef}")
+                ->json();
+
+            if (($verify['code'] ?? '') === '00' && (
+                strtolower($verify['data']['status'] ?? '') === 'success' ||
+                strtolower($verify['status'] ?? '') === '200 ok' ||
+                strtolower($verify['description'] ?? '') === 'successful' ||
+                isset($verify['data']['paymentRef']) ||
+                isset($verify['data']['depositedAmount'])
+            )) {
+                $isVerified = true;
+                $rawAmount = (float) ($verify['data']['amount'] ?? $verify['data']['depositedAmount'] ?? 2000);
+                $amountPaid = $rawAmount > 20000 ? round($rawAmount / 100, 2) : $rawAmount;
+            }
+        } catch (\Exception $e) {}
+
+        // 2. Fallback: Verify via Zainpay hanging card transaction reconcile endpoint
+        if (!$isVerified) {
+            try {
+                $cardReconcile = Http::timeout(30)->withToken($pubKey)
+                    ->get("{$baseUrl}/virtual-account/wallet/transaction/reconcile/card-payment", [
+                        'txnRef' => $txnRef,
+                    ])->json();
+
+                if (($cardReconcile['code'] ?? '') === '00' && in_array(strtolower($cardReconcile['data']['txnStatus'] ?? ''), ['success', 'successful'])) {
+                    $isVerified = true;
+                }
+            } catch (\Exception $e) {}
+        }
+
+        // 3. Fallback: Search in Zainbox Card Transactions list
+        if (!$isVerified && !empty($zainboxCode)) {
+            try {
+                $boxTxns = Http::timeout(30)->withToken($pubKey)
+                    ->get("{$baseUrl}/zainbox/card/transactions/{$zainboxCode}", [
+                        'txnRef' => $txnRef,
+                    ])->json();
+
+                if (($boxTxns['code'] ?? '') === '00' && !empty($boxTxns['data'])) {
+                    foreach ($boxTxns['data'] as $tx) {
+                        if (($tx['txnRef'] ?? '') === $txnRef && in_array(strtolower($tx['txnStatus'] ?? ''), ['success', 'successful'])) {
+                            $isVerified = true;
+                            break;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {}
+        }
+
+        if ($isVerified) {
+            $applicant->update([
+                'edit_fee_paid'      => true,
+                'edit_fee_amount'    => $amountPaid > 0 ? number_format($amountPaid, 2, '.', '') : '2000.00',
+                'edit_fee_reference' => $txnRef,
+                'edit_fee_paid_at'   => now(),
+            ]);
+
+            try {
+                Auth::guard('applicant')->login($applicant);
+                $request->session()->regenerate();
+            } catch (\Throwable) {}
+
+            return redirect()->route('admissions.edit', $applicant->id)
+                ->with('success', 'Modification fee payment of N2,000 has been verified! You can now edit any details on your application.');
+        }
+
+        return redirect()->route('admissions.edit', $applicant->id)
+            ->with('error', 'Modification fee payment not confirmed yet. Please complete payment or contact support if you were debited.');
+    }
+
+    /**
+     * Direct / Demo authorization for Application Modification Fee (NGN 2,000).
+     */
+    public function authorizeEditFeePayment(Applicant $applicant)
+    {
+        if (in_array($applicant->admission_status, ['admitted', 'cleared'])) {
+            return back()->with('error', 'Your admission screening has already been finalized and can no longer be modified.');
+        }
+
+        if ($applicant->edit_fee_paid) {
+            return redirect()->route('admissions.edit', $applicant->id)
+                ->with('info', 'Modification fee already authorized.');
+        }
+
+        $applicant->update([
+            'edit_fee_paid'      => true,
+            'edit_fee_amount'    => '2000.00',
+            'edit_fee_reference' => 'ACON_MOD_AUTH_' . strtoupper(Str::random(10)),
+            'edit_fee_paid_at'   => now(),
+        ]);
+
+        try {
+            Auth::guard('applicant')->login($applicant);
+            request()->session()->regenerate();
+        } catch (\Throwable) {}
+
+        return redirect()->route('admissions.edit', $applicant->id)
+            ->with('success', 'Application modification fee of N2,000 authorized! Edit form is now fully unlocked.');
+    }
+
+    /**
+     * Submit full application updates.
+     */
+    public function submitEditForm(Request $request, Applicant $applicant)
+    {
+        if (in_array($applicant->admission_status, ['admitted', 'cleared'])) {
+            return back()->with('error', 'Your admission screening has already been finalized and can no longer be modified.');
+        }
+
+        if (!$applicant->edit_fee_paid) {
+            return back()->with('error', 'You must pay the N2,000 application modification fee before saving changes.');
+        }
+
+        $validated = $request->validate([
+            // Personal Info
+            'full_name'              => 'required|string|max:255',
+            'dob'                    => 'required|date',
+            'place_of_birth'         => 'required|string|max:255',
+            'lga'                    => 'required|string|max:255',
+            'state_of_origin'        => 'required|string|max:255',
+            'nationality'            => 'required|string|max:255',
+            'email'                  => 'nullable|email|max:255',
+            'contact_address'        => 'required|string',
+            'phone_number'           => 'required|string|max:30',
+            'sex'                    => 'required|string|max:20',
+            'next_of_kin_name'       => 'required|string|max:255',
+            'next_of_kin_address'    => 'required|string',
+            'jamb_score'             => 'required|integer|min:100',
+            'jamb_number'            => 'required|string|max:40|unique:applicants,jamb_number,' . $applicant->id,
+            'physical_disabilities'  => 'nullable|string|max:255',
+            'highest_qualification'  => 'nullable|string|max:255',
+
+            // Program choice
+            'applied_program_id'     => 'nullable|exists:programs,id',
+
+            // Parents & Sponsors
+            'parent_name'            => 'required|string|max:255',
+            'parent_address'         => 'required|string',
+            'parent_phone'           => 'required|string|max:30',
+            'sponsor_name_address'   => 'required|string',
+
+            // Schools Attended
+            'primary_school_name'    => 'required|string|max:255',
+            'primary_school_from'    => 'required|string|max:20',
+            'primary_school_to'      => 'required|string|max:20',
+            'secondary_school_name'  => 'required|string|max:255',
+            'secondary_school_from'  => 'required|string|max:20',
+            'secondary_school_to'    => 'required|string|max:20',
+            'tertiary_school_name'   => 'nullable|string|max:255',
+            'tertiary_school_from'   => 'nullable|string|max:20',
+            'tertiary_school_to'     => 'nullable|string|max:20',
+
+            // O'Levels Sitting 1
+            'first_sitting_type'     => 'required|string|max:40',
+            'first_sitting_year'     => 'required|string|max:10',
+            'first_sitting_no'       => 'required|string|max:40',
+            'first_sitting_grades'   => 'required|array|min:1',
+
+            // O'Levels Sitting 2 (Optional)
+            'second_sitting_type'    => 'nullable|string|max:40',
+            'second_sitting_year'    => 'nullable|string|max:10',
+            'second_sitting_no'      => 'nullable|string|max:40',
+            'second_sitting_grades'  => 'nullable|array',
+        ]);
+
+        $validated['jamb_number'] = strtoupper($validated['jamb_number']);
+
+        // Update password if phone number changed
+        if ($applicant->phone_number !== $validated['phone_number']) {
+            $validated['password'] = Hash::make($validated['phone_number']);
+        }
+
+        // Consume the modification credit
+        $validated['edit_fee_paid'] = false;
+
+        $applicant->update($validated);
+
+        try {
+            Auth::guard('applicant')->login($applicant);
+            $request->session()->regenerate();
+        } catch (\Throwable) {}
+
+        return redirect()->route('admissions.dashboard')
+            ->with('success', 'Your application details have been successfully updated! All changes are now active.');
     }
 
     /**

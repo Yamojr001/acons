@@ -143,12 +143,20 @@ export default function Apply({ tenant, programs }: ApplyProps) {
             <span className="text-[9px] uppercase font-bold tracking-widest text-blue-600 block mt-0.5">Online Admissions</span>
           </div>
         </div>
-        <Link 
-          href={route('admissions.login')}
-          className="px-4 py-2 rounded-xl text-xs font-bold text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors"
-        >
-          Track Admission Process
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link 
+            href="/admissions/edit"
+            className="hidden sm:inline-flex px-3.5 py-1.5 rounded-xl text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors"
+          >
+            Edit Application (₦2,000)
+          </Link>
+          <Link 
+            href={route('admissions.login')}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors"
+          >
+            Track Admission Process
+          </Link>
+        </div>
       </nav>
 
       {/* ── Main Container ─────────────────────────────────────────────── */}

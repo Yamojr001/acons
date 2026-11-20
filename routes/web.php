@@ -53,6 +53,15 @@ Route::group([], function () {
     Route::get('/admissions/login',               [PublicApplicantController::class, 'showLoginForm'])->name('admissions.login');
     Route::post('/admissions/login',              [PublicApplicantController::class, 'login'])->name('admissions.login.submit');
 
+    // Application Data Modification / Edit Routes
+    Route::get('/admissions/edit',                         [PublicApplicantController::class, 'showEditLookupForm'])->name('admissions.edit.lookup');
+    Route::post('/admissions/edit/lookup',                  [PublicApplicantController::class, 'lookupForEdit'])->name('admissions.edit.lookup.submit');
+    Route::get('/admissions/edit/{applicant}',              [PublicApplicantController::class, 'showEditForm'])->name('admissions.edit');
+    Route::post('/admissions/edit/{applicant}',             [PublicApplicantController::class, 'submitEditForm'])->name('admissions.edit.submit');
+    Route::post('/admissions/edit/pay/{applicant}',         [PublicApplicantController::class, 'initEditFeePayment'])->name('admissions.edit.pay');
+    Route::match(['get', 'post'], '/admissions/edit/verify/{applicant}', [PublicApplicantController::class, 'verifyEditFeePayment'])->name('admissions.edit.verify');
+    Route::post('/admissions/edit/authorize/{applicant}',   [PublicApplicantController::class, 'authorizeEditFeePayment'])->name('admissions.edit.authorize');
+
     Route::middleware(['auth:applicant'])->group(function () {
         Route::get('/admissions/status',             [PublicApplicantController::class, 'dashboard'])->name('admissions.dashboard');
         Route::post('/admissions/logout',            [PublicApplicantController::class, 'logout'])->name('admissions.logout');

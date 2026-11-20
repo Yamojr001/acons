@@ -86,6 +86,10 @@ class Applicant extends Authenticatable
         'acceptance_fee_reference',
         'acceptance_fee_paid_at',
         'registration_number',
+        'edit_fee_paid',
+        'edit_fee_amount',
+        'edit_fee_reference',
+        'edit_fee_paid_at',
     ];
 
     protected $appends = [
@@ -109,6 +113,9 @@ class Applicant extends Authenticatable
         'acceptance_fee_paid' => 'boolean',
         'acceptance_fee_amount' => 'decimal:2',
         'acceptance_fee_paid_at' => 'datetime',
+        'edit_fee_paid' => 'boolean',
+        'edit_fee_amount' => 'decimal:2',
+        'edit_fee_paid_at' => 'datetime',
         'data' => 'array',
     ];
 
